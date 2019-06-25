@@ -1,0 +1,61 @@
+/*
+ * Copyright (c) ProsiebenSat1. Digital GmbH 2019.
+ */
+
+apply plugin: 'findbugs'
+
+// Run findBugs + lint with gradle task check
+check.dependsOn 'lint'
+
+// Treat all warnings as errors
+tasks.withType(JavaCompile).all {
+    options.compilerArgs << "-Xlint:all"
+}
+
+// Find bugs task
+android.libraryVariants.all { variant ->
+    def taskName = "findbugs${variant.name.capitalize()}"
+
+    task(taskName, type: FindBugs, dependsOn: "assemble") {
+        // Description
+        description = 'Find bugs'
+        group = 'verification'
+
+        // Aborting
+        ignoreFailures = false
+        effort = 'max'
+
+        // Use module sources + classes directories
+        classes = files("$project.buildDir/intermediates/classes/${variant.dirName}")
+        source = variant.javaCompileProvider.get().source
+        classpath = variant.javaCompileProvider.get().classpath
+
+        // Exclude Android stuff
+        excludeFilter = new File("${project.rootDir}/scripts/quality/rules/findbugs-rules.xml")
+
+        // Report HTML
+        reports {
+            xml.enabled = false
+            html.enabled = true
+            html {
+                destination file("${project.buildDir}/reports/findbugs/findbugs-${variant.name}-report.html")
+            }
+        }
+    }
+}
+
+// Lint settings
+android {
+    lintOptions {
+        // Aborting
+        abortOnError false
+
+        // Ignore custom lint warnings
+        lintConfig file("${project.rootDir}/scripts/quality/rules/lint-rules.xml")
+
+        // Report HTML
+        xmlReport  false
+        htmlReport true
+        htmlOutput file("${project.rootDir}/build/reports/lint/lint-report.html")
+    }
+}

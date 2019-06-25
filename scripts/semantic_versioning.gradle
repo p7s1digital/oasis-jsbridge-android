@@ -1,0 +1,35 @@
+/*
+ * Copyright (c) ProsiebenSat1. Digital GmbH 2019.
+ */
+
+android {
+    defaultConfig {
+        versionCode getSemanticVersionCode()
+        versionName getSemanticVersion()
+        version = getSemanticVersion()
+    }
+}
+
+def getSemanticVersionCode() {
+    int[] params = getVersionParams()
+    return params[2] + params[1] * 1000 + params[0] * 1000000
+}
+
+def getVersionFile() {
+    File versionFile = new File("${rootDir}/version");
+    return versionFile;
+}
+
+def getSemanticVersion() {
+    return getVersionFile().text;
+}
+
+def getVersionParams() {
+    String strippedVersion = getSemanticVersion().replaceAll("-.*", "")
+    println("strippedVersion = ${strippedVersion}")
+    return strippedVersion.split("\\.")*.toInteger()
+}
+
+ext {
+    getSemanticVersion = this.&getSemanticVersion
+}

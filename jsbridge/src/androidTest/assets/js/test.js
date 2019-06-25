@@ -1,0 +1,1 @@
+nativeFunctionMock("localFileString");

@@ -1,0 +1,29 @@
+# Build folder
+build
+captures
+semanticVersion
+.externalNativeBuild
+
+# JS
+node_modules
+oasisplayer/src/main/assets/js
+
+# Maven artifact
+maven
+
+# Android Studio local
+local.properties
+.gradle
+*.iml
+.idea/
+#.idea/workspace.xml
+#.idea/libraries
+#.idea/misc.xml
+#.idea/dictionaries
+#.idea/copyright
+
+# MacOS
+.DS_Store
+
+# generated javadoc
+javadoc

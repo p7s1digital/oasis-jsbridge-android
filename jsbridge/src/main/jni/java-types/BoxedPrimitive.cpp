@@ -1,0 +1,98 @@
+/*
+ * Copyright (C) 2019 ProSiebenSat1.Digital GmbH.
+ *
+ * Originally based on Duktape Android:
+ * Copyright (C) 2015 Square, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+#include "BoxedPrimitive.h"
+
+#include "Primitive.h"
+
+#if defined(DUKTAPE)
+# include "JsBridgeContext.h"
+# include "StackUnwinder.h"
+#elif defined(QUICKJS)
+# include "JsBridgeContext.h"
+#endif
+
+namespace JavaTypes {
+
+BoxedPrimitive::BoxedPrimitive(const JsBridgeContext *jsBridgeContext, const Primitive &primitive)
+  : JavaType(jsBridgeContext, primitive.boxedClass())
+  , m_primitive(primitive)
+  , m_unbox(m_jniContext->getMethodID(primitive.boxedClass(), primitive.getUnboxMethodName(), primitive.getUnboxSignature()))
+  , m_box(m_jniContext->getStaticMethodID(primitive.boxedClass(), primitive.getBoxMethodName(), primitive.getBoxSignature())) {
+}
+
+#if defined(DUKTAPE)
+
+JValue BoxedPrimitive::pop(bool inScript, const AdditionalData *) const {
+  if (duk_is_null_or_undefined(m_ctx, -1)) {
+    duk_pop(m_ctx);
+    return JValue();
+  }
+
+  JValue primitiveValue = m_primitive.pop(inScript, nullptr);
+  JniLocalRef<jobject> localRef = m_jniContext->callStaticObjectMethodA(
+      m_primitive.boxedClass(), m_box, std::vector<JValue> { primitiveValue });
+  m_jsBridgeContext->checkRethrowJsError();
+  return JValue(localRef);
+}
+
+duk_ret_t BoxedPrimitive::push(const JValue &value, bool inScript, const AdditionalData *) const {
+  const JniLocalRef<jobject> &jObject = value.getLocalRef();
+  if (jObject.isNull()) {
+    duk_push_null(m_ctx);
+    return 1;
+  }
+
+  JValue unboxedValue = m_primitive.callMethod(m_unbox, jObject, std::vector<JValue>());  // TODO: check it!
+  m_jsBridgeContext->checkRethrowJsError();
+  return m_primitive.push(unboxedValue, inScript, nullptr /*TODO?*/);
+}
+
+#elif defined(QUICKJS)
+
+JValue BoxedPrimitive::toJava(JSValueConst v, bool inScript, const AdditionalData *) const {
+  if (JS_IsNull(v) || JS_IsUndefined(v)) {
+    return JValue();
+  }
+
+  JValue primitiveValue = m_primitive.toJava(v, inScript, nullptr);
+  JniLocalRef<jobject> localRef = m_jniContext->callStaticObjectMethodA(
+      m_primitive.boxedClass(), m_box, std::vector<JValue> { primitiveValue });
+  m_jsBridgeContext->checkRethrowJsError();
+  return JValue(localRef);
+}
+
+JSValue BoxedPrimitive::fromJava(const JValue &value, bool inScript, const AdditionalData *) const {
+  const JniLocalRef<jobject> &jObject = value.getLocalRef();
+  if (jObject.isNull()) {
+    return JS_NULL;
+  }
+
+  JValue unboxedValue = m_primitive.callMethod(m_unbox, jObject, std::vector<JValue>());  // TODO: check it!
+  m_jsBridgeContext->checkRethrowJsError();
+  return m_primitive.fromJava(unboxedValue, inScript, nullptr /*TODO?*/);
+}
+
+#endif
+
+bool BoxedPrimitive::isInteger() const {
+  return m_primitive.isInteger();
+}
+
+}  // namespace JavaTypes
+

@@ -1,0 +1,23 @@
+stages:
+  - build
+
+build_and_deploy:
+  stage: build
+
+  before_script:
+
+  script:
+    - ./scripts/build-ci.sh
+
+# Gitlab CI does not support "build on PR" (https://gitlab.com/gitlab-org/gitlab-ce/issues/23902).
+# It means we can't use "only" branch filter.
+# However, we want to avoid building master and tag at the same time, hence we use "except".
+  except:
+    - master
+
+  variables:
+  # all secret vars (PROD_S3_ACCESS_KEY etc.) are stored in <repo>/settings/ci_cd/Secret variables or CI_machine's ~/.profile
+
+  artifacts:
+    paths:
+      - jsbridge/build/outputs/aar/jsbridge-*.aar

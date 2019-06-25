@@ -1,0 +1,131 @@
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+apply from: "${rootDir}/scripts/javadoc.gradle"
+apply from: "${rootDir}/scripts/quality.gradle"
+apply from: "${rootDir}/scripts/publishing.gradle"
+apply from: "${rootDir}/scripts/semantic_versioning.gradle"
+
+group = 'de.prosiebensat1digital'
+
+android {
+    compileSdkVersion rootProject.ext.versions.compile_sdk
+
+    defaultConfig {
+        targetSdkVersion rootProject.ext.versions.target_sdk
+        minSdkVersion rootProject.ext.versions.min_sdk
+
+        // export proguard rules
+        consumerProguardFiles  '../proguard-rules.pro'
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+        }
+
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility 1.8
+        targetCompatibility 1.8
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    sourceSets {
+        main {
+            assets.srcDirs += ['src/main/assets']
+            java.srcDirs += ['src/main/kotlin']
+            test.java.srcDirs += ['src/test/kotlin']
+            androidTest.java.srcDirs += ['src/androidTest/kotlin']
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "CMakeLists.txt"
+        }
+    }
+
+    flavorDimensions "jsInterpreter"
+
+    productFlavors {
+        duktape {
+            dimension "jsInterpreter"
+
+            def serverPort=9092
+            def jniLibName="duktape-jni-lib"
+
+            buildConfigField "String", "JNI_LIB_NAME", "\"$jniLibName\""
+            buildConfigField "Boolean", "HAS_BUILTIN_PROMISE", "false"
+            buildConfigField "Integer", "DUKTAPE_DEBUGGER_SERVER_PORT", "$serverPort"
+
+            externalNativeBuild {
+                cmake {
+                    arguments "-DFLAVOR=DUKTAPE", "-DJNI_LIB_NAME=$jniLibName", "-DDEBUGGER_SERVER_PORT=$serverPort"  // , "-DCMAKE_BUILD_TYPE=Release"
+                }
+            }
+        }
+
+        quickjs {
+            dimension "jsInterpreter"
+
+            def serverPort=0
+            def jniLibName="quickjs-jni-lib"
+
+            buildConfigField "String", "JNI_LIB_NAME", "\"$jniLibName\""
+            buildConfigField "Boolean", "HAS_BUILTIN_PROMISE", "true"
+            buildConfigField "Integer", "DUKTAPE_DEBUGGER_SERVER_PORT", "$serverPort"
+
+            externalNativeBuild {
+                cmake {
+                    arguments "-DFLAVOR=QUICKJS", "-DJNI_LIB_NAME=$jniLibName"  // , "-DCMAKE_BUILD_TYPE=Release"
+                }
+            }
+        }
+    }
+}
+
+// Temporary workaround for mockk (see https://github.com/mockk/mockk/issues/281)
+configurations.all {
+    resolutionStrategy {
+        force("org.objenesis:objenesis:2.6")
+    }
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
+    kotlinOptions.freeCompilerArgs += ["-Xuse-experimental=kotlin.Experimental"]
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:$versions.kotlin.kotlin"
+    implementation "org.jetbrains.kotlin:kotlin-reflect:$versions.kotlin.kotlin"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$versions.kotlin.coroutines"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:$versions.kotlin.coroutines"
+
+    implementation 'com.jakewharton.timber:timber:4.7.1'
+    implementation 'com.jaredrummler:android-device-names:1.1.7'
+    implementation 'com.squareup.okhttp3:okhttp:3.11.0'  // Note: support for Android 4 removed in okhttp 3.13!
+
+    testImplementation 'junit:junit:4.12'
+    androidTestImplementation 'junit:junit:4.12'
+
+    testImplementation "org.jetbrains.kotlin:kotlin-test:$versions.kotlin.kotlin"
+    testImplementation "io.mockk:mockk:$versions.mockk"
+
+    androidTestImplementation "androidx.test:core:1.2.0"
+    androidTestImplementation "androidx.test:runner:$versions.androidx.test"
+    androidTestImplementation "org.jetbrains.kotlin:kotlin-test:$versions.kotlin.kotlin"
+    androidTestImplementation "io.mockk:mockk-android:$versions.mockk"
+}

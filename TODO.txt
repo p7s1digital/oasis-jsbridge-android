@@ -1,0 +1,42 @@
+Features:
+- JS Api with suspending functions
+- varargs
+- unit test for all kinds of exceptions
+- QuickJS: ensure that all instances (and especially JniGlobalRef's) are destroyed
+on JsBridge.release()
+
+Performance:
+- Long-based JsValue (*)
+- cache all method IDs
+
+Refactoring:
+- Replace ArgumentLoader + JavaTypeMap into a new JavaTypeProvider (**)
+- do not hard-code kotlin.Unit, Function, de.prosiebensat1digital.oasisjsbridge.JsBridge, ...
+
+
+(*) Long-based JsValue
+----------------------
+
+While convenient to use, using String to identify a JsValue is inefficient because:
+- it needs to be transfered/converted from/to JNI 
+- it must be mapped from a string to its actually value
+
+Using a jlong would improve those cases and might also be used to directly map QuickJS JSValue.
+
+
+(**) Replace ArgumentLoader + JavaTypeMap into a new JavaTypeProvider
+---------------------------------------------------------------------
+
+A static map was historically used (since Duktape Android) to create and store all existing
+JavaType instances once.
+
+Now that we have more dynamic functionalities and support generic arguments (e.g. for Array,
+Deferred and FunctionX), some functionalities have been "glued" to the existing implementations
+via ArgumentLoader and AdditionalData. This implementation is inconvenient to use and is hardly
+readable/maintainable.
+
+A better approach would be to get read of ArgumentLoader and JavaTypeMap and use a
+"JavaTypeProvider" instead which creates (value-based) JavaType instances on demand (those
+instances are "cheap"). The mapping from JVM type to C++ JavaType could also use a custom enum
+in the "Parameter" class (Kotlin) to avoid using type signature (a string...) for lookups.
+
