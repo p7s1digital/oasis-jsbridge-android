@@ -1,22 +1,43 @@
-Oasis JS Bridge
+🏝 Oasis JsBridge
 ===============
 
-Seamless integration of JavaScript code in Android Java/Kotlin projects, powered by:
+Evaluate JavaScript code and map values, objects and functions between Kotlin/Java and JavaScript on Android.  
+
+Powered by:
 - [Duktape][duktape] or
 - [QuickJS][quickjs]
 
 
+## Features
+
+Based on [Duktape Android][duktape-android] we added:
+ * advanced type inference (generics, reified type parameters)
+ * support for non-blocking API, suspending functions (coroutines)
+ * higher order functions (lambdas, callback functions)
+ * two-way support for JS promises (mapped to Kotlin via Deferred or suspending functions)
+ * JsValue class to reference JS objects from Kotlin/Java
+ * JsonObjectWrapper for object serialization
+ * polyfills for some JS runtime features (e.g. setTimeout, XmlHttpRequest, console)
+
+
 ## Usage
+  
+1. [Evaluate JS code](#1-evaluating-js-code)
+1. [Reference any JS value](#2-jsvalue)
+1. [Map JS functions to Kotlin](#3-calling-js-functions-from-kotlin)
+1. [Map Kotlin functions to JS](#4-calling-kotlin-functions-from-js)
+1. [Map JS objects to Java/Kotlin](#5-using-js-objects-from-javakotlin)
+1. [Map Kotlin/Java objects to JS](#6-using-javakotlin-objects-from-js)
 
 Minimal hello world:
 ```kotlin
 val jsBridge = JsBridge(application.context)
 jsBridge.start()
-
 jsBridge.evaluateNoRetVal("console.log('Hello world!');")
+jsBridge.release()
 ```
 
-Advanced hello world (with JS <-> Kotlin function mapping and Promise):
+Hello world with JS <-> Kotlin function mapping and Promise:
 ```kotlin
 val jsBridge = JsBridge(application.context)
 jsBridge.start()
@@ -47,49 +68,6 @@ runBlocking {
 
 jsBridge.release()
 ``` 
-
-
-## Features
-
- 1. [Evaluate JS code](#evaluating-js-code)
- 2. [Reference any JS value](#jsvalue)
- 3. [Map JS functions to Kotlin](#3-calling-js-functions-from-kotlin)
- 4. [Map Kotlin functions to JS](#4-calling-kotlin-functions-from-js)
- 5. [Map JS objects to Java/Kotlin](#5-using-js-objects-from-javakotlin)
- 6. [Map Kotlin/Java objects to JS](#6-using-javakotlin-objects-from-js)
-
-This project was initially based on the great [Duktape Android][duktape-android] project from
-Square and has been refactored i.a. to take advantage of Kotlin features:
- * non-blocking API
- * advanced type inference, including generics (via reified type parameters)
- * support for suspending functions (coroutines)
- * higher order functions (lambdas), e.g.: callback parameters, proxy functions
- * support for JS promises (mapped to Kotlin via Deferred or suspending functions)
- * JsValue class to reference JS objects from Kotlin/Java
- * JsonObjectWrapper for easy object serialization
- * JS extensions (e.g. setTimeout, XmlHttpRequest, console)
- * integration of Duktape debugger
-
-
-Supported types:
-
-| Kotlin             | Java                | JS        | Note
-| ------------------ | ------------------- | --------- | ---
-| `Boolean`          | `boolean`, `Boolean`| `number`  |
-| `Int`              | `int`, `Integer`    | `number`  |
-| `Float`            | `float`, `Float`    | `number`  |
-| `Double`           | `double`, `Double`  | `number`  |
-| `String`           | `String`            | `string`  |
-| `BooleanArray`     | `boolean[]`         | `Array`   |
-| `IntArray`         | `int[]`             | `Array`   |
-| `FloatArray`       | `float[]`           | `Array`   |
-| `DoubleArray`      | `double[]`          | `Array`   |
-| `Array<T: Any>`    | `T[]`               | `Array`   | where T is a supported type
-| `Function<R>`      | n.a.                | `function`| lambda whose parameters and return value are supported types
-| `Deferred<T>`      | n.a.                | `Promise` | where T is a supported type
-| `JsonObjectWrapper`| `JsonObjectWrapper` | `object`  | custom class to transparently serialize JS objects via JSON, see below
-| `JsValue`          | `JsValue`           | any       | custom class to reference any existing JS value, see below
-
 
 ### 1. Evaluating JS code
 
@@ -123,7 +101,7 @@ A JsValue is a reference to any JS value.
 
 #### 2.1 Creating a JsValue
 
-With inital value (JS code):<br/>
+With initial value (JS code):<br/>
 ```kotlin
 val jsValue = JsValue(jsBridge, "'hello'.toUpperCase()")
 ```
@@ -276,10 +254,36 @@ manage the execution context (e.g.: going to the main thread when calling
 UI methods)
 
 
+## Supported types
+
+| Kotlin             | Java                | JS        | Note
+| ------------------ | ------------------- | --------- | ---
+| `Boolean`          | `boolean`, `Boolean`| `number`  |
+| `Int`              | `int`, `Integer`    | `number`  |
+| `Float`            | `float`, `Float`    | `number`  |
+| `Double`           | `double`, `Double`  | `number`  |
+| `String`           | `String`            | `string`  |
+| `BooleanArray`     | `boolean[]`         | `Array`   |
+| `IntArray`         | `int[]`             | `Array`   |
+| `FloatArray`       | `float[]`           | `Array`   |
+| `DoubleArray`      | `double[]`          | `Array`   |
+| `Array<T: Any>`    | `T[]`               | `Array`   | T must be a supported type
+| `Function<R>`      | n.a.                | `function`| lambda with supported types
+| `Deferred<T>`      | n.a.                | `Promise` | T must be a supported type
+| `JsonObjectWrapper`| `JsonObjectWrapper` | `object`  | serializes JS objects via JSON
+| `JsValue`          | `JsValue`           | any       | reference any JS value
+
+
+## TODO:
+* publish to maven central
+* code samples
+
+
 ## License
 
 ```
-Copyright (C) 2019 ProSiebenSat1.Digital GmbH.
+Copyright (C) 2018-2019 ProSiebenSat1.Digital GmbH
+🏝 Oasis Player team
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -295,17 +299,17 @@ limitations under the License.
 ```
 
 
-Originally based on Duktape Android (Apache license, version 2.0)<br/>
+Originally based on [Duktape Android][duktape-android] (Apache license, version 2.0)<br/>
 `Copyright (C) 2015 Square, Inc.`
 
-Includes C code from Duktape (MIT license)<br/>
+Includes C code from [Duktape][duktape] (MIT license)<br/>
 `Copyright (c) 2013-2019 by Duktape authors`
 
-Includes C code from QuickJS (MIT license)<br/>
+Includes C code from [QuickJS][quickjs] (MIT license)<br/>
 `Copyright (c) 2017-2019 Fabrice Bellard`<br/>
 `Copyright (c) 2017-2019 Charlie Gordon`
 
 
+ [duktape-android]: https://github.com/square/duktape-android/
  [duktape]: http://duktape.org/
  [quickjs]: https://bellard.org/quickjs/
- [duktape-android]: https://github.com/square/duktape-android/commits?author=JakeWharton
