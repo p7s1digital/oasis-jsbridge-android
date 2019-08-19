@@ -26,9 +26,7 @@
 #include <vector>
 
 #ifdef QUICKJS
-extern "C" {
 # include "quickjs/quickjs.h"
-}
 #endif
 
 class ArgumentLoader;

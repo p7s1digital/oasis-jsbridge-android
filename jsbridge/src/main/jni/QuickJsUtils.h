@@ -18,11 +18,8 @@
 
 #include "jni-helpers/JniGlobalRef.h"
 #include "jni-helpers/JStringLocalRef.h"
+#include "quickjs/quickjs.h"
 #include <functional>
-
-extern "C" {
-# include "quickjs/quickjs.h"
-}
 
 static const char *CPP_OBJECT_MAP_PROP_NAME = "__cpp_object_map";
 

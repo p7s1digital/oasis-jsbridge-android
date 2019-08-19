@@ -30,9 +30,7 @@
 # include "JavaScriptObjectMapper.h"
 # include "duktape/duktape.h"
 #else
-extern "C" {
 # include "quickjs/quickjs.h"
-}
 #endif
 
 class JavaType;

@@ -26,9 +26,7 @@
 #if defined(DUKTAPE)
 # include "duktape/duktape.h"
 #elif defined(QUICKJS)
-extern "C" {
 # include "quickjs/quickjs.h"
-}
 #endif
 
 class JavaTypeMap;

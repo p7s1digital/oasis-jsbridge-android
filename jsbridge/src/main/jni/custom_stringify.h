@@ -24,9 +24,7 @@ duk_int_t custom_stringify(duk_context *, duk_idx_t);
 
 #elif defined(QUICKJS)
 
-extern "C" {
 # include "quickjs/quickjs.h"
-}
 
 JSValue custom_stringify(JSContext *, JSValueConst);
 
