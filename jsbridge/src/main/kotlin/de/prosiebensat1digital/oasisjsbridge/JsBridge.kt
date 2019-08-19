@@ -288,7 +288,7 @@ class JsBridge(context: Context): CoroutineScope {
     // Notes:
     // - runs in the JS thread and block the caller thread until the result has been evaluated!
     // - from Kotlin, it is recommended to use the method with generic parameter, instead!
-    fun evaluate(js: String, javaClass: Class<*>?): Any? {
+    fun evaluateBlocking(js: String, javaClass: Class<*>?): Any? {
         return runBlocking {
             if (isMainThread()) {
                 Timber.w("WARNING: evaluating JS code in the main thread! Consider using non-blocking API or evaluating JS code in another thread!")
@@ -351,7 +351,7 @@ class JsBridge(context: Context): CoroutineScope {
     }
 
     // Evaluate the given JS value and return the result as a deferred
-    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
     suspend fun <T: Any?> evaluateJsValue(jsValue: JsValue, type: KType?, awaitJsPromise: Boolean): T {
         jsValue.codeEvaluationDeferred?.await()
         return evaluate("$jsValue", type, awaitJsPromise)

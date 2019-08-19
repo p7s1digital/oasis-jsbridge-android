@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.reflect.typeOf
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
-import kotlin.reflect.KClass
+import kotlin.reflect.full.createType
 
 // A simple wrapper around a JS value stored as a global JS variable and deleted
 // when the Java object is finalized.
@@ -231,6 +231,18 @@ internal constructor(
 
         return runBlocking(context) {
             jsBridge.evaluateJsValue<T>(this@JsValue, typeOf<T>(), true)
+        }
+    }
+
+    // Notes:
+    // - runs in the JS thread and block the caller thread until the result has been evaluated!
+    // - from Kotlin, it is recommended to use the method with generic parameter, instead!
+    fun evaluateBlocking(javaClass: Class<*>?): Any? {
+        val jsBridge = jsBridge
+                ?: throw JsValueEvaluationError(associatedJsName, customMessage = "Cannot evaluate JS value because the JS interpreter has been destroyed")
+
+        return runBlocking {
+            jsBridge.evaluateJsValue<Any?>(this@JsValue, javaClass?.kotlin?.createType(), false)
         }
     }
 

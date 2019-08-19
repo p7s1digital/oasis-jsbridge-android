@@ -20,7 +20,7 @@ import org.junit.After;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
-// Minimal test for using the JsBridge from Java
+// Minimal test for using JsBridge from Java
 public final class JsBridgeJavaTest {
     private JsBridge jsBridge;
 
@@ -47,9 +47,9 @@ public final class JsBridgeJavaTest {
         String js = "1.5 + 2";
 
         // WHEN
-        Double sumDouble = (Double) subject.evaluate(js, null);
-        Integer sumInt = (Integer) subject.evaluate(js, Integer.class);
-        String sumString = (String) subject.evaluate("\"" + js + "\"", null);
+        Double sumDouble = (Double) subject.evaluateBlocking(js, null);
+        Integer sumInt = (Integer) subject.evaluateBlocking(js, Integer.class);
+        String sumString = (String) subject.evaluateBlocking("\"" + js + "\"", null);
 
         // THEN
         assertEquals(sumDouble, new Double(3.5));
@@ -73,10 +73,10 @@ public final class JsBridgeJavaTest {
         };
 
         // WHEN
-        JsValue nativeApiJsValue = JsValue.fromNativeObject(jsBridge, nativeApi, NativeApi.class);
+        JsValue nativeApiJsValue = JsValue.fromNativeObject(subject, nativeApi, NativeApi.class);
 
         // THEN
-        Integer sum = (Integer) jsBridge.evaluate(
+        Integer sum = (Integer) subject.evaluateBlocking(
                 "var nativeApi = " + nativeApiJsValue + ";\n" +
                     "nativeApi.calcSum(2, 3);\n",
                 Integer.class
