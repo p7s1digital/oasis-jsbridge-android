@@ -56,8 +56,6 @@
 
       const JniLocalRefStats *localRefStats = m_jniContext->getLocalRefStats();
       //alog("END OF JNI SCOPE, LOCAL REF COUNT: %d, MAX: %d", localRefStats->currentCount(), localRefStats->maxCount());
-
-      m_jniContext->m_jniEnv = nullptr;
     }
 
     JsBridgeContext *getJsBridgeContext() const { return m_jsBridgeContext; }

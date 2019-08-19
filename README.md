@@ -92,7 +92,7 @@ CoroutineScope.launch {
 
 From Java (blocking):
 ```java
-Integer sum = (Integer) jsBridge.evaluateBlocking("1 + 2", Integer.class);
+Integer sum = (Integer) jsBridge.evaluateBlocking("1+2", Integer.class);
 ```
 
 
@@ -146,6 +146,8 @@ there is no existing reference to the JsValue instance in the JVM!
 A JS value can be evaluated via:
 - `JsValue.evaluate<T>()`
 - `JsValue.evaluateAsync<T>()`
+- `JsValue.evaluateBlocking<T>()`
+- `JsValue.evaluateBlocking(Class<*> javaClass)`  // from Java
 
 A JS function can be [mapped to a Kotlin proxy function](#using-js-functions-from-native) via `JsValue.mapToNativeObject()`.
 A JS object can be [mapped to a Java/Kotlin proxy object](#using-js-objects-from-native) via `JsValue.mapToNativeObject()`.

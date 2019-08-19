@@ -35,7 +35,7 @@ Deferred and FunctionX), some functionalities have been "glued" to the existing 
 via ArgumentLoader and AdditionalData. This implementation is inconvenient to use and is hardly
 readable/maintainable.
 
-A better approach would be to get read of ArgumentLoader and JavaTypeMap and use a
+A better approach would be to get rid of ArgumentLoader and JavaTypeMap and use a
 "JavaTypeProvider" instead which creates (value-based) JavaType instances on demand (those
 instances are "cheap"). The mapping from JVM type to C++ JavaType could also use a custom enum
 in the "Parameter" class (Kotlin) to avoid using type signature (a string...) for lookups.

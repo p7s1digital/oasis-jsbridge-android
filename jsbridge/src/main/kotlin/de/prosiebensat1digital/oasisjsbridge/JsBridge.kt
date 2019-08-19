@@ -46,7 +46,7 @@ import timber.log.Timber
 import kotlin.reflect.full.createType
 
 
-// Execute JS code via Duktape and handle the bi-directional communication between native
+// Execute JS code via Duktape or QuickJS and handle the bi-directional communication between native
 // and JS code via interface registration.
 //
 // All the given types are transfered and converted between Native and JS via reflection.
@@ -792,7 +792,7 @@ class JsBridge(context: Context): CoroutineScope {
         val jsFunctionObject = JsValue(this, null, associatedJsName = globalObjectName)
 
         return method.asFunctionWithArgArray { args ->
-            launch {
+            runInJsThread {
                 try {
                     val jniJsContext = jniJsContextOrThrow()
                     jniCallJsLambda(jniJsContext, jsFunctionObject.associatedJsName, args, false)
