@@ -650,7 +650,7 @@ JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
     std::string stack = duk_safe_to_string(m_context, -1);
 
     std::size_t firstEndOfLine = stack.find('\n');
-    std::string strFirstLine = firstEndOfLine == std::string::npos || firstEndOfLine == 0 ? stack : stack.substr(0, firstEndOfLine - 1);
+    std::string strFirstLine = firstEndOfLine == std::string::npos ? stack : stack.substr(0, firstEndOfLine);
     std::string strJsStacktrace = firstEndOfLine == std::string::npos ? "" : stack.substr(firstEndOfLine, std::string::npos);
 
     // Is there an exception thrown from a Java method?
