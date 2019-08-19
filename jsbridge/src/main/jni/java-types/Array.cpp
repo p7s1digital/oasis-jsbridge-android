@@ -56,7 +56,7 @@ JavaType::AdditionalData *Array::createAdditionalPopData(const JniRef<jsBridgePa
   jmethodID getGenericJavaClass = m_jniContext->getMethodID(parameterClass, "getJava", "()Ljava/lang/Class;");
   JniLocalRef<jclass> genericJavaClass = m_jniContext->callObjectMethod<jclass>(genericParameter, getGenericJavaClass);
 
-  data->genericArgumentType = m_jsBridgeContext->getJavaTypes().get(m_jsBridgeContext, genericJavaClass);
+  data->genericArgumentType = m_jsBridgeContext->getJavaTypes().get(m_jsBridgeContext, genericJavaClass, true /*boxed*/);
   data->genericArgumentParameter = JniGlobalRef<jsBridgeParameter>(genericParameter);
   return data;
 }

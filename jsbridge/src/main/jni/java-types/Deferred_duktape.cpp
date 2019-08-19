@@ -32,6 +32,8 @@ namespace {
 
   extern "C" {
     duk_ret_t onPromiseFulfilled(duk_context *ctx) {
+      alog("Deferred::onPromiseFulfilled1()");
+
       JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
       assert(jsBridgeContext != nullptr);
 
@@ -51,10 +53,13 @@ namespace {
       // Pop promise value
       JValue value = payload->argumentLoader.pop();
 
+      alog("Deferred::onPromiseFulfilled2()");
+
       // Complete the native Deferred
       jniContext->callJsBridgeVoidMethod("resolveDeferred",
                                          "(Lkotlinx/coroutines/CompletableDeferred;Ljava/lang/Object;)V",
                                          payload->javaDeferred, value);
+      alog("Deferred::onPromiseFulfilled3()");
       return 0;
     }
 
@@ -151,7 +156,7 @@ JavaType::AdditionalData *Deferred::createAdditionalPopData(const JniRef<jsBridg
   jmethodID getGenericJavaClass = m_jniContext->getMethodID(parameterClass, "getJava", "()Ljava/lang/Class;");
   JniLocalRef<jclass> genericJavaClass = m_jniContext->callObjectMethod<jclass>(genericParameter, getGenericJavaClass);
 
-  data->genericArgumentType = m_jsBridgeContext->getJavaTypes().get(m_jsBridgeContext, genericJavaClass);
+  data->genericArgumentType = m_jsBridgeContext->getJavaTypes().get(m_jsBridgeContext, genericJavaClass, true /*boxed*/);
   data->genericArgumentParameter = JniGlobalRef<jsBridgeParameter>(genericParameter);
   return data;
 }
@@ -165,12 +170,15 @@ JValue Deferred::pop(bool inScript, const AdditionalData *additionalData) const 
 }
 
 JValue Deferred::pop(bool inScript, const JavaType *genericArgumentType, const JniRef<jsBridgeParameter> &genericArgumentParameter) const {
+  alog("Deferred::pop1()");
+
   // Create a native Deferred instance
   JniLocalRef<jobject> javaDeferred =
       m_jniContext->callJsBridgeObjectMethod("createCompletableDeferred", "()Lkotlinx/coroutines/CompletableDeferred;");
   m_jsBridgeContext->checkRethrowJsError();
 
   if (!duk_is_object(m_ctx, -1) || !duk_has_prop_string(m_ctx, -1, "then")) {
+    alog("Deferred::pop2()");
     // Not a Promise => directly resolve the native Deferred with the value
     ArgumentLoader argumentLoader(genericArgumentType, genericArgumentParameter, inScript);
     JValue value = argumentLoader.pop();
@@ -186,13 +194,15 @@ JValue Deferred::pop(bool inScript, const JavaType *genericArgumentType, const J
   const duk_idx_t onPromiseFulfilledIdx = duk_push_c_function(m_ctx, onPromiseFulfilled, 1);
   const duk_idx_t onPromiseRejectedIdx = duk_push_c_function(m_ctx, onPromiseRejected, 1);
 
+  alog("Deferred::pop3()");
+
   // Call JsPromise.then(onPromiseFulfilled, onPromiseRejected)
   duk_push_string(m_ctx, "then");
   duk_dup(m_ctx, onPromiseFulfilledIdx);
   duk_dup(m_ctx, onPromiseRejectedIdx);
   if (duk_pcall_prop(m_ctx, jsPromiseObjectIdx, 2) != DUK_EXEC_SUCCESS) {
     const char *errStr = duk_to_string(m_ctx, -1);
-    alog("Error while calling JSPromise.then()");
+    alog("Error while calling JSPromise.then(): %s", errStr);
     JniLocalRef<jthrowable> javaException = m_jsBridgeContext->getJavaExceptionForJsError();
     m_jniContext->callJsBridgeVoidMethod("rejectDeferred",
                                          "(Lkotlinx/coroutines/CompletableDeferred;Ljava/lang/Object;)V",

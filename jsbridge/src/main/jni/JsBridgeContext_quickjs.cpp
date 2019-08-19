@@ -151,7 +151,7 @@ JValue JsBridgeContext::evaluateString(const std::string &strCode, const JniLoca
   jmethodID getParameterClass = jniContext()->getMethodID(jsBridgeParameterClass, "getJava", "()Ljava/lang/Class;");
   JniLocalRef<jclass> returnClass = jniContext()->callObjectMethod<jclass>(returnParameter, getParameterClass);
 
-  const JavaType *returnType = m_javaTypes.getBoxed(this, returnClass);
+  const JavaType *returnType = m_javaTypes.get(this, returnClass, true /*boxed*/);
 
   ArgumentLoader argumentLoader(returnType, returnParameter, false);
 

@@ -44,7 +44,7 @@ JavaScriptMethod::JavaScriptMethod(const JsBridgeContext *jsBridgeContext, const
     jmethodID getReturnParameter = jniContext->getMethodID(jsBridgeMethodClass, "getReturnParameter", "()Lde/prosiebensat1digital/oasisjsbridge/Parameter;");
     JniLocalRef<jsBridgeParameter> returnParameter = jniContext->callObjectMethod<jsBridgeParameter>(method, getReturnParameter);
     JniLocalRef<jclass> returnClass = jniContext->callObjectMethod<jclass>(returnParameter, getParameterClass);
-    const JavaType *returnType = jsBridgeContext->getJavaTypes().getBoxed(jsBridgeContext, returnClass);
+    const JavaType *returnType = jsBridgeContext->getJavaTypes().get(jsBridgeContext, returnClass, true /*boxed*/);
     m_returnValueLoader = new ArgumentLoader(returnType, returnParameter, false);
   }
 
@@ -72,7 +72,8 @@ JavaScriptMethod::JavaScriptMethod(const JsBridgeContext *jsBridgeContext, const
     }
 
     // Always load the boxed type instead of the primitive type (e.g. Integer vs int)
-    const JavaType *javaType = javaTypes.getBoxed(jsBridgeContext, javaClass);
+    // because we are going to a Proxy object
+    const JavaType *javaType = javaTypes.get(jsBridgeContext, javaClass, true /*boxed*/);
 
     m_argumentLoaders[i] = new ArgumentLoader(javaType, parameter, false);
   }

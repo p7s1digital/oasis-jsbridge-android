@@ -320,7 +320,7 @@ class JsBridge(context: Context): CoroutineScope {
     @PublishedApi
     internal suspend fun <T: Any?> evaluate(js: String, type: KType?, awaitJsPromise: Boolean): T {
         //val initialStackTrace = Thread.currentThread().stackTrace
-        val parameter = type?.let { Parameter(type, null, false) }
+        val parameter = type?.let { Parameter(type, null) }
 
         val doAwaitJsPromise = awaitJsPromise && type?.classifier != Deferred::class
 
@@ -425,7 +425,7 @@ class JsBridge(context: Context): CoroutineScope {
     // the lambda via callJsLambda()
     @PublishedApi
     internal fun registerJsLambda(jsValue: JsValue, types: List<KType>, isVarArgs: Boolean): JsValue {
-        val parameters = types.map { Parameter(it, null, true) }
+        val parameters = types.map { Parameter(it, null) }
         val inputParameters = parameters.take(types.count() - 1)
         val outputParameter = parameters.last()
         val method = Method(inputParameters.toTypedArray(), outputParameter, isVarArgs)

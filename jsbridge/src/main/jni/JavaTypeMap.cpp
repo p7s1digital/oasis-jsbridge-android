@@ -100,13 +100,10 @@ JavaTypeMap::~JavaTypeMap() {
   }
 }
 
-const JavaType* JavaTypeMap::get(const JsBridgeContext *jsBridgeContext, const JniRef<jclass> &javaClass) const {
-  return find(jsBridgeContext, getName(jsBridgeContext, javaClass));
-}
+const JavaType* JavaTypeMap::get(const JsBridgeContext *jsBridgeContext, const JniRef<jclass> &javaClass, bool boxed) const {
+  const JavaType *javaType = find(jsBridgeContext, getName(jsBridgeContext, javaClass));
 
-const JavaType* JavaTypeMap::getBoxed(const JsBridgeContext *jsBridgeContext, const JniRef<jclass> &javaClass) const {
-  const JavaType *javaType = get(jsBridgeContext, javaClass);
-  if (!javaType->isPrimitive()) {
+  if (!boxed  || !javaType->isPrimitive()) {
     return javaType;
   }
 

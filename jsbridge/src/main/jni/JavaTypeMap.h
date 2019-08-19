@@ -40,9 +40,7 @@ public:
   ~JavaTypeMap();
 
   /** Get the JavaType to use to marshal instances of {@code javaClass}. */
-  const JavaType *get(const JsBridgeContext *, const JniRef<jclass> &javaClass) const;
-  /** Get the JavaType to use to marshal instances of {@code javaClass}, force boxed primitives. */
-  const JavaType *getBoxed(const JsBridgeContext *, const JniRef<jclass> &javaClass) const;
+  const JavaType *get(const JsBridgeContext *, const JniRef<jclass> &javaClass, bool boxed = false) const;
   /** Get the JavaType that represents Object. */
   const JavaType *getObjectType(const JsBridgeContext *) const;
   /** Get the Deferred type */

@@ -17,6 +17,8 @@ package de.prosiebensat1digital.oasisjsbridge
 
 import kotlin.reflect.*
 import kotlin.reflect.full.memberFunctions
+import kotlin.reflect.jvm.javaType
+import kotlin.reflect.jvm.jvmErasure
 
 // Represents a (reflected) function parameter (or return value) with its (optional) name based on:
 // - (ideally) Kotlin KParameter or KType which has the (full) reflection info
@@ -27,12 +29,12 @@ internal open class Parameter private constructor(
     val name: String?,
     val methodName: String?
 ) {
-    constructor(kotlinType: KType, methodName: String?, wrapAsObject: Boolean)
-        : this(kotlinType, findJavaClass(kotlinType, wrapAsObject), null, methodName)
+    constructor(kotlinType: KType, methodName: String?)
+        : this(kotlinType, findJavaClass(kotlinType), null, methodName)
 
     constructor(kotlinParameter: KParameter, methodName: String?) : this(
         kotlinParameter.type,
-        findJavaClass(kotlinParameter.type, false),
+        findJavaClass(kotlinParameter.type),
         kotlinParameter.name,
         methodName
     )
@@ -91,7 +93,7 @@ internal open class Parameter private constructor(
         } else {
             // Use KType instance to get the (only) generic type
             kotlinType.arguments.firstOrNull()?.type?.let { genericParameterType ->
-                Parameter(genericParameterType, null, true)
+                Parameter(genericParameterType, null)
             }
         }
     }
@@ -101,10 +103,10 @@ internal open class Parameter private constructor(
 // Private
 // ---
 
-private fun findJavaClass(kotlinType: KType, wrapAsObject: Boolean): Class<*>? {
+private fun findJavaClass(kotlinType: KType): Class<*>? {
     return when (val kotlinClassifier = kotlinType.classifier) {
         is KType -> {
-            findJavaClass(kotlinClassifier, wrapAsObject)
+            findJavaClass(kotlinClassifier)
         }
         is KClass<*> -> {
             if (kotlinType.toString().startsWith("kotlin.Array")) {
@@ -116,8 +118,6 @@ private fun findJavaClass(kotlinType: KType, wrapAsObject: Boolean): Class<*>? {
                 } else {
                     kotlinClassifier.javaObjectType
                 }
-            } else if (wrapAsObject) {
-                kotlinClassifier.javaObjectType
             } else {
                 kotlinClassifier.java
             }

@@ -58,15 +58,13 @@ JavaMethod::JavaMethod(const JsBridgeContext *jsBridgeContext, const JniLocalRef
       jmethodID getComponentType = jniContext->getMethodID(jniContext->getObjectClass(javaClass),
                                                            "getComponentType",
                                                            "()Ljava/lang/Class;");
-      JniLocalRef<jclass> componentType = jniContext->callObjectMethod<jclass>(javaClass,
-                                                                            getComponentType);
-      const JavaType *javaType = jsBridgeContext->getJavaTypes().get(jsBridgeContext, componentType);
+      JniLocalRef<jclass> componentType = jniContext->callObjectMethod<jclass>(javaClass, getComponentType);
+      const JavaType *javaType = jsBridgeContext->getJavaTypes().get(jsBridgeContext, componentType, m_isLambda /*boxed*/);
       m_argumentLoaders[i] = new ArgumentLoader(javaType, parameter, true);
       break;
     }
 
-    const JavaType *javaType = jsBridgeContext->getJavaTypes().get(jsBridgeContext, javaClass);
-
+    const JavaType *javaType = jsBridgeContext->getJavaTypes().get(jsBridgeContext, javaClass, m_isLambda /*boxed*/);
     m_argumentLoaders[i] = new ArgumentLoader(javaType, parameter, true);
   }
 
@@ -77,7 +75,7 @@ JavaMethod::JavaMethod(const JsBridgeContext *jsBridgeContext, const JniLocalRef
     jmethodID getReturnParameter = jniContext->getMethodID(jsBridgeMethodClass, "getReturnParameter", "()Lde/prosiebensat1digital/oasisjsbridge/Parameter;");
     JniLocalRef<jsBridgeParameter> returnParameter = jniContext->callObjectMethod<jsBridgeParameter>( method, getReturnParameter);
     JniLocalRef<jclass> returnClass = jniContext->callObjectMethod<jclass>(returnParameter, getParameterClass);
-    const JavaType *returnType = jsBridgeContext->getJavaTypes().get(jsBridgeContext, returnClass);
+    const JavaType *returnType = jsBridgeContext->getJavaTypes().get(jsBridgeContext, returnClass, m_isLambda /*boxed*/);
     m_returnValueLoader = new ArgumentLoader(returnType, returnParameter, true);
   }
 
