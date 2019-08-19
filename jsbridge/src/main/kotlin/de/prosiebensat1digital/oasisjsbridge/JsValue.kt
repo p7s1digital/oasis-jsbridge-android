@@ -280,7 +280,7 @@ internal constructor(
         val jsBridge = jsBridge
                 ?: throw NativeToJsRegistrationError(nativeToJsInterface.kotlin, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
 
-        return jsBridge.registerNativeToJsInterface(this, nativeToJsInterface.kotlin, true)
+        return jsBridge.registerNativeToJsInterface(this, nativeToJsInterface.kotlin)
     }
 
     // Unfortunately crashes with latest Kotlin (1.3.40) because typeOf<>() does not work yet for suspending functions,

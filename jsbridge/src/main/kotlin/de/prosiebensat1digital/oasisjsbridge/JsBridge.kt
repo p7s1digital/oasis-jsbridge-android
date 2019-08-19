@@ -20,6 +20,7 @@ package de.prosiebensat1digital.oasisjsbridge
 
 import android.app.Activity
 import android.content.Context
+import android.os.Looper
 import android.support.annotation.VisibleForTesting
 import de.prosiebensat1digital.oasisjsbridge.JsBridgeError.*
 import de.prosiebensat1digital.oasisjsbridge.extensions.JsDebuggerExtension
@@ -38,9 +39,7 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.reflect.*
 import kotlin.reflect.KClass
-import kotlin.reflect.KFunction
 import kotlin.reflect.full.declaredMemberFunctions
-import kotlin.reflect.jvm.javaMethod
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import timber.log.Timber
@@ -279,6 +278,9 @@ class JsBridge(context: Context): CoroutineScope {
     @UseExperimental(ExperimentalStdlibApi::class)
     inline fun <reified T: Any> evaluateBlocking(js: String, context: CoroutineContext = EmptyCoroutineContext): T {
         return runBlocking(context) {
+            if (isMainThread()) {
+                Timber.w("WARNING: evaluating JS code in the main thread! Consider using non-blocking API or evaluating JS code in another thread!")
+            }
             evaluate<T>(js, typeOf<T>(), true)
         }
     }
@@ -288,6 +290,9 @@ class JsBridge(context: Context): CoroutineScope {
     // - from Kotlin, it is recommended to use the method with generic parameter, instead!
     fun evaluate(js: String, javaClass: Class<*>?): Any? {
         return runBlocking {
+            if (isMainThread()) {
+                Timber.w("WARNING: evaluating JS code in the main thread! Consider using non-blocking API or evaluating JS code in another thread!")
+            }
             evaluate<Any?>(js, javaClass?.kotlin?.createType(), false)
         }
     }
@@ -381,9 +386,9 @@ class JsBridge(context: Context): CoroutineScope {
     //
     // TODO: support for suspend methods!
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
-    fun <T : NativeToJsInterface> registerNativeToJsInterface(jsValue: JsValue, type: KClass<T>, blocking: Boolean = false): T {
+    fun <T : NativeToJsInterface> registerNativeToJsInterface(jsValue: JsValue, type: KClass<T>): T {
         return try {
-            registerNativeToJsInterfaceHelper(jsValue, type, blocking)
+            registerNativeToJsInterfaceHelper(jsValue, type)
         } catch (t: Throwable) {
             throw NativeToJsRegistrationError(type, cause = t)
                 .also(::notifyErrorListeners)
@@ -657,7 +662,7 @@ class JsBridge(context: Context): CoroutineScope {
     }
 
     @Throws
-    private fun <T: Any> registerNativeToJsInterfaceHelper(jsValue: JsValue, type: KClass<T>, blocking: Boolean): T {
+    private fun <T: Any> registerNativeToJsInterfaceHelper(jsValue: JsValue, type: KClass<T>): T {
         if (!type.java.isInterface) {
             throw NativeToJsRegistrationError(type, customMessage = "$type must be an interface")
         }
@@ -694,9 +699,6 @@ class JsBridge(context: Context): CoroutineScope {
             // -> Sequence<KFunction<*>>
             .flatMap { it.declaredMemberFunctions.asSequence() }
 
-            // Validate the methods
-            .also { if (!blocking) it.forEach(::validateNativeToJsMethod) }
-
             // Group by name
             // -> Map<methodName, List<Method>>
             .groupBy({ it.name }, { Method(it, false) })
@@ -723,32 +725,13 @@ class JsBridge(context: Context): CoroutineScope {
             }
         }
 
-        val proxyListener = if (blocking)
-            ProxyListenerBlocking(jsValue, type.java)
-        else
-            ProxyListener(jsValue, type.java)
+        val proxyListener = ProxyListener(jsValue, type.java)
 
         @Suppress("UNCHECKED_CAST")
         val proxy = Proxy.newProxyInstance(type.java.classLoader, arrayOf(type.java), proxyListener) as T
         Timber.v("Created proxy instance for ${type.java.name}, js value name: $jsValue")
 
         return proxy
-    }
-
-    private fun validateNativeToJsMethod(memberFunction: KFunction<*>) {
-        val returnJavaType = memberFunction.javaMethod?.returnType
-
-        when {
-            returnJavaType == null -> Unit
-            returnJavaType.isAssignableFrom(Deferred::class.java) -> Unit
-            returnJavaType == Unit::class -> Unit
-            returnJavaType == Void::class -> Unit
-            returnJavaType == Void::class.javaPrimitiveType -> Unit
-            else -> {
-                //throw Throwable("Unsupported return value: $returnJavaType. NativeToJs interface methods should either return no value or a deferred")
-                Timber.w("Unsupported return value: $returnJavaType. NativeToJs interface methods should either return no value or a deferred")
-            }
-        }
     }
 
     // Call a JS method registered via registerNativeToJsInterface()
@@ -809,7 +792,7 @@ class JsBridge(context: Context): CoroutineScope {
         val jsFunctionObject = JsValue(this, null, associatedJsName = globalObjectName)
 
         return method.asFunctionWithArgArray { args ->
-            runInJsThread {
+            launch {
                 try {
                     val jniJsContext = jniJsContextOrThrow()
                     jniCallJsLambda(jniJsContext, jsFunctionObject.associatedJsName, args, false)
@@ -890,7 +873,9 @@ class JsBridge(context: Context): CoroutineScope {
         }
     }
 
-    private fun isJsThread(): Boolean = (Thread.currentThread().id == jsThreadId)
+    @PublishedApi
+    internal fun isMainThread(): Boolean = (Looper.myLooper() == Looper.getMainLooper())
+    internal fun isJsThread(): Boolean = (Thread.currentThread().id == jsThreadId)
 
     private fun jniJsContextOrThrow() = jniJsContext ?: throw InternalError("Missing JNI JS context!")
 
@@ -951,12 +936,34 @@ class JsBridge(context: Context): CoroutineScope {
                 return method.invoke(this, args)
             }
 
+            return when (method.returnType) {
+                null, Unit::class, Void::class, Void::class.javaPrimitiveType -> {
+                    callJsMethodWithoutRetVal(method, args)
+                    CompletableDeferred(Unit)
+                }
+                Deferred::class -> callJsMethodAsync(method, args)
+                else -> callJsMethodBlocking(method, args)
+            }
+        }
+
+        private fun callJsMethodWithoutRetVal(method: JavaMethod, args: Array<Any?>?) {
+            runInJsThread {
+                try {
+                    Timber.v("Calling (deferred) JS method ${type.canonicalName}/$jsValue.${method.name}...")
+                    callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf())
+                } catch (t: Throwable) {
+                    throw NativeToJsCallError("${type.canonicalName}/$jsValue.${method.name}", t)
+                        .also(::notifyErrorListeners)
+                }
+            }
+        }
+
+        private fun callJsMethodAsync(method: JavaMethod, args: Array<Any?>?): Deferred<Any?> {
             val deferred = CompletableDeferred<Any?>()
 
-            // TODO: optimize and avoid context switch when it can directly run (when already in JS thread...)
             launch {
                 try {
-                    //Timber.v("Calling JS method ${type.canonicalName}/$jsValue.${method.name}...")
+                    Timber.v("Calling (deferred) JS method ${type.canonicalName}/$jsValue.${method.name}...")
                     val retVal = callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf())
 
                     if (retVal is Deferred<*>) {
@@ -979,33 +986,20 @@ class JsBridge(context: Context): CoroutineScope {
 
             return deferred
         }
-    }
 
-    private inner class ProxyListenerBlocking(
-        private val jsValue: JsValue,
-        private val type: Class<*>
-    ) : java.lang.reflect.InvocationHandler {
-
-        override fun invoke(proxy: Any, method: JavaMethod, args: Array<Any?>?): Any? {
-            // If the method is a method from Object then defer to normal invocation
-            if (method.declaringClass == Object::class.java) {
-                return method.invoke(this, args)
-            }
-
-            val retDeferred = async {
+        private fun callJsMethodBlocking(method: JavaMethod, args: Array<Any?>?): Any? {
+            return runBlocking(coroutineContext) {
                 try {
+                    Timber.v("Calling (blocking) JS method ${type.canonicalName}/$jsValue.${method.name}...")
+                    if (isMainThread()) {
+                        Timber.w("WARNING: executing JS method ${type.canonicalName}/$jsValue.${method.name} in the main thread! Consider using a Deferred or calling the method in another thread!")
+                    } else {
+                        Timber.v("Calling (blocking) JS method ${type.canonicalName}/$jsValue.${method.name}...")
+                    }
                     callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf())
                 } catch (t: Throwable) {
                     throw NativeToJsCallError("${type.canonicalName}/$jsValue.${method.name}", t)
                         .also(::notifyErrorListeners)
-                }
-            }
-
-            // Wait for the return value (if any) by blocking the current thread
-            return when (method.returnType) {
-                null, Unit::class, Void::class, Void::class.javaPrimitiveType -> Unit
-                else -> runBlocking(this@JsBridge.coroutineContext) {
-                    retDeferred.await()
                 }
             }
         }

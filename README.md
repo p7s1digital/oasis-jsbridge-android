@@ -29,6 +29,7 @@ Based on [Duktape Android][duktape-android] we added:
 1. [Map JS objects to Java/Kotlin](#5-using-js-objects-from-javakotlin)
 1. [Map Kotlin/Java objects to JS](#6-using-javakotlin-objects-from-js)
 
+
 Minimal hello world:
 ```kotlin
 val jsBridge = JsBridge(application.context)
@@ -91,7 +92,7 @@ CoroutineScope.launch {
 
 From Java (blocking):
 ```java
-Integer sum = (Integer) jsBridge.evaluate("1 + 2", Integer.class);
+Integer sum = (Integer) jsBridge.evaluateBlocking("1 + 2", Integer.class);
 ```
 
 
