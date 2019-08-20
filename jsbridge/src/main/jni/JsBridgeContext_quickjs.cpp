@@ -225,8 +225,8 @@ void JsBridgeContext::registerJavaLambda(const std::string &strName, const JniLo
     return;
   }
 
-  JSValue javaLambdaValue = m_utils->createCppPtrValue(javaMethod.release(), true);
-  JSValue javaThisValue = m_utils->createJavaRefValue(JniGlobalRef<jobject>(object));
+  JSValue javaLambdaValue = m_utils->createCppPtrValue(javaMethod.release(), true /*deleteOnFinalize*/);  // wrap the C++ instance
+  JSValue javaThisValue = m_utils->createJavaRefValue(JniGlobalRef<jobject>(object));  // wrap the JNI ref
   JSValueConst javaLambdaHandlerData[2];
   javaLambdaHandlerData[0] = javaLambdaValue;
   javaLambdaHandlerData[1] = javaThisValue;
@@ -570,10 +570,6 @@ JSValue JsBridgeContext::createJavaObject(const char *instanceName, const JniLoc
 
   JSValue javaObjectValue = JS_NewObject(m_ctx);
 
-  m_utils->addFinalizer(javaObjectValue, []() {
-    // TODO?
-  });
-
   const JniRef<jclass> &methodClass = jniContext()->getJsBridgeMethodClass();
 
   const jsize numMethods = methods.getLength();
@@ -611,7 +607,8 @@ JSValue JsBridgeContext::createJavaObject(const char *instanceName, const JniLoc
     // No JS_FreeValue(m_ctx, javaMethodHandlerValue) after JS_SetPropertyStr()
   }
 
-  // Keep a reference in JavaScript to the object being bound.
+  // Keep a reference in JavaScript to the object being bound
+  // (which is properly released when the JSValue gets finalized)
   auto javaThisValue = m_utils->createJavaRefValue<jobject>(object);
   JS_SetPropertyStr(m_ctx, javaObjectValue, JAVA_THIS_PROP_NAME, javaThisValue);
   // No JS_FreeValue(m_ctx, javaThisValue) after JS_SetPropertyStr()

@@ -37,6 +37,8 @@ public:
   JStringLocalRef toJString(JSValueConst v) const;
   std::string toString(JSValueConst v) const;
 
+  // Wrap a C++ instance inside a new JSValue and (optionally) ensure that it is
+  // deleted when the JSValue gets finalized
   template <class T>
   JSValue createCppPtrValue(T *obj, bool deleteOnFinalize) const {
     JSValue cppWrapperObj = JS_NewObjectClass(m_ctx, js_cppwrapper_class_id);
@@ -52,14 +54,26 @@ public:
     return cppWrapperObj;
   }
 
+  // Access the instance wrapped in a JSValue via createCppPtrValue()
   template <class T>
   static T *getCppPtr(JSValueConst cppWrapperValue) {
     auto cppWrapper = reinterpret_cast<CppWrapper *>(JS_GetOpaque(cppWrapperValue, js_cppwrapper_class_id));
     return reinterpret_cast<T *>(cppWrapper->ptr);
   }
 
+  // Wrap a C++ instance inside an existing JSValue as a new map entry with the given key.
+  //
+  // The existingValue will have the following structure:
+  // {
+  //   __cpp_object_map: {
+  //     key1: [wrapped C++ instance 1]
+  //     key2: [wrapped C++ instance 2]
+  //     ...
+  //   }
+  //   ...
+  // }
   template <class T>
-  void createMappedCppPtrValue(T *obj, JSValueConst jsValue, const char *jsName) const {
+  void createMappedCppPtrValue(T *obj, JSValueConst jsValue, const char *key) const {
     // Get or create CPP object map
     JSValue cppObjectMapValue = JS_GetPropertyStr(m_ctx, jsValue, CPP_OBJECT_MAP_PROP_NAME);
     if (JS_IsUndefined(cppObjectMapValue)) {
@@ -69,14 +83,15 @@ public:
 
     // Store it in jsLambda.cppObjectMap["lambda_global_name"]
     auto cppValue = createCppPtrValue<T>(obj, true /*deleteOnFinalize*/);
-    JS_SetPropertyStr(m_ctx, cppObjectMapValue, jsName, cppValue);
+    JS_SetPropertyStr(m_ctx, cppObjectMapValue, key, cppValue);
     // No JS_FreeValue(m_ctx, cppValue) after JS_SetPropertyStr
 
     JS_FreeValue(m_ctx, cppObjectMapValue);
   }
 
+  // Access a C++ instance mapped inside a JSValue via createMappedCppPtrValue()
   template <class T>
-  T *getMappedCppPtrValue(JSValueConst jsValue, const char *jsName) const {
+  T *getMappedCppPtrValue(JSValueConst jsValue, const char *key) const {
     // Get CPP object map
     JSValue cppObjectMapValue = JS_GetPropertyStr(m_ctx, jsValue, CPP_OBJECT_MAP_PROP_NAME);
     if (JS_IsUndefined(cppObjectMapValue)) {
@@ -87,7 +102,7 @@ public:
     }
 
     // Get C++ JavaScriptObject instance stored in jsObject.cppObjectMap["lambda_global_name"]
-    JSValue cppJsObjectValue = JS_GetPropertyStr(m_ctx, cppObjectMapValue, jsName);
+    JSValue cppJsObjectValue = JS_GetPropertyStr(m_ctx, cppObjectMapValue, key);
     T *cppObject = nullptr;
     if (JS_IsObject(cppJsObjectValue)) {
       cppObject = getCppPtr<T>(cppJsObjectValue);
@@ -97,6 +112,8 @@ public:
     return cppObject;
   }
 
+  // Wrap a JNI ref inside a new JSValue and ensure that it's properly
+  // released when the JSValue gets finalized
   template <class T>
   JSValue createJavaRefValue(const JniRef<T> &ref) const {
     JSValue cppWrapperObj = JS_NewObjectClass(m_ctx, js_cppwrapper_class_id);
@@ -113,20 +130,13 @@ public:
     return cppWrapperObj;
   }
 
+  // Access a JNI ref wrapped in a JSValue via createJavaRefValue()
   template <class T>
   JniLocalRef<T> getJavaRef(JSValueConst v) const {
     auto cppWrapper = reinterpret_cast<CppWrapper *>(JS_GetOpaque(v, js_cppwrapper_class_id));
     auto globalRefPtr = reinterpret_cast<JniGlobalRef<T> *>(cppWrapper->ptr);
 
     return JniLocalRef<T>(*globalRefPtr);
-  }
-
-  void addFinalizer(JSValueConst v, std::function<void()> &&deleter) const {
-    JSValue cppWrapperObj = JS_NewObjectClass(m_ctx, js_cppwrapper_class_id);
-    JS_SetPropertyStr(m_ctx, v, "__finalizer", cppWrapperObj);
-
-    auto cppWrapper = new CppWrapper { nullptr, deleter };
-    JS_SetOpaque(cppWrapperObj, cppWrapper);
   }
 
 public:  // internal
