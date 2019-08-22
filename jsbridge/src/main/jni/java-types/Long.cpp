@@ -29,19 +29,20 @@
 
 namespace JavaTypes {
 
-Long::Long(const JsBridgeContext *jsBridgeContext, const JniGlobalRef<jclass>& classRef, const JniGlobalRef<jclass>& boxedClassRef)
-  : Primitive(jsBridgeContext, classRef, boxedClassRef) {
+Long::Long(const JsBridgeContext *jsBridgeContext)
+  : Primitive(jsBridgeContext, JavaTypeId::Long, JavaTypeId::BoxedLong) {
 }
 
 #if defined(DUKTAPE)
 
-JValue Long::pop(bool inScript, const AdditionalData *) const {
+JValue Long::pop(bool inScript) const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
-  if (!inScript && !duk_is_number(m_ctx, -1)) {
+  if (!duk_is_number(m_ctx, -1)) {
     const auto message = std::string("Cannot convert return value ") + duk_safe_to_string(m_ctx, -1) + " to long";
     duk_pop(m_ctx);
-    throw std::invalid_argument(message);
+    CHECK_STACK_NOW();
+    m_jsBridgeContext->throwTypeException(message, inScript);
   }
   if (duk_is_null_or_undefined(m_ctx, -1)) {
     duk_pop(m_ctx);
@@ -52,28 +53,35 @@ JValue Long::pop(bool inScript, const AdditionalData *) const {
   return JValue(l);
 }
 
-JValue Long::popArray(uint32_t count, bool expanded, bool inScript, const AdditionalData *additionalData) const {
+JValue Long::popArray(uint32_t count, bool expanded, bool inScript) const {
   // If we're not expanded, pop the array off the stack no matter what.
   const StackUnwinder _(m_ctx, expanded ? 0 : 1);
 
-  count = expanded ? count : static_cast<uint32_t>(duk_get_length(m_ctx, -1));
+  if (!expanded) {
+    count = static_cast<uint32_t>(duk_get_length(m_ctx, -1));
+    if (!duk_is_array(m_ctx, -1)) {
+      const auto message = std::string("Cannot convert JS value ") + duk_safe_to_string(m_ctx, -1) + " to Array<Boolean>";
+      m_jsBridgeContext->throwTypeException(message, inScript);
+    }
+  }
+
   JArrayLocalRef<jlong> longArray(m_jniContext, count);
   for (int i = count - 1; i >= 0; --i) {
     if (!expanded) {
       duk_get_prop_index(m_ctx, -1, i);
     }
-    JValue value = pop(inScript, additionalData);
+    JValue value = pop(inScript);
     longArray.setElement(i, value.getLong());
   }
   return JValue(longArray);
 }
 
-duk_ret_t Long::push(const JValue &value, bool inScript, const AdditionalData *) const {
+duk_ret_t Long::push(const JValue &value, bool inScript) const {
   duk_push_number(m_ctx, (duk_double_t) value.getLong());
   return 1;
 }
 
-duk_ret_t Long::pushArray(const JniLocalRef<jarray> &values, bool expand, bool inScript, const AdditionalData *) const {
+duk_ret_t Long::pushArray(const JniLocalRef<jarray> &values, bool expand, bool inScript) const {
   JArrayLocalRef<jlong> longArray(values);
   const auto count = longArray.getLength();
 
@@ -93,10 +101,11 @@ duk_ret_t Long::pushArray(const JniLocalRef<jarray> &values, bool expand, bool i
 
 #elif defined(QUICKJS)
 
-JValue Long::toJava(JSValueConst v, bool inScript, const AdditionalData *) const {
-  if (!inScript && !JS_IsNumber(v)) {
-    const auto message = "Cannot convert return value to long";
-    throw std::invalid_argument(message);
+JValue Long::toJava(JSValueConst v, bool inScript) const {
+  if (!JS_IsNumber(v)) {
+    const char *message = "Cannot convert return value to long";
+    m_jsBridgeContext->throwTypeException(message, inScript);
+    return JValue();
   }
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
     return JValue();
@@ -111,18 +120,54 @@ JValue Long::toJava(JSValueConst v, bool inScript, const AdditionalData *) const
   return JValue(l);
 }
 
-JValue Long::toJavaArray(JSValueConst v, bool inScript, const AdditionalData *additionalData) const {
-  // TODO
-  return JValue();
+JValue Long::toJavaArray(JSValueConst v, bool inScript) const {
+  if (JS_IsNull(v) || JS_IsUndefined(v)) {
+    return JValue();
+  }
+
+  if (!JS_IsArray(m_ctx, v)) {
+    m_jsBridgeContext->throwTypeException("Cannot convert JS value to Java array", inScript);
+    return JValue();
+  }
+
+  JSValue lengthValue = JS_GetPropertyStr(m_ctx, v, "length");
+  assert(JS_IsNumber(lengthValue));
+  uint32_t count = JS_VALUE_GET_INT(lengthValue);
+  JS_FreeValue(m_ctx, lengthValue);
+
+  JArrayLocalRef<jlong> longArray(m_jniContext, count);
+
+  for (uint32_t i = 0; i < count; ++i) {
+    JValue elementValue = toJava(JS_GetPropertyUint32(m_ctx, v, i), inScript);
+    longArray.setElement(i, elementValue.getLong());
+    m_jsBridgeContext->checkRethrowJsError();
+  }
+
+  return JValue(longArray);
 }
 
-JSValue Long::fromJava(const JValue &value, bool inScript, const AdditionalData *) const {
+JSValue Long::fromJava(const JValue &value, bool inScript) const {
   return JS_NewInt64(m_ctx, value.getLong());
 }
 
-JSValue Long::fromJavaArray(const JniLocalRef<jarray> &values, bool inScript, const AdditionalData *) const {
-  // TODO
-  return JS_UNDEFINED;
+JSValue Long::fromJavaArray(const JniLocalRef<jarray> &values, bool inScript) const {
+  JArrayLocalRef<jlong> longArray(values);
+  const auto count = longArray.getLength();
+
+  JSValue jsArray = JS_NewArray(m_ctx);
+
+  for (jsize i = 0; i < count; ++i) {
+    jlong lValue = longArray.getElement(i);
+    try {
+      JSValue elementValue = fromJava(JValue(lValue), inScript);
+      JS_SetPropertyUint32(m_ctx, jsArray, static_cast<uint32_t>(i), elementValue);
+    } catch (std::invalid_argument &e) {
+      JS_FreeValue(m_ctx, jsArray);
+      throw e;
+    }
+  }
+
+  return jsArray;
 }
 
 #endif
@@ -138,8 +183,16 @@ JValue Long::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
   return JValue(l);
 }
 
-JniLocalRef<jclass> Long::getArrayClass() const {
-  return m_jniContext->getObjectClass(JArrayLocalRef<jlong>(m_jniContext, 0));
+JValue Long::box(const JValue &longValue) const {
+  // From long to Long
+  jmethodID boxId = m_jniContext->getStaticMethodID(getBoxedJavaClass(), "valueOf", "(J)Ljava/lang/Long;");
+  return JValue(m_jniContext->callStaticObjectMethod(getBoxedJavaClass(), boxId, longValue.getLong()));
+}
+
+JValue Long::unbox(const JValue &boxedValue) const {
+  // From Long to long
+  jmethodID unboxId = m_jniContext->getMethodID(getBoxedJavaClass(), "longValue", "()J");
+  return JValue(m_jniContext->callLongMethod(boxedValue.getLocalRef(), unboxId));
 }
 
 }  // namespace JavaTypes

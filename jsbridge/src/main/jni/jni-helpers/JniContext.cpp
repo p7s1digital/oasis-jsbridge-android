@@ -16,26 +16,17 @@
 #include "JniContext.h"
 #include "JStringLocalRef.h"
 
-
-// Internal
-
-namespace {
-  const char *JSBRIDGE_JAVA_CLASS_NAME = "de/prosiebensat1digital/oasisjsbridge/JsBridge";
-  const char *JSBRIDGE_METHOD_CLASS_NAME = "de/prosiebensat1digital/oasisjsbridge/Method";
-  const char *JSBRIDGE_PARAMETER_CLASS_NAME = "de/prosiebensat1digital/oasisjsbridge/Parameter";
-}
-
-
-// Class methods
+#define JSBRIDGE_PKG_PATH "de/prosiebensat1digital/oasisjsbridge"
 
 JniContext::JniContext(JNIEnv *env, jobject jsBridgeJavaObject)
  : m_jniEnv(env)
  , m_localRefStats(new JniLocalRefStats())
- , m_jsBridgeJavaClass(JniGlobalRef<jclass>(findClass(JSBRIDGE_JAVA_CLASS_NAME)))
+ , m_jsBridgeJavaClass(JniGlobalRef<jclass>(findClass(JSBRIDGE_PKG_PATH "/JsBridge")))
  , m_jsBridgeJavaObject(JniGlobalRef<jobject>(JniLocalRef<jobject>(this, jsBridgeJavaObject, true))) {
 
-    m_jsBridgeMethodClass = JniGlobalRef<jclass>(findClass(JSBRIDGE_METHOD_CLASS_NAME));
-    m_jsBridgeParameterClass = JniGlobalRef<jclass>(findClass(JSBRIDGE_PARAMETER_CLASS_NAME));
+  m_objectClass = JniGlobalRef<jclass>(findClass("java/lang/Object"));
+  m_jsBridgeMethodClass = JniGlobalRef<jclass>(findClass(JSBRIDGE_PKG_PATH "/Method"));
+  m_jsBridgeParameterClass = JniGlobalRef<jclass>(findClass(JSBRIDGE_PKG_PATH "/Parameter"));
 }
 
 JniContext::~JniContext() {
@@ -85,4 +76,3 @@ void JniContext::exceptionClear() {
   assert(m_jniEnv);
   m_jniEnv->ExceptionClear();
 }
-

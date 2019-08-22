@@ -26,36 +26,30 @@ namespace JavaTypes {
 class Double : public Primitive {
 
 public:
-  Double(const JsBridgeContext *, const JniGlobalRef<jclass>& classRef, const JniGlobalRef<jclass>& boxedClassRef);
+  Double(const JsBridgeContext *);
 
 #if defined(DUKTAPE)
-  JValue pop(bool inScript, const AdditionalData *) const override;
-  JValue popArray(uint32_t count, bool expanded, bool inScript, const AdditionalData *) const override;
+  JValue pop(bool inScript) const override;
+  JValue popArray(uint32_t count, bool expanded, bool inScript) const override;
 
-  duk_ret_t push(const JValue &, bool inScript, const AdditionalData *) const override;
-  duk_ret_t pushArray(const JniLocalRef<jarray> &values, bool expand, bool inScript, const AdditionalData *) const override;
+  duk_ret_t push(const JValue &, bool inScript) const override;
+  duk_ret_t pushArray(const JniLocalRef<jarray> &values, bool expand, bool inScript) const override;
 #elif defined(QUICKJS)
-  JValue toJava(JSValueConst, bool inScript, const AdditionalData *) const override;
-  JValue toJavaArray(JSValueConst, bool inScript, const AdditionalData *) const override;
+  JValue toJava(JSValueConst, bool inScript) const override;
+  JValue toJavaArray(JSValueConst, bool inScript) const override;
 
-  JSValue fromJava(const JValue &, bool inScript, const AdditionalData *) const override;
-  JSValue fromJavaArray(const JniLocalRef<jarray> &values, bool inScript, const AdditionalData *) const override;
+  JSValue fromJava(const JValue &, bool inScript) const override;
+  JSValue fromJavaArray(const JniLocalRef<jarray> &values, bool inScript) const override;
 #endif
 
   JValue callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
                     const std::vector<JValue> &args) const override;
 
-  JniLocalRef<jclass> getArrayClass() const override;
+  JavaTypeId arrayId() const override { return JavaTypeId::DoubleArray; }
 
-  const char* getUnboxSignature() const override {
-    return "()D";
-  }
-  const char* getUnboxMethodName() const override {
-    return "doubleValue";
-  }
-  const char* getBoxSignature() const override {
-    return "(D)Ljava/lang/Double;";
-  }
+private:
+  JValue box(const JValue &) const override;
+  JValue unbox(const JValue &) const override;
 };
 
 }  // namespace JavaTypes

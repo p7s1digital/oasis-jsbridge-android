@@ -9,7 +9,10 @@ apply plugin: 'maven-publish'
 publishing {
     publications {
         android.libraryVariants.all { variant ->
+            if (!variant.name.contains("Release")) return
+
             println("Publishing config ${variant.name} for project ${project.name}...")
+
 
             def suffix = variant.name.replace("Release", "")
             def variantArtifactId = "oasis-${project.name}-${suffix}"

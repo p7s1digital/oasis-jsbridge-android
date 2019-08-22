@@ -18,7 +18,6 @@
  */
 #include "JsBridgeContext.h"
 
-#include "ArgumentLoader.h"
 #include "DuktapeUtils.h"
 #include "JavaMethod.h"
 #include "JavaScriptLambda.h"
@@ -42,7 +41,6 @@
 // ---
 
 namespace {
-
   // The \xff\xff part keeps the variable hidden from JavaScript (visible through C API only).
   const char *JAVA_THIS_PROP_NAME = "\xff\xffjava_this";
   const char *JAVA_METHOD_PROP_NAME = "\xff\xffjava_method";
@@ -143,7 +141,7 @@ namespace {
       duk_enum(ctx, -1, DUK_ENUM_OWN_PROPERTIES_ONLY);
       while (duk_next(ctx, -1, (duk_bool_t) true)) {
         if (!duk_get_prop_string(ctx, -1, JAVA_METHOD_PROP_NAME)) {
-          duk_pop_2(ctx);
+          duk_pop_3(ctx);
           continue;
         }
         delete static_cast<JavaMethod *>(duk_require_pointer(ctx, -1));
@@ -189,41 +187,39 @@ namespace {
 // ---
 
 JsBridgeContext::JsBridgeContext()
- : m_javaTypes() {
+ : m_javaTypeProvider(this) {
 }
 
 JsBridgeContext::~JsBridgeContext() {
   // Delete the proxies before destroying the heap.
-  duk_destroy_heap(m_context);
+  duk_destroy_heap(m_ctx);
 }
 
 void JsBridgeContext::init(JniContext *jniContext) {
 
   m_currentJniContext = jniContext;
 
-  m_context = duk_create_heap(nullptr, nullptr, nullptr, nullptr, fatalErrorHandler);
+  m_ctx = duk_create_heap(nullptr, nullptr, nullptr, nullptr, fatalErrorHandler);
 
-  if (!m_context) {
+  if (!m_ctx) {
     throw std::bad_alloc();
   }
 
-  m_utils = new DuktapeUtils(jniContext, m_context);
+  m_utils = new DuktapeUtils(jniContext, m_ctx);
 
   // Stash the JsBridgeContext instance in the context, so we can find our way back from a Duktape C callback.
-  duk_push_global_stash(m_context);
-  duk_push_pointer(m_context, this);
-  duk_put_prop_string(m_context, -2, JSBRIDGE_CPP_CLASS_PROP_NAME);
-  duk_pop(m_context);
-
-  m_objectType = m_javaTypes.getObjectType(this);
+  duk_push_global_stash(m_ctx);
+  duk_push_pointer(m_ctx, this);
+  duk_put_prop_string(m_ctx, -2, JSBRIDGE_CPP_CLASS_PROP_NAME);
+  duk_pop(m_ctx);
 
   // Set global + window (TODO)
   // See also https://wiki.duktape.org/howtoglobalobjectreference
   static const char *str1 = "var global = this; var window = this; window.open = function() {};\n";
-  duk_eval_string_noresult(m_context, str1);
+  duk_eval_string_noresult(m_ctx, str1);
 
   // Console
-  duk_console_init(m_context, 0 /*flags*/);
+  duk_console_init(m_ctx, 0 /*flags*/);
 }
 
 void JsBridgeContext::initDebugger() {
@@ -240,15 +236,15 @@ void JsBridgeContext::initDebugger() {
   jniContext()->callJsBridgeVoidMethod("onDebuggerReady", "()V");
 
   duk_debugger_attach(
-    m_context,
-    duk_trans_socket_read_cb,
-    duk_trans_socket_write_cb,
-    duk_trans_socket_peek_cb,
-    duk_trans_socket_read_flush_cb,
-    duk_trans_socket_write_flush_cb,
-    nullptr,
-    debugger_detached,
-    (void *) m_context
+      m_ctx,
+      duk_trans_socket_read_cb,
+      duk_trans_socket_write_cb,
+      duk_trans_socket_peek_cb,
+      duk_trans_socket_read_flush_cb,
+      duk_trans_socket_write_flush_cb,
+      nullptr,
+      debugger_detached,
+      (void *) m_ctx
   );
 }
 
@@ -259,67 +255,60 @@ void JsBridgeContext::cancelDebug() {
 
 JValue JsBridgeContext::evaluateString(const std::string &strCode, const JniLocalRef<jsBridgeParameter> &returnParameter,
                                       bool awaitJsPromise) const {
-  CHECK_STACK(m_context);
+  CHECK_STACK(m_ctx);
 
   JNIEnv *env = jniContext()->getJNIEnv();
   assert(env != nullptr);
 
-  if (duk_peval_string(m_context, strCode.c_str()) != DUK_EXEC_SUCCESS) {
+  if (duk_peval_string(m_ctx, strCode.c_str()) != DUK_EXEC_SUCCESS) {
     alog("Could not evaluate string:\n%s", strCode.c_str());
     queueJavaExceptionForJsError();
-    duk_pop(m_context);
+    duk_pop(m_ctx);
     return JValue();
   }
 
-  bool isDeferred = awaitJsPromise && duk_is_object(m_context, -1) && duk_has_prop_string(m_context, -1, "then");
-
+  bool isDeferred = awaitJsPromise && duk_is_object(m_ctx, -1) && duk_has_prop_string(m_ctx, -1, "then");
   if (!isDeferred && returnParameter.isNull()) {
     // No return type given: try to guess it out of the JS value
     const int supportedTypeMask = DUK_TYPE_MASK_BOOLEAN | DUK_TYPE_MASK_NUMBER | DUK_TYPE_MASK_STRING;
 
-    if (duk_check_type_mask(m_context, -1, supportedTypeMask)) {
+    if (duk_check_type_mask(m_ctx, -1, supportedTypeMask)) {
       // The result is a supported scalar type - return it.
-      return m_objectType->pop(false, nullptr);
+      return m_javaTypeProvider.getObjectType()->pop(false);
     }
 
-    if (duk_is_array(m_context, -1)) {
-      return m_objectType->popArray(1, false, false, nullptr);
+    if (duk_is_array(m_ctx, -1)) {
+      return m_javaTypeProvider.getObjectType()->popArray(1, false /*expand*/, false /*inScript*/);
     }
 
     // The result is an unsupported type, undefined, or null.
-    duk_pop(m_context);
+    duk_pop(m_ctx);
     return JValue();
   }
 
-  const JniRef<jclass> &jsBridgeParameterClass = jniContext()->getJsBridgeParameterClass();
-  jmethodID getParameterClass = jniContext()->getMethodID(jsBridgeParameterClass, "getJava", "()Ljava/lang/Class;");
-  JniLocalRef<jclass> returnClass = jniContext()->callObjectMethod<jclass>(returnParameter, getParameterClass);
-
-  const JavaType *returnType = m_javaTypes.get(this, returnClass, true /*boxed*/);
-
-  ArgumentLoader argumentLoader(returnType, returnParameter, false);
+  auto returnType = m_javaTypeProvider.makeUniqueType(returnParameter, true /*boxed*/);
 
   if (isDeferred && !returnType->isDeferred()) {
-    return argumentLoader.popDeferred(&m_javaTypes);
+    return m_javaTypeProvider.getDeferredType(returnParameter)->pop(false /*inScript*/);
   }
 
-  return argumentLoader.pop();
+  return returnType->pop(false /*inScript*/);
 }
 
 void JsBridgeContext::evaluateFileContent(const std::string &strCode, const std::string &strFileName) const {
 
-  CHECK_STACK(m_context);
+  CHECK_STACK(m_ctx);
 
-  duk_push_string(m_context, strCode.c_str());
-  duk_push_string(m_context, strFileName.c_str());
+  duk_push_string(m_ctx, strCode.c_str());
+  duk_push_string(m_ctx, strFileName.c_str());
 
-  if (duk_pcompile(m_context, DUK_COMPILE_EVAL) == DUK_EXEC_SUCCESS) {
-    if (duk_pcall(m_context, 0) != DUK_EXEC_SUCCESS) {
+  if (duk_pcompile(m_ctx, DUK_COMPILE_EVAL) == DUK_EXEC_SUCCESS) {
+    if (duk_pcall(m_ctx, 0) != DUK_EXEC_SUCCESS) {
       alog("Could not execute file %s", strFileName.c_str());
       queueJavaExceptionForJsError();
       return;
     }
-    duk_pop(m_context);
+    duk_pop(m_ctx);
   } else {
     alog("Could not compile file %s", strFileName.c_str());
     queueJavaExceptionForJsError();
@@ -328,34 +317,34 @@ void JsBridgeContext::evaluateFileContent(const std::string &strCode, const std:
 
 void JsBridgeContext::registerJavaObject(const std::string &strName, const JniLocalRef<jobject> &object,
                                         const JObjectArrayLocalRef &methods) {
-  CHECK_STACK(m_context);
+  CHECK_STACK(m_ctx);
 
-  duk_push_global_object(m_context);
+  duk_push_global_object(m_ctx);
 
-  if (duk_has_prop_string(m_context, -1, strName.c_str())) {
-    duk_pop(m_context);
+  if (duk_has_prop_string(m_ctx, -1, strName.c_str())) {
+    duk_pop(m_ctx);
     queueIllegalArgumentException("A global object called " + strName + " already exists");
     return;
   }
 
   if (pushJavaObject(strName.c_str(), object, methods) != DUK_INVALID_INDEX) {
       // Make our bound Java object a property of the Duktape global object (so it's a JS global).
-      duk_put_prop_string(m_context, -2, strName.c_str());
+      duk_put_prop_string(m_ctx, -2, strName.c_str());
   }
 
   // Pop the Duktape global object off the stack.
-  duk_pop(m_context);
+  duk_pop(m_ctx);
 }
 
 void JsBridgeContext::registerJavaLambda(const std::string &strName, const JniLocalRef<jobject> &object,
                                         const JniLocalRef<jsBridgeMethod> &method) {
 
-  CHECK_STACK(m_context);
+  CHECK_STACK(m_ctx);
 
-  duk_push_global_object(m_context);
+  duk_push_global_object(m_ctx);
 
-  if (duk_has_prop_string(m_context, -1, strName.c_str())) {
-    duk_pop(m_context);
+  if (duk_has_prop_string(m_ctx, -1, strName.c_str())) {
+    duk_pop(m_ctx);
     queueIllegalArgumentException("A global object called " + strName + " already exists");
     return;
   }
@@ -373,7 +362,7 @@ void JsBridgeContext::registerJavaLambda(const std::string &strName, const JniLo
   } catch (const std::invalid_argument &e) {
     queueIllegalArgumentException(std::string() + "In bound method \"" + qualifiedMethodName + "\": " + e.what());
     // Pop the object being bound
-    duk_pop(m_context);
+    duk_pop(m_ctx);
     return;
   }
 
@@ -381,39 +370,39 @@ void JsBridgeContext::registerJavaLambda(const std::string &strName, const JniLo
   // given in the call. If we specify the actual number of arguments needed, Duktape will try to
   // be helpful by discarding extra or providing missing arguments. That's not quite what we want.
   // See http://duktape.org/api.html#duk_push_c_function for details.
-  const duk_idx_t funcIndex = duk_push_c_function(m_context, javaLambdaHandler, DUK_VARARGS);
+  const duk_idx_t funcIndex = duk_push_c_function(m_ctx, javaLambdaHandler, DUK_VARARGS);
 
-  duk_push_pointer(m_context, javaMethod.release());
-  duk_put_prop_string(m_context, funcIndex, JAVA_METHOD_PROP_NAME);
+  duk_push_pointer(m_ctx, javaMethod.release());
+  duk_put_prop_string(m_ctx, funcIndex, JAVA_METHOD_PROP_NAME);
 
   // Keep a reference in JavaScript to the object being bound.
-  duk_push_pointer(m_context, object.toNewRawGlobalRef());  // JNI global ref will be deleted via JS finalizer
-  duk_put_prop_string(m_context, funcIndex, JAVA_THIS_PROP_NAME);
+  duk_push_pointer(m_ctx, object.toNewRawGlobalRef());  // JNI global ref will be deleted via JS finalizer
+  duk_put_prop_string(m_ctx, funcIndex, JAVA_THIS_PROP_NAME);
 
   // Set a finalizer
-  duk_push_c_function(m_context, javaLambdaFinalizer, 1);
-  duk_set_finalizer(m_context, funcIndex);
+  duk_push_c_function(m_ctx, javaLambdaFinalizer, 1);
+  duk_set_finalizer(m_ctx, funcIndex);
 
   // Make our Java lambda a property of the Duktape global object (so it's a JS global).
-  duk_put_prop_string(m_context, -2, strName.c_str());
+  duk_put_prop_string(m_ctx, -2, strName.c_str());
 
   // Pop the Duktape global object off the stack.
-  duk_pop(m_context);
+  duk_pop(m_ctx);
 }
 
 void JsBridgeContext::registerJsObject(const std::string &strName,
                                        const JObjectArrayLocalRef &methods) {
-  CHECK_STACK(m_context);
+  CHECK_STACK(m_ctx);
 
-  duk_get_global_string(m_context, strName.c_str());
+  duk_get_global_string(m_ctx, strName.c_str());
 
-  if (!duk_is_object(m_context, -1) || duk_is_null(m_context, -1)) {
-    duk_pop(m_context);
+  if (!duk_is_object(m_ctx, -1) || duk_is_null(m_ctx, -1)) {
+    duk_pop(m_ctx);
     throw std::invalid_argument("Cannot register " + strName + ". It does not exist or is not a valid object");
   }
 
   // Check that it is not a promise!
-  if (duk_is_object(m_context, -1) && duk_has_prop_string(m_context, -1, "then")) {
+  if (duk_is_object(m_ctx, -1) && duk_has_prop_string(m_ctx, -1, "then")) {
     alog_warn("Attempting to register a JS promise (%s)... JsValue.await() should probably be called, first...");
   }
 
@@ -423,17 +412,17 @@ void JsBridgeContext::registerJsObject(const std::string &strName,
   // Wrap it inside the JS object
   m_utils->createMappedCppPtrValue(cppJsObject, -1, strName.c_str());
 
-  duk_pop(m_context);  // JS object
+  duk_pop(m_ctx);  // JS object
 }
 
 void JsBridgeContext::registerJsLambda(const std::string &strName,
                                        const JniLocalRef<jsBridgeMethod> &method) {
-  CHECK_STACK(m_context);
+  CHECK_STACK(m_ctx);
 
-  duk_get_global_string(m_context, strName.c_str());
+  duk_get_global_string(m_ctx, strName.c_str());
 
-  if (!duk_is_function(m_context, -1)) {
-    duk_pop(m_context);
+  if (!duk_is_function(m_ctx, -1)) {
+    duk_pop(m_ctx);
     throw std::invalid_argument("Cannot register " + strName + ". It does not exist or is not a valid function.");
   }
 
@@ -443,18 +432,18 @@ void JsBridgeContext::registerJsLambda(const std::string &strName,
   // Wrap it inside the JS object
   m_utils->createMappedCppPtrValue(cppJsLambda, -1, strName.c_str());
 
-  duk_pop(m_context);  // JS lambda
+  duk_pop(m_ctx);  // JS lambda
 }
 
 JValue JsBridgeContext::callJsMethod(const std::string &objectName,
                                      const JniLocalRef<jobject> &javaMethod,
                                      const JObjectArrayLocalRef &args) {
-  CHECK_STACK(m_context);
+  CHECK_STACK(m_ctx);
 
   // Get the JS object
-  duk_get_global_string(m_context, objectName.c_str());
-  if (!duk_is_object(m_context, -1) || duk_is_null(m_context, -1)) {
-    duk_pop(m_context);
+  duk_get_global_string(m_ctx, objectName.c_str());
+  if (!duk_is_object(m_ctx, -1) || duk_is_null(m_ctx, -1)) {
+    duk_pop(m_ctx);
     throw std::invalid_argument("The JS object " + objectName + " cannot be accessed (not an object)");
   }
 
@@ -465,19 +454,19 @@ JValue JsBridgeContext::callJsMethod(const std::string &objectName,
                                 " because it does not exist or has been deleted!");
   }
 
-  duk_pop(m_context);
+  duk_pop(m_ctx);
   return cppJsObject->call(javaMethod, args);
 }
 
 JValue JsBridgeContext::callJsLambda(const std::string &strFunctionName,
                                      const JObjectArrayLocalRef &args,
                                      bool awaitJsPromise) {
-  CHECK_STACK(m_context);
+  CHECK_STACK(m_ctx);
 
   // Get the JS lambda
-  duk_get_global_string(m_context, strFunctionName.c_str());
-  if (!duk_is_function(m_context, -1)) {
-    duk_pop(m_context);
+  duk_get_global_string(m_ctx, strFunctionName.c_str());
+  if (!duk_is_function(m_ctx, -1)) {
+    duk_pop(m_ctx);
     throw std::invalid_argument("The JS method " + strFunctionName + " cannot be called (not a function)");
   }
 
@@ -488,7 +477,7 @@ JValue JsBridgeContext::callJsLambda(const std::string &strFunctionName,
                                 " because it does not exist or has been deleted!");
   }
 
-  duk_pop(m_context);
+  duk_pop(m_ctx);
   CHECK_STACK_NOW();
 
   return cppJsLambda->call(this, args, awaitJsPromise);
@@ -496,13 +485,13 @@ JValue JsBridgeContext::callJsLambda(const std::string &strFunctionName,
 
 duk_idx_t JsBridgeContext::pushJavaObject(const char *instanceName, const JniLocalRef<jobject> &object, const JObjectArrayLocalRef &methods) const {
 
-  CHECK_STACK_OFFSET(m_context, 1);
+  CHECK_STACK_OFFSET(m_ctx, 1);
 
-  const duk_idx_t objIndex = duk_push_object(m_context);
+  const duk_idx_t objIndex = duk_push_object(m_ctx);
 
   // Hook up a finalizer to decrement the refcount and clean up our JavaMethods.
-  duk_push_c_function(m_context, javaObjectFinalizer, 1);
-  duk_set_finalizer(m_context, objIndex);
+  duk_push_c_function(m_ctx, javaObjectFinalizer, 1);
+  duk_set_finalizer(m_ctx, objIndex);
 
   const JniRef<jclass> &methodClass = jniContext()->getJsBridgeMethodClass();
 
@@ -522,7 +511,7 @@ duk_idx_t JsBridgeContext::pushJavaObject(const char *instanceName, const JniLoc
     } catch (const std::invalid_argument &e) {
       queueIllegalArgumentException(std::string() + "In bound method \"" + qualifiedMethodName + "\": " + e.what());
       // Pop the object being bound
-      duk_pop(m_context);
+      duk_pop(m_ctx);
       return DUK_INVALID_INDEX;
     }
 
@@ -530,86 +519,64 @@ duk_idx_t JsBridgeContext::pushJavaObject(const char *instanceName, const JniLoc
     // given in the call. If we specify the actual number of arguments needed, Duktape will try to
     // be helpful by discarding extra or providing missing arguments. That's not quite what we want.
     // See http://duktape.org/api.html#duk_push_c_function for details.
-    const duk_idx_t func = duk_push_c_function(m_context, javaMethodHandler, DUK_VARARGS);
-    duk_push_pointer(m_context, javaMethod.release());
-    duk_put_prop_string(m_context, func, JAVA_METHOD_PROP_NAME);
+    const duk_idx_t func = duk_push_c_function(m_ctx, javaMethodHandler, DUK_VARARGS);
+    duk_push_pointer(m_ctx, javaMethod.release());
+    duk_put_prop_string(m_ctx, func, JAVA_METHOD_PROP_NAME);
 
     // Add this method to the bound object.
-    duk_put_prop_string(m_context, objIndex, strMethodName.c_str());
+    duk_put_prop_string(m_ctx, objIndex, strMethodName.c_str());
   }
 
   JNIEnv *env = jniContext()->getJNIEnv();
   assert(env != nullptr);
 
   // Keep a reference in JavaScript to the object being bound.
-  duk_push_pointer(m_context, object.toNewRawGlobalRef());  // JNI global ref will be deleted via JS finalizer
-  duk_put_prop_string(m_context, objIndex, JAVA_THIS_PROP_NAME);
+  duk_push_pointer(m_ctx, object.toNewRawGlobalRef());  // JNI global ref will be deleted via JS finalizer
+  duk_put_prop_string(m_ctx, objIndex, JAVA_THIS_PROP_NAME);
 
   return objIndex;
 }
 
 void JsBridgeContext::assignJsValue(const std::string &strGlobalName, const std::string &strCode) {
-  CHECK_STACK(m_context);
+  CHECK_STACK(m_ctx);
 
-  if (duk_peval_string(m_context, strCode.c_str()) != DUK_EXEC_SUCCESS) {
+  if (duk_peval_string(m_ctx, strCode.c_str()) != DUK_EXEC_SUCCESS) {
     alog("Could not assign JS value:\n%s", strCode.c_str());
     queueJavaExceptionForJsError();
-    duk_pop(m_context);
+    duk_pop(m_ctx);
     return;
   }
 
-  duk_put_global_string(m_context, strGlobalName.c_str());
+  duk_put_global_string(m_ctx, strGlobalName.c_str());
 }
 
 void JsBridgeContext::newJsFunction(const std::string &strGlobalName, const JObjectArrayLocalRef &args, const std::string &strCode) {
-  CHECK_STACK(m_context);
+  CHECK_STACK(m_ctx);
 
   // Push global Function (which can be constructed with "new Function"
-  duk_get_global_string(m_context, "Function");
+  duk_get_global_string(m_ctx, "Function");
 
   // This fails with "constructor requires 'new'"
-  //duk_require_constructor_call(m_context);
+  //duk_require_constructor_call(m_ctx);
 
   // Push all arguments (as string)
   jsize argCount = args.getLength();
   for (jsize i = 0; i < argCount; ++i) {
     JStringLocalRef argString(args.getElement<jstring>(i));
-    duk_push_string(m_context, argString.c_str());
+    duk_push_string(m_ctx, argString.c_str());
   }
 
   // Push JS code as string
-  duk_push_string(m_context, strCode.c_str());
+  duk_push_string(m_ctx, strCode.c_str());
 
   // New Function(arg1, arg2, ..., jsCode)
-  if (duk_pnew(m_context, argCount + 1) != DUK_EXEC_SUCCESS) {
+  if (duk_pnew(m_ctx, argCount + 1) != DUK_EXEC_SUCCESS) {
     queueJavaExceptionForJsError();
-    duk_pop(m_context);
+    duk_pop(m_ctx);
     return;
   }
 
-  duk_put_global_string(m_context, strGlobalName.c_str());
-}
-
-void JsBridgeContext::completeJsPromise(const std::string &strId, bool isFulfilled, const JniLocalRef<jobject> &value, const JniLocalRef<jclass> &valueClass) {
-  CHECK_STACK(m_context);
-
-  // Get the global PromiseObject
-  if (!duk_get_global_string(m_context, strId.c_str())) {
-    alog("Could not find PromiseObject with id %s", strId.c_str());
-    duk_pop(m_context);
-    return;
-  }
-
-  // Get the resolve/reject function
-  duk_get_prop_string(m_context, -1, isFulfilled ? "resolve" : "reject");
-
-  // Call it with the Promise value
-  m_javaTypes.get(this, valueClass)->push(JValue(value), false /*inScript*/, nullptr);
-  if (duk_pcall(m_context, 1) != DUK_EXEC_SUCCESS) {
-    alog("Could not complete Promise with id %s", strId.c_str());
-  }
-
-  duk_pop_2(m_context);  // (undefined) call result + PromiseObject
+  duk_put_global_string(m_ctx, strGlobalName.c_str());
 }
 
 void JsBridgeContext::processPromiseQueue() {
@@ -624,6 +591,14 @@ JsBridgeContext *JsBridgeContext::getInstance(duk_context *ctx) {
   duk_pop_2(ctx);
 
   return duktapeContext;
+}
+
+void JsBridgeContext::throwTypeException(const std::string &message, bool inScript) const {
+  if (inScript) {
+    duk_error(m_ctx, DUK_RET_TYPE_ERROR, message.c_str());
+  } else {
+    throw std::invalid_argument(message);
+  }
 }
 
 void JsBridgeContext::queueIllegalArgumentException(const std::string &message) const {
@@ -650,7 +625,7 @@ void JsBridgeContext::queueJsException(const std::string &message) const {
 
 //void JsBridgeContext::queueNullPointerException(const std::string &message) const {
 //  JniLocalRef<jclass> exceptionClass = findClass("java/lang/NullPointerException");
-//  m_jniEnv->ThrowNew(exceptionClass.get(), message.c_str());
+//  m_jniEnv->ThrowNew(exceptionClass.create(), message.c_str());
 //}
 
 // Check for pending JNI exceptions and throw a corresponding JS/Duktape error
@@ -667,10 +642,10 @@ void JsBridgeContext::checkRethrowJsError() const {
   JStringLocalRef message(jniContext()->callObjectMethod<jstring>(exception, getMessage));
 
   // Propagate Java exception to JavaScript (and store pointer to Java exception)
-  duk_push_error_object(m_context, DUK_ERR_ERROR, message.c_str());
-  duk_push_pointer(m_context, exception.toNewRawLocalRef());
-  duk_put_prop_string(m_context, -2, JAVA_EXCEPTION_PROP_NAME);
-  duk_throw(m_context);
+  duk_push_error_object(m_ctx, DUK_ERR_ERROR, message.c_str());
+  duk_push_pointer(m_ctx, exception.toNewRawLocalRef());
+  duk_put_prop_string(m_ctx, -2, JAVA_EXCEPTION_PROP_NAME);
+  duk_throw(m_ctx);
 }
 
 // Sets up a Java {@code DuktapeException} based on the Duktape JavaScript error at the top of the
@@ -681,7 +656,7 @@ void JsBridgeContext::queueJavaExceptionForJsError() const {
 }
 
 JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
-  CHECK_STACK(m_context);
+  CHECK_STACK(m_ctx);
 
   JniLocalRef<jclass> exceptionClass = jniContext()->findClass("de/prosiebensat1digital/oasisjsbridge/JsException");
 
@@ -690,15 +665,15 @@ JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
 
   // Create the JSON string
   const char *jsonStringRaw = nullptr;
-  if (custom_stringify(m_context, -1) == DUK_EXEC_SUCCESS) {
-    jsonStringRaw = duk_require_string(m_context, -1);
+  if (custom_stringify(m_ctx, -1) == DUK_EXEC_SUCCESS) {
+    jsonStringRaw = duk_require_string(m_ctx, -1);
   }
   JStringLocalRef jsonString(jniContext(), jsonStringRaw);
-  duk_pop(m_context);  // stringified string
+  duk_pop(m_ctx);  // stringified string
 
-  duk_dup(m_context, -1);  // JS error
-  const std::string stack = duk_safe_to_stacktrace(m_context, -1);
-  duk_pop(m_context);  // duplicated JS error
+  duk_dup(m_ctx, -1);  // JS error
+  const std::string stack = duk_safe_to_stacktrace(m_ctx, -1);
+  duk_pop(m_ctx);  // duplicated JS error
 
   std::size_t firstEndOfLine = stack.find('\n');
   std::string strFirstLine = firstEndOfLine == std::string::npos ? stack : stack.substr(0, firstEndOfLine);
@@ -706,10 +681,10 @@ JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
 
   // Is there an exception thrown from a Java method?
   JniLocalRef<jthrowable> cause;
-  if (duk_is_object(m_context, -1) && !duk_is_null(m_context, -1) && duk_has_prop_string(m_context, -1, JAVA_EXCEPTION_PROP_NAME)) {
-    duk_get_prop_string(m_context, -1, JAVA_EXCEPTION_PROP_NAME);
-    cause = JniLocalRef<jthrowable>(jniContext(), static_cast<jthrowable>(duk_get_pointer(m_context, -1)));
-    duk_pop(m_context);  // Java exception
+  if (duk_is_object(m_ctx, -1) && !duk_is_null(m_ctx, -1) && duk_has_prop_string(m_ctx, -1, JAVA_EXCEPTION_PROP_NAME)) {
+    duk_get_prop_string(m_ctx, -1, JAVA_EXCEPTION_PROP_NAME);
+    cause = JniLocalRef<jthrowable>(jniContext(), static_cast<jthrowable>(duk_get_pointer(m_ctx, -1)));
+    duk_pop(m_ctx);  // Java exception
   }
 
   return jniContext()->newObject<jthrowable>(

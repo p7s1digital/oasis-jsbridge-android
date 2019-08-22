@@ -29,20 +29,20 @@
 
 namespace JavaTypes {
 
-Float::Float(const JsBridgeContext *jsBridgeContext, const JniGlobalRef<jclass>& classRef, const JniGlobalRef<jclass>& boxedClassRef)
- : Primitive(jsBridgeContext, classRef, boxedClassRef) {
+Float::Float(const JsBridgeContext *jsBridgeContext)
+ : Primitive(jsBridgeContext, JavaTypeId::Float, JavaTypeId::BoxedFloat) {
 }
 
 #if defined(DUKTAPE)
 
-JValue Float::pop(bool inScript, const AdditionalData *) const {
+JValue Float::pop(bool inScript) const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
-  if (!inScript && !duk_is_number(m_ctx, -1)) {
-    const auto message =
-        std::string("Cannot convert return value ") + duk_safe_to_string(m_ctx, -1) + " to float";
+  if (!duk_is_number(m_ctx, -1)) {
+    const auto message = std::string("Cannot convert return value ") + duk_safe_to_string(m_ctx, -1) + " to float";
     duk_pop(m_ctx);
-    throw std::invalid_argument(message);
+    CHECK_STACK_NOW();
+    m_jsBridgeContext->throwTypeException(message, inScript);
   }
 
   auto f = static_cast<float>(duk_require_number(m_ctx, -1));
@@ -50,11 +50,18 @@ JValue Float::pop(bool inScript, const AdditionalData *) const {
   return JValue(f);
 }
 
-JValue Float::popArray(uint32_t count, bool expanded, bool inScript, const AdditionalData *additionalData) const {
+JValue Float::popArray(uint32_t count, bool expanded, bool inScript) const {
   // If we're not expanded, pop the array off the stack no matter what.
   const StackUnwinder _(m_ctx, expanded ? 0 : 1);
 
-  count = expanded ? count : static_cast<uint32_t>(duk_get_length(m_ctx, -1));
+  if (!expanded) {
+    count = static_cast<uint32_t>(duk_get_length(m_ctx, -1));
+    if (!duk_is_array(m_ctx, -1)) {
+      const auto message = std::string("Cannot convert JS value ") + duk_safe_to_string(m_ctx, -1) + " to Array<Float>";
+      m_jsBridgeContext->throwTypeException(message, inScript);
+    }
+  }
+
   JArrayLocalRef<jfloat> floatArray(m_jniContext, count);
   m_jsBridgeContext->checkRethrowJsError();
 
@@ -62,19 +69,19 @@ JValue Float::popArray(uint32_t count, bool expanded, bool inScript, const Addit
     if (!expanded) {
       duk_get_prop_index(m_ctx, -1, i);
     }
-    JValue value = pop(inScript, additionalData);
+    JValue value = pop(inScript);
     floatArray.setElement(i, value.getFloat());
   }
 
   return JValue(floatArray);
 }
 
-duk_ret_t Float::push(const JValue &value, bool inScript, const AdditionalData *) const {
+duk_ret_t Float::push(const JValue &value, bool inScript) const {
   duk_push_number(m_ctx, value.getFloat());
   return 1;
 }
 
-duk_ret_t Float::pushArray(const JniLocalRef<jarray> &values, bool expand, bool inScript, const AdditionalData *) const {
+duk_ret_t Float::pushArray(const JniLocalRef<jarray> &values, bool expand, bool inScript) const {
   JArrayLocalRef<jfloat> floatArray(values);
   const auto count = floatArray.getLength();
 
@@ -95,10 +102,11 @@ duk_ret_t Float::pushArray(const JniLocalRef<jarray> &values, bool expand, bool 
 
 #elif defined(QUICKJS)
 
-JValue Float::toJava(JSValueConst v, bool inScript, const AdditionalData *) const {
-  if (!inScript && !JS_IsNumber(v)) {
-    const auto message = "Cannot convert return value to float";
-    throw std::invalid_argument(message);
+JValue Float::toJava(JSValueConst v, bool inScript) const {
+  if (!JS_IsNumber(v)) {
+    const char *message = "Cannot convert return value to float";
+    m_jsBridgeContext->throwTypeException(message, inScript);
+    return JValue();
   }
 
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
@@ -114,8 +122,13 @@ JValue Float::toJava(JSValueConst v, bool inScript, const AdditionalData *) cons
   return JValue(f);
 }
 
-JValue Float::toJavaArray(JSValueConst v, bool inScript, const AdditionalData *additionalData) const {
+JValue Float::toJavaArray(JSValueConst v, bool inScript) const {
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
+    return JValue();
+  }
+
+  if (!JS_IsArray(m_ctx, v)) {
+    m_jsBridgeContext->throwTypeException("Cannot convert JS value to Java array", inScript);
     return JValue();
   }
 
@@ -126,9 +139,8 @@ JValue Float::toJavaArray(JSValueConst v, bool inScript, const AdditionalData *a
 
   JArrayLocalRef<jfloat> floatArray(m_jniContext, count);
 
-  assert(JS_IsArray(m_ctx, v));
   for (uint32_t i = 0; i < count; ++i) {
-    JValue elementValue = toJava(JS_GetPropertyUint32(m_ctx, v, i), inScript, additionalData);
+    JValue elementValue = toJava(JS_GetPropertyUint32(m_ctx, v, i), inScript);
     floatArray.setElement(i, elementValue.getFloat());
     m_jsBridgeContext->checkRethrowJsError();
   }
@@ -136,11 +148,11 @@ JValue Float::toJavaArray(JSValueConst v, bool inScript, const AdditionalData *a
   return JValue(floatArray);
 }
 
-JSValue Float::fromJava(const JValue &value, bool inScript, const AdditionalData *) const {
+JSValue Float::fromJava(const JValue &value, bool inScript) const {
   return JS_NewFloat64(m_ctx, value.getFloat());
 }
 
-JSValue Float::fromJavaArray(const JniLocalRef<jarray> &values, bool inScript, const AdditionalData *additionalData) const {
+JSValue Float::fromJavaArray(const JniLocalRef<jarray> &values, bool inScript) const {
   JArrayLocalRef<jfloat> floatArray(values);
   const auto count = floatArray.getLength();
 
@@ -149,7 +161,7 @@ JSValue Float::fromJavaArray(const JniLocalRef<jarray> &values, bool inScript, c
   for (jsize i = 0; i < count; ++i) {
    jfloat f = floatArray.getElement(i);
     try {
-      JSValue elementValue = fromJava(JValue(f), inScript, additionalData);
+      JSValue elementValue = fromJava(JValue(f), inScript);
       JS_SetPropertyUint32(m_ctx, jsArray, i, elementValue);
     } catch (std::invalid_argument &e) {
       JS_FreeValue(m_ctx, jsArray);
@@ -174,8 +186,16 @@ JValue Float::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
   return JValue(f);
 }
 
-JniLocalRef<jclass> Float::getArrayClass() const {
-  return m_jniContext->getObjectClass(JArrayLocalRef<jfloat>(m_jniContext, 0));
+JValue Float::box(const JValue &floatValue) const {
+  // From float to Float
+  jmethodID boxId = m_jniContext->getStaticMethodID(getBoxedJavaClass(), "valueOf", "(F)Ljava/lang/Float;");
+  return JValue(m_jniContext->callStaticObjectMethod(getBoxedJavaClass(), boxId, floatValue.getFloat()));
+}
+
+JValue Float::unbox(const JValue &boxedValue) const {
+  // From Float to float
+  jmethodID unboxId = m_jniContext->getMethodID(getBoxedJavaClass(), "floatValue", "()F");
+  return JValue(m_jniContext->callFloatMethod(boxedValue.getLocalRef(), unboxId));
 }
 
 }  // namespace JavaTypes

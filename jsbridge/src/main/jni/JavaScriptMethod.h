@@ -20,7 +20,7 @@
 #define _JSBRIDGE_JAVASCRIPTMETHOD_H
 
 #include "jni-helpers/JniTypes.h"
-#include "jni-helpers/JniRef.h"
+#include "jni-helpers/JniGlobalRef.h"
 #include <string>
 #include <vector>
 
@@ -28,7 +28,7 @@
 # include "quickjs/quickjs.h"
 #endif
 
-class ArgumentLoader;
+class JavaType;
 class JsBridgeContext;
 class JObjectArrayLocalRef;
 class JValue;
@@ -36,7 +36,6 @@ class JValue;
 class JavaScriptMethod {
 public:
   JavaScriptMethod(const JsBridgeContext *, const JniRef<jsBridgeMethod> &method, std::string methodName, bool isLambda);
-  ~JavaScriptMethod();
 
   JavaScriptMethod(const JavaScriptMethod &) = delete;
   JavaScriptMethod& operator=(const JavaScriptMethod &) = delete;
@@ -54,8 +53,9 @@ public:
 
 private:
   std::string m_methodName;
-  const ArgumentLoader *m_returnValueLoader;
-  std::vector<ArgumentLoader *> m_argumentLoaders;
+  std::unique_ptr<const JavaType> m_returnValueType;
+  JniGlobalRef<jsBridgeParameter> m_returnValueParameter;
+  std::vector<std::unique_ptr<const JavaType>> m_argumentTypes;
   bool m_isVarArgs;
   bool m_isLambda;
 };

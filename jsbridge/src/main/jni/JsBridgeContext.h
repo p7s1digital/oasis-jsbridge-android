@@ -19,7 +19,7 @@
 #ifndef _JSBRIDGE_JSBRIDGECONTEXT_H
 #define _JSBRIDGE_JSBRIDGECONTEXT_H
 
-#include "JavaTypeMap.h"
+#include "JavaTypeProvider.h"
 #include "jni-helpers/JniLocalRef.h"
 #include "jni-helpers/JniContext.h"
 #include "jni-helpers/JObjectArrayLocalRef.h"
@@ -71,9 +71,9 @@ public:
   void assignJsValue(const std::string &strGlobalName, const std::string &strCode);
   void newJsFunction(const std::string &strGlobalName, const JObjectArrayLocalRef &args, const std::string &strCode);
 
-  void completeJsPromise(const std::string &strId, bool isFulfilled, const JniLocalRef<jobject> &value,
-                                 const JniLocalRef<jclass> &valueType);
   void processPromiseQueue();
+
+  void throwTypeException(const std::string &message, bool inScript) const;
 
   void queueIllegalArgumentException(const std::string &message) const;
   void queueJsException(const std::string &message) const;
@@ -82,14 +82,14 @@ public:
   void queueJavaExceptionForJsError() const;
 
   JniContext *jniContext() const { return m_currentJniContext; }
-  const JavaTypeMap &getJavaTypes() const { return m_javaTypes; }
+  const JavaTypeProvider &getJavaTypeProvider() const { return m_javaTypeProvider; }
   JniLocalRef<jthrowable> getJavaExceptionForJsError() const;
 
 #if defined(DUKTAPE)
   static JsBridgeContext *getInstance(duk_context *);
 
   DuktapeUtils *getUtils() const { return m_utils; }
-  duk_context *getCContext() const { return m_context; };
+  duk_context *getCContext() const { return m_ctx; };
 #elif defined(QUICKJS)
   static JsBridgeContext *getInstance(JSContext *);
 
@@ -101,13 +101,12 @@ private:
   // Updated on each Java -> Native call (and reset to nullptr afterwards)
   JniContext *m_currentJniContext = nullptr;
 
-  mutable JavaTypeMap m_javaTypes;
-  const JavaType *m_objectType = nullptr;
+  const JavaTypeProvider m_javaTypeProvider;
 
 #if defined(DUKTAPE)
   duk_idx_t pushJavaObject(const char *instanceName, const JniLocalRef<jobject> &object, const JObjectArrayLocalRef &methods) const;
 
-  duk_context *m_context = nullptr;
+  duk_context *m_ctx = nullptr;
   DuktapeUtils *m_utils = nullptr;
 #elif defined(QUICKJS)
   JSValue createJavaObject(const char *instanceName, const JniLocalRef<jobject> &object, const JObjectArrayLocalRef &methods) const;

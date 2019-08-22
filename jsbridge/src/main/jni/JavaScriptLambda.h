@@ -27,7 +27,6 @@
 # include "quickjs/quickjs.h"
 #endif
 
-class ArgumentLoader;
 class JsBridgeContext;
 class JavaScriptMethod;
 class JObjectArrayLocalRef;

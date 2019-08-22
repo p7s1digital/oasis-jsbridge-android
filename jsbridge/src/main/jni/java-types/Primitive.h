@@ -26,22 +26,19 @@ namespace JavaTypes {
 class Primitive : public JavaType {
 
 public:
-  virtual const char* getUnboxSignature() const = 0;
-  virtual const char* getUnboxMethodName() const = 0;
-  virtual const char* getBoxSignature() const = 0;
-  virtual const char* getBoxMethodName() const { return "valueOf"; }
+  virtual JValue box(const JValue &) const = 0;
+  virtual JValue unbox(const JValue &) const = 0;
 
-  bool isPrimitive() const override { return true; }
-  const JniGlobalRef<jclass> &boxedClass() const { return m_boxedClassRef; }
+  JavaTypeId boxedId() const { return m_boxedId; }
+  virtual JavaTypeId arrayId() const = 0;
 
 protected:
-  Primitive(const JsBridgeContext *jsBridgeContext, const JniGlobalRef<jclass>& classRef, const JniGlobalRef<jclass>& boxedClassRef)
-   : JavaType(jsBridgeContext, classRef)
-   , m_boxedClassRef(boxedClassRef) {
-  }
+  Primitive(const JsBridgeContext *, JavaTypeId primitiveId, JavaTypeId boxedId);
+
+  const JniRef<jclass> &getBoxedJavaClass() const;
 
 private:
-  JniGlobalRef<jclass> m_boxedClassRef;
+  JavaTypeId m_boxedId;
 };
 
 }  // namespace JavaTypes

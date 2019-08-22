@@ -18,35 +18,29 @@
 
 #include "JavaType.h"
 
-class ArgumentLoader;
-
 namespace JavaTypes {
 
 class Deferred : public JavaType {
 
 public:
-  Deferred(const JsBridgeContext *, const JniGlobalRef <jclass> &classRef);
+  static const char *PROMISE_COMPONENT_TYPE_PROP_NAME;
+
+  Deferred(const JsBridgeContext *, std::unique_ptr<const JavaType> &&componentType);
 
 #if defined(DUKTAPE)
-  JValue pop(bool inScript, const AdditionalData *) const override;
-  JValue pop(bool inScript, const JavaType *genericArgumentType, const JniRef<jsBridgeParameter> &genericArgumentParameter) const;
-  duk_ret_t push(const JValue &, bool inScript, const AdditionalData *) const override;
+  JValue pop(bool inScript) const override;
+  duk_ret_t push(const JValue &, bool inScript) const override;
 #elif defined(QUICKJS)
-  JValue toJava(JSValueConst, bool inScript, const AdditionalData *) const override;
-  JValue toJava(JSValueConst, bool inScript, const JavaType *genericArgumentType, const JniRef<jsBridgeParameter> &genericArgumentParameter) const;
-  JSValue fromJava(const JValue &, bool inScript, const AdditionalData *) const override;
+  JValue toJava(JSValueConst, bool inScript) const override;
+  JSValue fromJava(const JValue &, bool inScript) const override;
 #endif
 
   bool isDeferred() const override { return true; }
 
-  AdditionalData *createAdditionalPushData(const JniRef<jsBridgeParameter> &) const override;
-  AdditionalData *createAdditionalPopData(const JniRef<jsBridgeParameter> &) const override;
+  static void completeJsPromise(const JsBridgeContext *, const std::string &strId, bool isFulfilled, const JniLocalRef<jobject> &value);
 
 private:
-  class AdditionalPushData;
-  class AdditionalPopData;
-
-  const JavaType *m_objectType;
+  std::shared_ptr<const JavaType> m_componentType;
 };
 
 }  // namespace JavaTypes

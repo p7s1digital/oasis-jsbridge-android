@@ -34,24 +34,54 @@ class JniGlobalRef: public JniRef<T> {
 public:
   JniGlobalRef()
     : m_jniContext(nullptr)
-    , m_object(nullptr) {
+    , m_object(nullptr)
+    , m_refCounter(nullptr) {
   }
 
-  explicit JniGlobalRef(const JniRef<T> &ref)
-    : m_jniContext(ref.isNull() ? nullptr : ref.getJniContext())
-    , m_object(ref.isNull() ? nullptr : static_cast<T>(JniRefHelper::getJNIEnv(m_jniContext)->NewGlobalRef(ref.get()))) {
+  explicit JniGlobalRef(const JniRef<T> &other)
+    : m_jniContext(other.isNull() ? nullptr : other.getJniContext())
+    , m_object(nullptr)
+    , m_refCounter(nullptr) {
+
+    if (m_jniContext == nullptr) {
+      return;
+    }
+
+    auto otherAsGlobalRef = dynamic_cast<const JniGlobalRef *>(&other);
+
+    if (otherAsGlobalRef == nullptr) {
+      // Another JniRef instance (probably a JniLocalRef)
+      if (!other.isNull()) {
+        m_object = static_cast<T>(JniRefHelper::getJNIEnv(m_jniContext)->NewGlobalRef(other.get()));
+        m_refCounter = new RefCounter(1);
+      }
+    } else {
+      // Other is already a JniGlobalRef instance, use its JNI object and increment ref counter
+      m_object = otherAsGlobalRef->m_object;
+      m_refCounter = otherAsGlobalRef->m_refCounter;
+      if (m_refCounter != nullptr) {
+        m_refCounter->increment();
+      }
+    }
   }
 
   JniGlobalRef(JniGlobalRef<T> &&other)
-      : m_jniContext(other.m_jniContext)
-      , m_object(other.m_object) {
+   : m_jniContext(other.m_jniContext)
+   , m_object(other.m_object)
+   , m_refCounter(other.m_refCounter) {
 
-    other.m_object = nullptr;  // make sure that the "old" instance does not delete the global ref which is used in the new one
+    // Make sure that the "old" instance does not delete the global ref which is used in the new one
+    other.m_object = nullptr;
+    other.m_refCounter = nullptr;
   }
 
   JniGlobalRef(const JniGlobalRef<T> &other)
     : m_jniContext(other.m_jniContext)
-    , m_object(other.isNull() ? nullptr : static_cast<T>(JniRefHelper::getJNIEnv(m_jniContext)->NewGlobalRef(other.m_object))) {
+    , m_object(other.m_object)
+    , m_refCounter(other.m_refCounter) {
+    if (m_refCounter != nullptr) {
+      m_refCounter->increment();
+    }
   }
 
   JniGlobalRef &operator=(const JniGlobalRef<T> &other) {
@@ -59,10 +89,16 @@ public:
       return *this;
     }
 
-    release();
+    if (m_object != other.m_object) {
+      release();
+    }
 
     m_jniContext = other.getJniContext();
-    m_object = other.isNull() ? nullptr : static_cast<T>(JniRefHelper::getJNIEnv(m_jniContext)->NewGlobalRef(other.get()));
+    m_object = other.m_object;
+    m_refCounter = other.m_refCounter;
+    if (m_refCounter != nullptr) {
+      m_refCounter->increment();
+    }
 
     return *this;
   }
@@ -72,13 +108,17 @@ public:
       return *this;
     }
 
-    release();
+    if (m_object != other.m_object) {
+      release();
+    }
 
     m_jniContext = other.m_jniContext;
     m_object = other.m_object;
+    m_refCounter = other.m_refCounter;
 
     other.m_jniContext = nullptr;
     other.m_object = nullptr;
+    other.m_refCounter = nullptr;
 
     return *this;
   }
@@ -141,12 +181,29 @@ public:
   }
 
   void detach() {
-    m_detached = true;
+    if (m_refCounter) {
+      m_refCounter->disable();  // make sure that other instance with same counter don't get destroyed
+    }
+
+    delete m_refCounter;
+    m_refCounter = nullptr;
   }
 
 private:
   void release() {
-    if (m_object != nullptr && !m_detached) {
+    if (m_refCounter == nullptr) {
+      return;
+    }
+
+    m_refCounter->decrement();
+    if (!m_refCounter->isZero()) {
+      return;
+    }
+
+    delete m_refCounter;
+    m_refCounter = nullptr;
+
+    if (m_object != nullptr) {
       assert(m_jniContext != nullptr);
       JniRefHelper::getJNIEnv(m_jniContext)->DeleteGlobalRef(m_object);
     }
@@ -154,7 +211,7 @@ private:
 
   const JniContext *m_jniContext;
   T m_object;
-  bool m_detached = false;
+  RefCounter *m_refCounter;
 };
 
 #endif

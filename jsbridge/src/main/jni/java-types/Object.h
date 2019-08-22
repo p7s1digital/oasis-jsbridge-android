@@ -26,24 +26,20 @@ namespace JavaTypes {
 class Object : public JavaType {
 
 public:
-  Object(const JsBridgeContext *, const JniGlobalRef <jclass> &classRef,
-         const JavaType &boxedBoolean, const JavaType &boxedDouble,
-         const JavaType &jsonObjectWrapperType);
+  Object(const JsBridgeContext *);
 
 #if defined(DUKTAPE)
-  JValue pop(bool inScript, const AdditionalData *) const override;
-  duk_ret_t push(const JValue &value, bool inScript, const AdditionalData *) const override;
+  JValue pop(bool inScript) const override;
+  duk_ret_t push(const JValue &value, bool inScript) const override;
 #elif defined(QUICKJS)
-  JValue toJava(JSValueConst, bool inScript, const AdditionalData *) const override;
-  JSValue fromJava(const JValue &value, bool inScript, const AdditionalData *) const override;
+  JValue toJava(JSValueConst v, bool inScript) const override;
+  JSValue fromJava(const JValue &value, bool inScript) const override;
 #endif
 
 private:
-  const JavaType &m_boxedBoolean;
-  const JavaType &m_boxedDouble;
-  const JavaType &m_jsonObjectWrapperType;
+  JavaType *newJavaType(const JniLocalRef<jobject> &jobject) const;
 };
 
-}  // JavaType
+}  // namespace JavaTypes
 
 #endif

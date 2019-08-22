@@ -19,6 +19,7 @@
 #include "de_prosiebensat1digital_oasisjsbridge_JsBridge.h"
 #include "JsBridgeContext.h"
 #include "log.h"
+#include "java-types/Deferred.h"
 #include "jni-helpers/JniLocalRefStats.h"
 #include "jni-helpers/JniLocalRef.h"
 #include "jni-helpers/JObjectArrayLocalRef.h"
@@ -396,7 +397,7 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniNe
 }
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCompleteJsPromise
-    (JNIEnv *env, jobject, jlong lctx, jstring id, jboolean isFulfilled, jobject value, jclass valueType) {
+    (JNIEnv *env, jobject, jlong lctx, jstring id, jboolean isFulfilled, jobject value) {
 
   //alog("jniCompleteJsPromise()");
 
@@ -411,13 +412,20 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCo
 
   std::string strId = JStringLocalRef(jniContext, id, true).str();
   JniLocalRef<jobject> valueRef(jniContext, value, true);
-  JniLocalRef<jclass> valueTypeRef(jniContext, valueType, true);
 
-  return jsBridgeContext->completeJsPromise(strId, isFulfilled, valueRef, valueTypeRef);
+  try {
+    JavaTypes::Deferred::completeJsPromise(jsBridgeContext, strId, isFulfilled, valueRef);
+  } catch (const std::invalid_argument &e) {
+    jsBridgeContext->queueIllegalArgumentException(e.what());
+  } catch (const std::runtime_error &e) {
+    jsBridgeContext->queueJsException(e.what());
+  }
 }
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniProcessPromiseQueue
   (JNIEnv *env, jobject, jlong lctx) {
+
+  //alog("jniProcessPromiseQueue()");
 
   SET_UP_JNI_CONTEXT(env, lctx);
   auto jsBridgeContext = GET_DUKTAPE_CONTEXT();

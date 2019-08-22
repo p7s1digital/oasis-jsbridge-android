@@ -42,7 +42,7 @@ public:
 
   //explicit JObjectArrayLocalRef(const JniLocalRef<jobjectArray > &localRef)
   //    : JniLocalRef<jobjectArray>(localRef)
-  //    , m_str(localRef.get() ? JniRefHelper::getJNIEnv(localRef.getJniContext())->GetStringUTFChars(localRef.get(), nullptr) : nullptr)
+  //    , m_str(localRef.get() ? JniRefHelper::getJNIEnv(localRef.getJniContext())->GetStringUTFChars(localRef.create(), nullptr) : nullptr)
   //    , m_needsReleaseChars(true) {
   //}
 

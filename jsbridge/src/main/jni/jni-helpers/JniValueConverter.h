@@ -26,6 +26,8 @@ namespace JniValueConverter {
   static jboolean toJniValue(jboolean v) { return v; }
   static jint toJniValue(jint v) { return v; }
   static jlong toJniValue(jlong v) { return v; }
+  static jfloat toJniValue(jfloat v) { return v; }
+  static jdouble toJniValue(jdouble v) { return v; }
 
   // JniRef to jobject
   template<typename JniT>

@@ -24,6 +24,7 @@
 #include "jni-helpers/JniLocalRef.h"
 #include <jni.h>
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -31,16 +32,17 @@
 # include "duktape/duktape.h"
 #elif defined(QUICKJS)
 # include "quickjs/quickjs.h"
+#include "JavaType.h"
+
 #endif
 
-class ArgumentLoader;
+class JavaType;
 class JsBridgeContext;
 
 class JavaMethod {
 public:
   JavaMethod(const JsBridgeContext *, const JniLocalRef<jsBridgeMethod> &method, std::string methodName,
              bool isLambda);
-  ~JavaMethod();
 
 #if defined(DUKTAPE)
   duk_ret_t invoke(const JsBridgeContext *, const JniRef<jobject> &javaThis) const;
@@ -49,11 +51,13 @@ public:
 #endif
 
 private:
+  static JValue callLambda(const JsBridgeContext *, const JniRef<jsBridgeMethod> &, const JniRef<jobject> &javaThis, const std::vector<JValue> &args);
+
   std::string m_methodName;
   bool m_isLambda;
-  std::vector<ArgumentLoader *> m_argumentLoaders;
+  std::vector<std::unique_ptr<const JavaType>> m_argumentTypes;
   bool m_isVarArgs;
-  ArgumentLoader *m_returnValueLoader = nullptr;
+  std::unique_ptr<const JavaType> m_returnValueType;
 
 #if defined(DUKTAPE)
   std::function<duk_ret_t(const JniRef<jobject> &javaThis, const std::vector<JValue> &args)> m_methodBody;
