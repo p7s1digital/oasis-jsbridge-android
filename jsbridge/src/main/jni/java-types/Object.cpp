@@ -19,127 +19,179 @@
 #include "Object.h"
 
 #include "JsBridgeContext.h"
+#include "BoxedPrimitive.h"
+#include "Boolean.h"
+#include "Double.h"
+#include "Float.h"
+#include "Integer.h"
+#include "JsonObjectWrapper.h"
+#include "Long.h"
+#include "String.h"
 #include "jni-helpers/JniContext.h"
-#include "../JsBridgeContext.h"
-
-#if defined(DUKTAPE)
-# include "StackChecker.h"
-#elif defined(QUICKJS)
-# include "QuickJsUtils.h"
-#endif
 
 namespace JavaTypes {
 
-Object::Object(const JsBridgeContext *jsBridgeContext, const JniGlobalRef <jclass> &classRef,
-               const JavaType &boxedBoolean, const JavaType &boxedDouble, const JavaType &jsonObjectWrapperType)
-  : JavaType(jsBridgeContext, classRef)
-  , m_boxedBoolean(boxedBoolean)
-  , m_boxedDouble(boxedDouble)
-  , m_jsonObjectWrapperType(jsonObjectWrapperType) {
+Object::Object(const JsBridgeContext *jsBridgeContext)
+ : JavaType(jsBridgeContext, JavaTypeId::Object) {
 }
 
 #if defined(DUKTAPE)
 
-JValue Object::pop(bool inScript, const AdditionalData *) const {
+#include "StackChecker.h"
+#include "JsonObjectWrapper.h"
+
+JValue Object::pop(bool inScript) const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
-  switch (duk_get_type(m_ctx, -1)) {
+  duk_ret_t dukType = duk_get_type(m_ctx, -1);
+
+  switch (dukType) {
     case DUK_TYPE_NULL:
     case DUK_TYPE_UNDEFINED:
       duk_pop(m_ctx);
-    return JValue();
+      return JValue();
 
-    case DUK_TYPE_BOOLEAN:
-      return m_boxedBoolean.pop(inScript, nullptr);
-
-    case DUK_TYPE_NUMBER:
-      return m_boxedDouble.pop(inScript, nullptr);
-
-    case DUK_TYPE_STRING: {
-      const char *str = duk_get_string(m_ctx, -1);
-      JStringLocalRef localRef(m_jniContext, str);
-      duk_pop(m_ctx);
-      return JValue(localRef);
+    case DUK_TYPE_BOOLEAN: {
+      auto booleanType = std::make_unique<Boolean>(m_jsBridgeContext);
+      auto boxedBoleanType = std::make_unique<BoxedPrimitive>(m_jsBridgeContext, std::move(booleanType));
+      return boxedBoleanType->pop(inScript);
     }
 
-    case DUK_TYPE_OBJECT:
-      return m_jsonObjectWrapperType.pop(inScript, nullptr);
+    case DUK_TYPE_NUMBER: {
+      auto doubleType = std::make_unique<Double>(m_jsBridgeContext);
+      auto boxedDoubleType = std::make_unique<BoxedPrimitive>(m_jsBridgeContext, std::move(doubleType));
+      return boxedDoubleType->pop(inScript);
+    }
+
+    case DUK_TYPE_STRING: {
+      auto stringType = std::make_unique<String>(m_jsBridgeContext);
+      return stringType->pop(inScript);
+    }
+
+    case DUK_TYPE_OBJECT: {
+      auto jsonObjectWrapperType = std::make_unique<JsonObjectWrapper>(m_jsBridgeContext);
+      return jsonObjectWrapperType->pop(inScript);
+    }
 
     default: {
       const auto message = std::string("Cannot marshal return value ") + duk_safe_to_string(m_ctx, -1) + " to Java";
-      if (inScript) {
-        duk_error(m_ctx, DUK_RET_TYPE_ERROR, message.c_str());
-      }
       duk_pop(m_ctx);
-      if (!inScript) {
-        throw std::invalid_argument(message);
-      }
-      return JValue();
+      CHECK_STACK_NOW();
+      m_jsBridgeContext->throwTypeException(message, inScript);
+      return JValue();  // unreachable
     }
   }
 }
 
-duk_ret_t Object::push(const JValue &value, bool inScript, const AdditionalData *) const {
+duk_ret_t Object::push(const JValue &value, bool inScript) const {
   CHECK_STACK_OFFSET(m_ctx, 1);
 
-  const JniLocalRef<jobject> &jObject = value.getLocalRef();
+  const JniLocalRef<jobject> &jBasicObject = value.getLocalRef();
 
-  if (jObject.isNull()) {
+  if (jBasicObject.isNull()) {
     duk_push_null(m_ctx);
     return 1;
   }
 
-  JniLocalRef<jclass> javaClass = m_jniContext->getObjectClass(jObject);
-  return m_jsBridgeContext->getJavaTypes().get(m_jsBridgeContext, javaClass)->push(value, inScript, nullptr /*TODO*/);
+  JavaType *javaType = newJavaType(jBasicObject);
+
+  if (javaType == nullptr) {
+    m_jsBridgeContext->throwTypeException("Cannot push Object: unsupported Java type", inScript);
+    return DUK_RET_ERROR;
+  }
+
+  duk_ret_t ret = javaType->push(value, inScript);
+  delete javaType;
+  return ret;
 }
 
 #elif defined(QUICKJS)
 
-JValue Object::toJava(JSValueConst v, bool inScript, const AdditionalData *) const {
+#include "QuickJsUtils.h"
+
+JValue Object::toJava(JSValueConst v, bool inScript) const {
   if (JS_IsUndefined(v) || JS_IsNull(v)) {
     return JValue();
   }
 
   if (JS_IsBool(v)) {
-    return m_boxedBoolean.toJava(v, inScript, nullptr);
+    auto booleanType = std::make_unique<Boolean>(m_jsBridgeContext);
+    auto boxedBoleanType = std::make_unique<BoxedPrimitive>(m_jsBridgeContext, std::move(booleanType));
+    return boxedBoleanType->toJava(v, inScript);
   }
 
   if (JS_IsNumber(v)) {
-    return m_boxedDouble.toJava(v, inScript, nullptr);
+    auto doubleType = std::make_unique<Double>(m_jsBridgeContext);
+    auto boxedDoubleType = std::make_unique<BoxedPrimitive>(m_jsBridgeContext, std::move(doubleType));
+    return boxedDoubleType->toJava(v, inScript);
   }
 
   if (JS_IsString(v)) {
-    JStringLocalRef localRef = m_jsBridgeContext->getUtils()->toJString(v);
-    return JValue(localRef);
+    auto stringType = std::make_unique<String>(m_jsBridgeContext);
+    return stringType->toJava(v, inScript);
   }
 
   if (JS_IsObject(v)) {
-    return m_jsonObjectWrapperType.toJava(v, inScript, nullptr);
+    auto jsonObjectWrapperType = std::make_unique<JsonObjectWrapper>(m_jsBridgeContext);
+    return jsonObjectWrapperType->toJava(v, inScript);
   }
 
-  const auto message = "Cannot marshal return value to Java";
-  if (inScript) {
-    JS_ThrowTypeError(m_ctx, message);
-  }
-  if (!inScript) {
-    throw std::invalid_argument(message);
-  }
-
+  const char *message = "Cannot marshal return value to Java";
+  m_jsBridgeContext->throwTypeException(message, inScript);
   return JValue();
 }
 
-JSValue Object::fromJava(const JValue &value, bool inScript, const AdditionalData *) const {
-  const JniLocalRef<jobject> &jObject = value.getLocalRef();
+JSValue Object::fromJava(const JValue &value, bool inScript) const {
+  const JniLocalRef<jobject> &jBasicObject = value.getLocalRef();
 
-  if (jObject.isNull()) {
+  if (jBasicObject.isNull()) {
     return JS_NULL;
   }
 
-  JniLocalRef<jclass> javaClass = m_jniContext->getObjectClass(jObject);
-  return m_jsBridgeContext->getJavaTypes().get(m_jsBridgeContext, javaClass)->fromJava(value, inScript, nullptr);
+  JavaType *javaType = newJavaType(jBasicObject);
+
+  if (javaType == nullptr) {
+    m_jsBridgeContext->throwTypeException("Cannot transfer Java Object to JS: unsupported Java type", inScript);
+    return JS_EXCEPTION;
+  }
+
+  JSValue ret = javaType->fromJava(value, inScript);
+  delete javaType;
+  return ret;
 }
 
 #endif
+
+JavaType *Object::newJavaType(const JniLocalRef<jobject> &jobject) const {
+  JniLocalRef<jclass> objectJavaClass = m_jniContext->getObjectClass(jobject);
+  jmethodID getName = m_jniContext->getMethodID(objectJavaClass, "getName", "()Ljava/lang/String;");
+  auto strName = JStringLocalRef(m_jniContext->callObjectMethod<jstring>(objectJavaClass, getName)).str();
+
+  JavaTypeId id = getJavaTypeIdByJavaName(strName);
+  switch (id) {
+    case JavaTypeId::Boolean:
+    case JavaTypeId::BoxedBoolean:
+      return new BoxedPrimitive(m_jsBridgeContext, std::make_unique<Boolean>(m_jsBridgeContext));
+    case JavaTypeId::Int:
+    case JavaTypeId::BoxedInt:
+      return new BoxedPrimitive(m_jsBridgeContext, std::make_unique<Integer>(m_jsBridgeContext));
+    case JavaTypeId::Long:
+    case JavaTypeId::BoxedLong:
+      return new BoxedPrimitive(m_jsBridgeContext, std::make_unique<Long>(m_jsBridgeContext));
+    case JavaTypeId::Float:
+    case JavaTypeId::BoxedFloat:
+      return new BoxedPrimitive(m_jsBridgeContext, std::make_unique<Float>(m_jsBridgeContext));
+    case JavaTypeId::Double:
+    case JavaTypeId::BoxedDouble:
+      return new BoxedPrimitive(m_jsBridgeContext, std::make_unique<Double>(m_jsBridgeContext));
+    case JavaTypeId::String:
+      return new String(m_jsBridgeContext);
+    case JavaTypeId::JsonObjectWrapper:
+      return new JsonObjectWrapper(m_jsBridgeContext);
+    default:
+      return nullptr;
+  }
+}
 
 }  // namespace JavaTypes
 

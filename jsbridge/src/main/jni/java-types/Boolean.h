@@ -26,37 +26,29 @@ namespace JavaTypes {
 class Boolean : public Primitive {
 
 public:
-  Boolean(const JsBridgeContext *, const JniGlobalRef<jclass>& classRef, const JniGlobalRef<jclass>& boxedClassRef);
+  Boolean(const JsBridgeContext *);
 
 #if defined(DUKTAPE)
-  JValue pop(bool inScript, const AdditionalData *) const override;
-  JValue popArray(uint32_t count, bool expanded, bool inScript, const AdditionalData *) const override;
+  JValue pop(bool inScript) const override;
+  JValue popArray(uint32_t count, bool expanded, bool inScript) const override;
 
-  duk_ret_t push(const JValue &, bool inScript, const AdditionalData *) const override;
-  duk_ret_t pushArray(const JniLocalRef<jarray>& values, bool expand, bool inScript, const AdditionalData *) const override;
+  duk_ret_t push(const JValue &, bool inScript) const override;
+  duk_ret_t pushArray(const JniLocalRef<jarray>& values, bool expand, bool inScript) const override;
 #elif defined(QUICKJS)
-  JValue toJava(JSValueConst, bool inScript, const AdditionalData *) const override;
-  JValue toJavaArray(JSValueConst, bool inScript, const AdditionalData *) const override;
+  JValue toJava(JSValueConst, bool inScript) const override;
+  JValue toJavaArray(JSValueConst, bool inScript) const override;
 
-  JSValue fromJava(const JValue &, bool inScript, const AdditionalData *) const override;
-  JSValue fromJavaArray(const JniLocalRef<jarray>& values, bool inScript, const AdditionalData *) const override;
+  JSValue fromJava(const JValue &, bool inScript) const override;
+  JSValue fromJavaArray(const JniLocalRef<jarray>& values, bool inScript) const override;
 #endif
 
   JValue callMethod(jmethodID, const JniRef<jobject> &javaThis, const std::vector<JValue> &args) const override;
 
-  JniLocalRef<jclass> getArrayClass() const override;
+  JavaTypeId arrayId() const override { return JavaTypeId::BooleanArray; }
 
-  const char* getUnboxSignature() const override {
-    return "()Z";
-  }
-
-  const char* getUnboxMethodName() const override {
-    return "booleanValue";
-  }
-
-  const char* getBoxSignature() const override {
-    return "(Z)Ljava/lang/Boolean;";
-  }
+private:
+  JValue box(const JValue &) const override;
+  JValue unbox(const JValue &) const override;
 };
 
 }  // namespace JavaTypes

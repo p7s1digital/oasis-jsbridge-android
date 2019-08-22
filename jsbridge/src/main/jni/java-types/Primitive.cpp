@@ -1,6 +1,9 @@
 /*
  * Copyright (C) 2019 ProSiebenSat1.Digital GmbH.
  *
+ * Originally based on Duktape Android:
+ * Copyright (C) 2015 Square, Inc.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -13,26 +16,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef _JSBRIDGE_REFCOUNTER_H
-#define _JSBRIDGE_REFCOUNTER_H
+#include "Primitive.h"
+#include "JsBridgeContext.h"
+#include "jni-helpers/JniContext.h"
 
-#include <cassert>
+namespace JavaTypes {
 
-// Simple, thread-unsafe reference counter.
-class RefCounter {
+Primitive::Primitive(const JsBridgeContext *jsBridgeContext, JavaTypeId primitiveId, JavaTypeId boxedId)
+ : JavaType(jsBridgeContext, primitiveId)
+ , m_boxedId(boxedId) {
+}
 
-public:
-    RefCounter(int initialCount = 0) : m_count(initialCount) {}
-    RefCounter(const RefCounter &) = delete;
-    RefCounter& operator=(const RefCounter &) = delete;
+const JniRef<jclass> &Primitive::getBoxedJavaClass() const {
+  return m_jsBridgeContext->getJavaTypeProvider().getJavaClass(m_boxedId);
+}
 
-    void increment() { if (m_count >= 0) ++m_count; }
-    void decrement() { assert(m_count != 0); --m_count; }
-    bool isZero() const { return m_count == 0; }
-    void disable() { m_count = -1; }
+}  // namespace JavaTypes
 
-private:
-    int m_count;
-};
-
-#endif //OASIS_NATIVE_ANDROID_REFCOUNTER_H

@@ -20,7 +20,6 @@
 #define _JSBRIDGE_JAVATYPES_BOXEDPRIMITIVE_H
 
 #include "JavaType.h"
-#include "../JsBridgeContext.h"
 
 namespace JavaTypes {
 
@@ -29,22 +28,18 @@ class Primitive;
 class BoxedPrimitive : public JavaType {
 
 public:
-  BoxedPrimitive(const JsBridgeContext *, const Primitive &);
+  BoxedPrimitive(const JsBridgeContext *, std::unique_ptr<Primitive>);
 
 #if defined(DUKTAPE)
-  JValue pop(bool inScript, const AdditionalData *) const override;
-  duk_ret_t push(const JValue &, bool inScript, const AdditionalData *) const override;
+  JValue pop(bool inScript) const override;
+  duk_ret_t push(const JValue &, bool inScript) const override;
 #elif defined(QUICKJS)
-  JValue toJava(JSValueConst, bool inScript, const AdditionalData *) const override;
-  JSValue fromJava(const JValue &, bool inScript, const AdditionalData *) const override;
+  JValue toJava(JSValueConst, bool inScript) const override;
+  JSValue fromJava(const JValue &, bool inScript) const override;
 #endif
 
-  bool isInteger() const override;
-
 private:
-  const Primitive &m_primitive;
-  jmethodID m_unbox;
-  jmethodID m_box;
+  std::unique_ptr<Primitive> m_primitive;
 };
 
 }  // namespace JavaTypes

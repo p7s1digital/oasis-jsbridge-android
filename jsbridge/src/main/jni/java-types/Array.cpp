@@ -19,57 +19,32 @@
 #include "Array.h"
 
 #include "JsBridgeContext.h"
+#include "Primitive.h"
 #include "jni-helpers/JValue.h"
 #include <string>
 
+namespace {
+  JavaTypeId getArrayId(const JavaType *componentType) {
+    auto primitive = dynamic_cast<const JavaTypes::Primitive *>(componentType);
+    if (primitive == nullptr) {
+      return JavaTypeId::ObjectArray;
+    }
+    return primitive->arrayId();
+  }
+}
+
 namespace JavaTypes {
 
-Array::Array(const JsBridgeContext *jsBridgeContext, const JniGlobalRef<jclass>& classRef, const JavaType& componentType)
- : JavaType(jsBridgeContext, classRef)
- , m_componentType(componentType) {
-}
-
-class Array::AdditionalArrayData: public JavaType::AdditionalData {
-public:
-  AdditionalArrayData() = default;
-
-  const JavaType *genericArgumentType = nullptr;
-  JniGlobalRef<jsBridgeParameter> genericArgumentParameter;
-};
-
-JavaType::AdditionalData *Array::createAdditionalPopData(const JniRef<jsBridgeParameter> &parameter) const {
-  if (m_componentType.isPrimitive()) {
-    return nullptr;
-  }
-
-  auto data = new AdditionalArrayData();
-
-  const JniRef<jclass> &parameterClass = m_jniContext->getJsBridgeParameterClass();
-
-  jmethodID getGenericParameter = m_jniContext->getMethodID(parameterClass, "getGenericParameter", "()Lde/prosiebensat1digital/oasisjsbridge/Parameter;");
-  JniLocalRef<jsBridgeParameter> genericParameter = m_jniContext->callObjectMethod<jsBridgeParameter>(parameter, getGenericParameter);
-
-  if (genericParameter.isNull()) {
-    return nullptr;
-  }
-
-  jmethodID getGenericJavaClass = m_jniContext->getMethodID(parameterClass, "getJava", "()Ljava/lang/Class;");
-  JniLocalRef<jclass> genericJavaClass = m_jniContext->callObjectMethod<jclass>(genericParameter, getGenericJavaClass);
-
-  data->genericArgumentType = m_jsBridgeContext->getJavaTypes().get(m_jsBridgeContext, genericJavaClass, true /*boxed*/);
-  data->genericArgumentParameter = JniGlobalRef<jsBridgeParameter>(genericParameter);
-  return data;
-}
-
-JavaType::AdditionalData *Array::createAdditionalPushData(const JniRef<jsBridgeParameter> &parameter) const {
-  return createAdditionalPopData(parameter);
+Array::Array(const JsBridgeContext *jsBridgeContext, std::unique_ptr<const JavaType> &&componentType)
+ : JavaType(jsBridgeContext, getArrayId(componentType.get()))
+ , m_componentType(std::move(componentType)) {
 }
 
 #if defined(DUKTAPE)
 
 #include "StackChecker.h"
 
-JValue Array::pop(bool inScript, const AdditionalData *additionalData) const {
+JValue Array::pop(bool inScript) const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
   if (duk_is_null_or_undefined(m_ctx, -1)) {
@@ -79,27 +54,15 @@ JValue Array::pop(bool inScript, const AdditionalData *additionalData) const {
 
   if (!duk_is_array(m_ctx, -1)) {
     const auto message = std::string("Cannot convert ") + duk_safe_to_string(m_ctx, -1) + " to array";
-    if (inScript) {
-      duk_error(m_ctx, DUK_RET_TYPE_ERROR, message.c_str());
-    }
     duk_pop(m_ctx);
-    if (!inScript) {
-      throw std::invalid_argument(message);
-    }
+    CHECK_STACK_NOW();
+    m_jsBridgeContext->throwTypeException(message, inScript);
   }
 
-  auto additionalArrayData = dynamic_cast<const AdditionalArrayData *>(additionalData);
-
-  const JavaType *componentType = additionalArrayData != nullptr ? additionalArrayData->genericArgumentType : &m_componentType;
-
-  AdditionalData *additionalComponentData = nullptr;
-  if (additionalArrayData != nullptr) {
-    additionalComponentData = componentType->createAdditionalPopData(additionalArrayData->genericArgumentParameter);
-  }
-  return componentType->popArray(1, false, inScript, additionalComponentData);
+  return m_componentType->popArray(1, false, inScript);
 }
 
-duk_ret_t Array::push(const JValue &value, bool inScript, const AdditionalData *additionalData) const {
+duk_ret_t Array::push(const JValue &value, bool inScript) const {
   CHECK_STACK_OFFSET(m_ctx, 1);
 
   JniLocalRef<jarray> jArray(value.getLocalRef().staticCast<jarray>());
@@ -109,54 +72,33 @@ duk_ret_t Array::push(const JValue &value, bool inScript, const AdditionalData *
     return 1;
   }
 
-  auto additionalArrayData = dynamic_cast<const AdditionalArrayData *>(additionalData);
-
-  const JavaType *componentType = additionalArrayData != nullptr ? additionalArrayData->genericArgumentType : &m_componentType;
-
-  AdditionalData *additionalComponentData = nullptr;
-  if (additionalArrayData != nullptr) {
-    additionalComponentData = componentType->createAdditionalPopData(additionalArrayData->genericArgumentParameter);
-  }
-  return componentType->pushArray(jArray, false, inScript, additionalComponentData);
+  return m_componentType->pushArray(jArray, false, inScript);
 }
 
 #elif defined(QUICKJS)
 
-JValue Array::toJava(JSValueConst v, bool inScript, const AdditionalData *additionalData) const {
+JValue Array::toJava(JSValueConst v, bool inScript) const {
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
     return JValue();
   }
 
-  assert(JS_IsArray(m_ctx, v));  // TODO: exception handling
-
-  auto additionalArrayData = dynamic_cast<const AdditionalArrayData *>(additionalData);
-
-  const JavaType *componentType = additionalArrayData != nullptr ? additionalArrayData->genericArgumentType : &m_componentType;
-
-  AdditionalData *additionalComponentData = nullptr;
-  if (additionalArrayData != nullptr) {
-    additionalComponentData = componentType->createAdditionalPopData(additionalArrayData->genericArgumentParameter);
+  if (!JS_IsArray(m_ctx, v)) {
+    const char *message = "Cannot convert value to array";
+    m_jsBridgeContext->throwTypeException(message, inScript);
+    return JValue();
   }
 
-  return componentType->toJavaArray(v, inScript, additionalComponentData);
+  return m_componentType->toJavaArray(v, inScript);
 }
 
-JSValue Array::fromJava(const JValue &value, bool inScript, const AdditionalData *additionalData) const {
+JSValue Array::fromJava(const JValue &value, bool inScript) const {
   JniLocalRef<jarray> jArray(value.getLocalRef().staticCast<jarray>());
 
   if (jArray.isNull()) {
     return JS_NULL;
   }
 
-  auto additionalArrayData = dynamic_cast<const AdditionalArrayData *>(additionalData);
-
-  const JavaType *componentType = additionalArrayData != nullptr ? additionalArrayData->genericArgumentType : &m_componentType;
-
-  AdditionalData *additionalComponentData = nullptr;
-  if (additionalArrayData != nullptr) {
-    additionalComponentData = componentType->createAdditionalPopData(additionalArrayData->genericArgumentParameter);
-  }
-  return componentType->fromJavaArray(jArray, inScript, additionalComponentData);
+  return m_componentType->fromJavaArray(jArray, inScript);
 }
 
 #endif

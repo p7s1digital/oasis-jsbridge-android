@@ -15,7 +15,6 @@
  */
 #include "java-types/Deferred.h"
 
-#include "ArgumentLoader.h"
 #include "JsBridgeContext.h"
 #include "StackChecker.h"
 #include "jni-helpers/JniContext.h"
@@ -28,7 +27,7 @@ namespace {
 
   struct OnPromisePayload {
     JniGlobalRef<jobject> javaDeferred;
-    ArgumentLoader argumentLoader;
+    std::shared_ptr<const JavaType> componentType;
   };
 
   extern "C" {
@@ -56,7 +55,7 @@ namespace {
       // Pop promise value
       JValue value;
       if (argCount == 1) {
-        value = payload->argumentLoader.pop();
+        value = payload->componentType->pop(true /*inScript*/);
       } else if (argCount > 1) {
         duk_pop_n(ctx, argCount);
       }
@@ -89,7 +88,6 @@ namespace {
 
       duk_pop_2(ctx);  // OnPromiseRejectedPayload + current function
 
-      //JValue value = payload->argumentLoader.pop();
       JValue value;
       if (argCount == 1) {
         value = JValue(jsBridgeContext->getJavaExceptionForJsError());
@@ -143,51 +141,36 @@ namespace {
       duk_pop_2(ctx);  // PromiseObject + current function
       return 0;
     }
+
+    duk_ret_t finalizePromiseObject(duk_context *ctx) {
+      CHECK_STACK(ctx);
+
+      JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
+      assert(jsBridgeContext != nullptr);
+
+      if (duk_get_prop_string(ctx, -1, JavaTypes::Deferred::PROMISE_COMPONENT_TYPE_PROP_NAME)) {
+        delete reinterpret_cast<std::shared_ptr<const JavaType> *>(duk_require_pointer(ctx, -1));
+      }
+
+      duk_pop(ctx);  // Component type ptr
+      return 0;
+    }
   }
 }
 
 
 namespace JavaTypes {
 
-Deferred::Deferred(const JsBridgeContext *jsBridgeContext, const JniGlobalRef <jclass> &classRef)
-  : JavaType(jsBridgeContext, classRef)
-  , m_objectType(m_jsBridgeContext->getJavaTypes().getObjectType(m_jsBridgeContext)){
-}
+// static
+const char *Deferred::PROMISE_COMPONENT_TYPE_PROP_NAME = "\xff\xff" "promise_type";
 
-class Deferred::AdditionalPopData: public JavaType::AdditionalData {
-public:
-  AdditionalPopData() = default;
-
-  const JavaType *genericArgumentType = nullptr;
-  JniGlobalRef<jsBridgeParameter> genericArgumentParameter;
-};
-
-JavaType::AdditionalData *Deferred::createAdditionalPopData(const JniRef<jsBridgeParameter> &parameter) const {
-  auto data = new AdditionalPopData();
-
-  const JniRef<jclass> &jsBridgeMethodClass = m_jniContext->getJsBridgeMethodClass();
-  const JniRef<jclass> &parameterClass = m_jniContext->getJsBridgeParameterClass();
-
-  jmethodID getGenericParameter = m_jniContext->getMethodID(parameterClass, "getGenericParameter", "()Lde/prosiebensat1digital/oasisjsbridge/Parameter;");
-  JniLocalRef<jsBridgeParameter> genericParameter = m_jniContext->callObjectMethod<jsBridgeParameter>(parameter, getGenericParameter);
-
-  jmethodID getGenericJavaClass = m_jniContext->getMethodID(parameterClass, "getJava", "()Ljava/lang/Class;");
-  JniLocalRef<jclass> genericJavaClass = m_jniContext->callObjectMethod<jclass>(genericParameter, getGenericJavaClass);
-
-  data->genericArgumentType = m_jsBridgeContext->getJavaTypes().get(m_jsBridgeContext, genericJavaClass, true /*boxed*/);
-  data->genericArgumentParameter = JniGlobalRef<jsBridgeParameter>(genericParameter);
-  return data;
+Deferred::Deferred(const JsBridgeContext *jsBridgeContext, std::unique_ptr<const JavaType> &&componentType)
+ : JavaType(jsBridgeContext, JavaTypeId::Deferred)
+ , m_componentType(std::move(componentType)) {
 }
 
 // JS Promise to native Deferred
-JValue Deferred::pop(bool inScript, const AdditionalData *additionalData) const {
-  auto additionalPopData = dynamic_cast<const AdditionalPopData *>(additionalData);
-  assert(additionalPopData != nullptr);
-
-  return pop(inScript, additionalPopData->genericArgumentType, additionalPopData->genericArgumentParameter);
-}
-
-JValue Deferred::pop(bool inScript, const JavaType *genericArgumentType, const JniRef<jsBridgeParameter> &genericArgumentParameter) const {
+JValue Deferred::pop(bool inScript) const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
   // Create a native Deferred instance
@@ -197,8 +180,7 @@ JValue Deferred::pop(bool inScript, const JavaType *genericArgumentType, const J
 
   if (!duk_is_object(m_ctx, -1) || !duk_has_prop_string(m_ctx, -1, "then")) {
     // Not a Promise => directly resolve the native Deferred with the value
-    ArgumentLoader argumentLoader(genericArgumentType, genericArgumentParameter, inScript);
-    JValue value = argumentLoader.pop();
+    JValue value = m_componentType->pop(inScript);
 
     m_jniContext->callJsBridgeVoidMethod("resolveDeferred",
                                          "(Lkotlinx/coroutines/CompletableDeferred;Ljava/lang/Object;)V",
@@ -216,8 +198,6 @@ JValue Deferred::pop(bool inScript, const JavaType *genericArgumentType, const J
   duk_dup(m_ctx, onPromiseFulfilledIdx);
   duk_dup(m_ctx, onPromiseRejectedIdx);
   if (duk_pcall_prop(m_ctx, jsPromiseObjectIdx, 2) != DUK_EXEC_SUCCESS) {
-    const char *errStr = duk_to_string(m_ctx, -1);
-    alog("Error while calling JSPromise.then(): %s", errStr);
     JniLocalRef<jthrowable> javaException = m_jsBridgeContext->getJavaExceptionForJsError();
     m_jniContext->callJsBridgeVoidMethod("rejectDeferred",
                                          "(Lkotlinx/coroutines/CompletableDeferred;Ljava/lang/Object;)V",
@@ -229,16 +209,16 @@ JValue Deferred::pop(bool inScript, const JavaType *genericArgumentType, const J
   duk_pop(m_ctx);  // ignored ret val
 
   // Bind the payload to the onPromiseFulfilled function
-  auto onPromiseFulfilledPayload = new OnPromisePayload { JniGlobalRef<jobject>(javaDeferred), ArgumentLoader(genericArgumentType, genericArgumentParameter, inScript) };
+  auto onPromiseFulfilledPayload = new OnPromisePayload { JniGlobalRef<jobject>(javaDeferred), m_componentType };
   duk_push_pointer(m_ctx, reinterpret_cast<void *>(onPromiseFulfilledPayload));
   duk_put_prop_string(m_ctx, onPromiseFulfilledIdx, PAYLOAD_PROP_NAME);
 
   // Bind the payload to the onPromiseRejected function
-  auto onPromiseRejectedPayload = new OnPromisePayload { JniGlobalRef<jobject>(javaDeferred), ArgumentLoader(m_objectType, JniLocalRef<jsBridgeParameter>(), inScript) };
+  auto onPromiseRejectedPayload = new OnPromisePayload { JniGlobalRef<jobject>(javaDeferred), m_componentType };
   duk_push_pointer(m_ctx, reinterpret_cast<void *>(onPromiseRejectedPayload));
   duk_put_prop_string(m_ctx, onPromiseRejectedIdx, PAYLOAD_PROP_NAME);
 
-  // Finalizer (which releases the JavaDeferred global ref and the ArgumentLoaderPtr pointer)
+  // Finalizer (which releases the JavaDeferred and the component Parameter global refs)
   duk_push_c_function(m_ctx, finalizeOnPromise, 1);
   duk_set_finalizer(m_ctx, onPromiseFulfilledIdx);
   duk_push_c_function(m_ctx, finalizeOnPromise, 1);
@@ -248,35 +228,9 @@ JValue Deferred::pop(bool inScript, const JavaType *genericArgumentType, const J
   return JValue(javaDeferred);
 }
 
-class Deferred::AdditionalPushData: public JavaType::AdditionalData {
-public:
-  AdditionalPushData() = default;
-
-  JniGlobalRef<jclass> promiseJavaClass;
-};
-
-JavaType::AdditionalData *Deferred::createAdditionalPushData(const JniRef<jsBridgeParameter> &parameter) const {
-  auto data = new AdditionalPushData();
-
-  const JniRef<jclass> &jsBridgeMethodClass = m_jniContext->getJsBridgeMethodClass();
-  const JniRef<jclass> &parameterClass = m_jniContext->getJsBridgeParameterClass();
-
-  jmethodID getGenericParameter = m_jniContext->getMethodID(parameterClass, "getGenericParameter", "()Lde/prosiebensat1digital/oasisjsbridge/Parameter;");
-  JniLocalRef<jsBridgeParameter> genericParameter = m_jniContext->callObjectMethod<jsBridgeParameter>(parameter, getGenericParameter);
-
-  jmethodID getGenericJavaClass = m_jniContext->getMethodID(parameterClass, "getJava", "()Ljava/lang/Class;");
-  JniLocalRef<jclass> genericJavaClass = m_jniContext->callObjectMethod<jclass>(genericParameter, getGenericJavaClass);
-
-  data->promiseJavaClass = JniGlobalRef<jclass>(genericJavaClass);
-  return data;
-}
-
 // Native Deferred to JS Promise
-duk_ret_t Deferred::push(const JValue &value, bool inScript, const AdditionalData *additionalData) const {
+duk_ret_t Deferred::push(const JValue &value, bool inScript) const {
   CHECK_STACK_OFFSET(m_ctx, 1);
-
-  auto additionalPushData = dynamic_cast<const AdditionalPushData *>(additionalData);
-  assert(additionalPushData != nullptr);
 
   const JniLocalRef<jobject> &jDeferred = value.getLocalRef();
 
@@ -291,7 +245,13 @@ duk_ret_t Deferred::push(const JValue &value, bool inScript, const AdditionalDat
 
   // Create a PromiseObject which will be eventually filled with {resolve, reject}
   duk_push_object(m_ctx);
+  duk_push_pointer(m_ctx, new std::shared_ptr<const JavaType>(m_componentType));
+  duk_put_prop_string(m_ctx, -2, PROMISE_COMPONENT_TYPE_PROP_NAME);
   // => STASH: [... promiseFunction PromiseObject]
+
+  // Set the finalizer of the PromiseObject
+  duk_push_c_function(m_ctx, finalizePromiseObject, 1);
+  duk_set_finalizer(m_ctx, -2);
 
   static int promiseCount = 0;
   std::string promiseObjectGlobalName = PROMISE_OBJECT_GLOBAL_NAME_PREFIX + std::to_string(++promiseCount);
@@ -307,10 +267,9 @@ duk_ret_t Deferred::push(const JValue &value, bool inScript, const AdditionalDat
 
   // new Promise(promiseFunction)
   if (!duk_get_global_string(m_ctx, "Promise")) {
-    // TODO: error
     duk_pop_2(m_ctx);  // (undefined) "Promise" + promiseFunction
-    duk_push_null(m_ctx);
-    return 1;
+    m_jsBridgeContext->throwTypeException("Cannot push Deferred: global.Promise is undefined", inScript);
+    return DUK_RET_ERROR;  // unreachable
   }
   duk_dup(m_ctx, -2 /*promiseFunction*/);
   duk_new(m_ctx, 1);  // [... "Promise" promiseFunction] => [... Promise]
@@ -320,11 +279,45 @@ duk_ret_t Deferred::push(const JValue &value, bool inScript, const AdditionalDat
   // => STASH: [... Promise]
 
   // Call Java setUpJsPromise()
-  m_jniContext->callJsBridgeVoidMethod("setUpJsPromise", "(Ljava/lang/String;Lkotlinx/coroutines/Deferred;Ljava/lang/Class;)V",
-                                       JStringLocalRef(m_jniContext, promiseObjectGlobalName.c_str()), jDeferred, additionalPushData->promiseJavaClass);
-    m_jsBridgeContext->checkRethrowJsError();
+  m_jniContext->callJsBridgeVoidMethod("setUpJsPromise", "(Ljava/lang/String;Lkotlinx/coroutines/Deferred;)V",
+                                       JStringLocalRef(m_jniContext, promiseObjectGlobalName.c_str()), jDeferred);
+  m_jsBridgeContext->checkRethrowJsError();
 
   return 1;
+}
+
+void Deferred::completeJsPromise(const JsBridgeContext *jsBridgeContext, const std::string &strId, bool isFulfilled, const JniLocalRef<jobject> &value) {
+  duk_context *ctx = jsBridgeContext->getCContext();
+  assert(ctx != nullptr);
+
+  CHECK_STACK(ctx);
+
+  // Get the global PromiseObject
+  if (!duk_get_global_string(ctx, strId.c_str())) {
+    alog_warn("Could not find PromiseObject with id %s", strId.c_str());
+    duk_pop(ctx);
+    return;
+  }
+
+  // Get attached type ptr...
+  if (!duk_get_prop_string(ctx, -1, JavaTypes::Deferred::PROMISE_COMPONENT_TYPE_PROP_NAME)) {
+    alog_warn("Could not get component type from Promise with id %s", strId.c_str());
+    duk_pop_2(ctx);  // (undefined) component type + PromiseObject
+    return;
+  }
+  auto componentType = *reinterpret_cast<std::shared_ptr<const JavaType> *>(duk_require_pointer(ctx, -1));
+  duk_pop(ctx);  // component type pointer
+
+  // Get the resolve/reject function
+  duk_get_prop_string(ctx, -1, isFulfilled ? "resolve" : "reject");
+
+  // Call it with the Promise value
+  componentType->push(JValue(value), false /*inScript*/);
+  if (duk_pcall(ctx, 1) != DUK_EXEC_SUCCESS) {
+    alog("Could not complete Promise with id %s", strId.c_str());
+  }
+
+  duk_pop_2(ctx);  // (undefined) call result + PromiseObject
 }
 
 }  // namespace JavaType

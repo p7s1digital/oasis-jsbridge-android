@@ -29,34 +29,38 @@
 
 namespace JavaTypes {
 
-Boolean::Boolean(const JsBridgeContext *jsBridgeContext, const JniGlobalRef<jclass>& classRef, const JniGlobalRef<jclass>& boxedClassRef)
- : Primitive(jsBridgeContext, classRef, boxedClassRef) {
+Boolean::Boolean(const JsBridgeContext *jsBridgeContext)
+ : Primitive(jsBridgeContext, JavaTypeId::Boolean, JavaTypeId::BoxedBoolean) {
 }
 
 #if defined(DUKTAPE)
 
-JValue Boolean::pop(bool inScript, const AdditionalData *) const {
+JValue Boolean::pop(bool inScript) const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
-  if (!inScript && !duk_is_boolean(m_ctx, -1)) {
+  if (!duk_is_boolean(m_ctx, -1)) {
     const auto message = std::string("Cannot convert return value ") + duk_safe_to_string(m_ctx, -1) + " to boolean";
     duk_pop(m_ctx);
-    throw std::invalid_argument(message);
+    CHECK_STACK_NOW();
+    m_jsBridgeContext->throwTypeException(message, inScript);
   }
-  if (duk_is_null_or_undefined(m_ctx, -1)) {
-    duk_pop(m_ctx);
-    return JValue();
-  }
+
   bool b = (bool) duk_require_boolean(m_ctx, -1);
   duk_pop(m_ctx);
   return JValue(b);
 }
 
-JValue Boolean::popArray(uint32_t count, bool expanded, bool inScript, const AdditionalData *additionalData) const {
+JValue Boolean::popArray(uint32_t count, bool expanded, bool inScript) const {
   // If we're not expanded, pop the array off the stack no matter what.
   const StackUnwinder _(m_ctx, expanded ? 0 : 1);
 
-  count = expanded ? count : static_cast<uint32_t>(duk_get_length(m_ctx, -1));
+  if (!expanded) {
+    count = static_cast<uint32_t>(duk_get_length(m_ctx, -1));
+    if (!duk_is_array(m_ctx, -1)) {
+      const auto message = std::string("Cannot convert JS value ") + duk_safe_to_string(m_ctx, -1) + " to Array<Boolean>";
+      m_jsBridgeContext->throwTypeException(message, inScript);
+    }
+  }
 
   JArrayLocalRef<jboolean> boolArray(m_jniContext, count);
   m_jsBridgeContext->checkRethrowJsError();
@@ -65,18 +69,18 @@ JValue Boolean::popArray(uint32_t count, bool expanded, bool inScript, const Add
     if (!expanded) {
       duk_get_prop_index(m_ctx, -1, i);
     }
-    JValue value = pop(inScript, additionalData);
+    JValue value = pop(inScript);
     boolArray.setElement(i, value.getBool());
   }
   return JValue(boolArray);
 }
 
-duk_ret_t Boolean::push(const JValue &value, bool inScript, const AdditionalData *) const {
+duk_ret_t Boolean::push(const JValue &value, bool inScript) const {
   duk_push_boolean(m_ctx, (duk_bool_t) value.getBool());
   return 1;
 }
 
-duk_ret_t Boolean::pushArray(const JniLocalRef<jarray>& values, bool expand, bool inScript, const AdditionalData *) const {
+duk_ret_t Boolean::pushArray(const JniLocalRef<jarray>& values, bool expand, bool inScript) const {
   JArrayLocalRef<jboolean> boolArray(values);
   const auto count = boolArray.getLength();
 
@@ -95,12 +99,10 @@ duk_ret_t Boolean::pushArray(const JniLocalRef<jarray>& values, bool expand, boo
 
 #elif defined(QUICKJS)
 
-JValue Boolean::toJava(JSValueConst v, bool inScript, const AdditionalData *) const {
-  if (!inScript && !JS_IsBool(v)) {
-    const auto message = "Cannot convert return value to boolean";
-    throw std::invalid_argument(message);
-  }
-  if (JS_IsNull(v) || JS_IsUndefined(v)) {
+JValue Boolean::toJava(JSValueConst v, bool inScript) const {
+  if (!JS_IsBool(v)) {
+    const char *message = "Cannot convert return value to boolean";
+    m_jsBridgeContext->throwTypeException(message, inScript);
     return JValue();
   }
 
@@ -108,8 +110,13 @@ JValue Boolean::toJava(JSValueConst v, bool inScript, const AdditionalData *) co
   return JValue(b);
 }
 
-JValue Boolean::toJavaArray(JSValueConst v, bool inScript, const AdditionalData *additionalData) const {
+JValue Boolean::toJavaArray(JSValueConst v, bool inScript) const {
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
+    return JValue();
+  }
+
+  if (!JS_IsArray(m_ctx, v)) {
+    m_jsBridgeContext->throwTypeException("Cannot convert JS value to Java array", inScript);
     return JValue();
   }
 
@@ -120,9 +127,8 @@ JValue Boolean::toJavaArray(JSValueConst v, bool inScript, const AdditionalData 
 
   JArrayLocalRef<jboolean> boolArray(m_jniContext, count);
 
-  assert(JS_IsArray(m_ctx, v));
   for (uint32_t i = 0; i < count; ++i) {
-    JValue elementValue = toJava(JS_GetPropertyUint32(m_ctx, v, i), inScript, additionalData);
+    JValue elementValue = toJava(JS_GetPropertyUint32(m_ctx, v, i), inScript);
     boolArray.setElement(i, elementValue.getBool());
     m_jsBridgeContext->checkRethrowJsError();
   }
@@ -130,11 +136,11 @@ JValue Boolean::toJavaArray(JSValueConst v, bool inScript, const AdditionalData 
   return JValue(boolArray);
 }
 
-JSValue Boolean::fromJava(const JValue &value, bool inScript, const AdditionalData *) const {
+JSValue Boolean::fromJava(const JValue &value, bool inScript) const {
   return JS_NewBool(m_ctx, value.getBool());
 }
 
-JSValue Boolean::fromJavaArray(const JniLocalRef<jarray>& values, bool inScript, const AdditionalData *additionalData) const {
+JSValue Boolean::fromJavaArray(const JniLocalRef<jarray>& values, bool inScript) const {
   JArrayLocalRef<jboolean> boolArray(values);
   const auto count = boolArray.getLength();
 
@@ -143,7 +149,7 @@ JSValue Boolean::fromJavaArray(const JniLocalRef<jarray>& values, bool inScript,
   for (jsize i = 0; i < count; ++i) {
     jboolean b = boolArray.getElement(i);
     try {
-      JSValue elementValue = fromJava(JValue(b), inScript, additionalData);
+      JSValue elementValue = fromJava(JValue(b), inScript);
       JS_SetPropertyUint32(m_ctx, jsArray, i, elementValue);
     } catch (std::invalid_argument &e) {
       JS_FreeValue(m_ctx, jsArray);
@@ -168,8 +174,16 @@ JValue Boolean::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
   return JValue((bool) retVal);
 }
 
-JniLocalRef<jclass> Boolean::getArrayClass() const {
-  return m_jniContext->getObjectClass(JArrayLocalRef<jboolean>(m_jniContext, 0));
+JValue Boolean::box(const JValue &booleanValue) const {
+  // From boolean to Boolean
+  jmethodID boxId = m_jniContext->getStaticMethodID(getBoxedJavaClass(), "valueOf", "(Z)Ljava/lang/Boolean;");
+  return JValue(m_jniContext->callStaticObjectMethod(getBoxedJavaClass(), boxId, booleanValue.getBool()));
+}
+
+JValue Boolean::unbox(const JValue &boxedValue) const {
+  // From Boolean to boolean
+  jmethodID unboxId = m_jniContext->getMethodID(getBoxedJavaClass(), "booleanValue", "()Z");
+  return JValue(m_jniContext->callBooleanMethod(boxedValue.getLocalRef(), unboxId));
 }
 
 }  // namespace JavaTypes

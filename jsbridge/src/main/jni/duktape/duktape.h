@@ -894,7 +894,7 @@ DUK_EXTERNAL_DECL duk_context *duk_get_context(duk_context *ctx, duk_idx_t idx);
 DUK_EXTERNAL_DECL void *duk_get_heapptr(duk_context *ctx, duk_idx_t idx);
 
 /*
- *  Get-with-explicit default operations: like get operations but with an
+ *  Get-with-explicit default operations: like create operations but with an
  *  explicit default value.
  */
 

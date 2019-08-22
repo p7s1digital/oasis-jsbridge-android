@@ -54,7 +54,7 @@ static duk_ret_t duk__console_log_helper(duk_context *ctx, const char *logType, 
         duk_push_string(ctx, "name");
         duk_push_string(ctx, error_name);
         duk_def_prop(ctx, -3,
-                     DUK_DEFPROP_FORCE | DUK_DEFPROP_HAVE_VALUE);  /* to get e.g. 'Trace: 1 2 3' */
+                     DUK_DEFPROP_FORCE | DUK_DEFPROP_HAVE_VALUE);  /* to create e.g. 'Trace: 1 2 3' */
         duk_get_prop_string(ctx, -1, "stack");
     }
 
@@ -168,7 +168,7 @@ void duk_console_init(duk_context *ctx, duk_uint_t flags) {
                                   "(function(){"
                                   "var D=function(){};"
                                   "console=new Proxy(console,{"
-                                  "get:function(t,k){"
+                                  "create:function(t,k){"
                                   "var v=t[k];"
                                   "return typeof v==='function'?v:D;"
                                   "}"

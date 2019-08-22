@@ -17,28 +17,35 @@
 #define _JSBRIDGE_JAVATYPES_FUNCTIONX_H
 
 #include "JavaType.h"
+#include "JavaMethod.h"
+#include <memory>
 
 namespace JavaTypes {
 
 class FunctionX : public JavaType {
 
 public:
-  FunctionX(const JsBridgeContext *, const JniGlobalRef <jclass> &classRef);
+  FunctionX(const JsBridgeContext *, const JniRef<jsBridgeParameter> &);
 
 #if defined(DUKTAPE)
-  JValue pop(bool inScript, const AdditionalData *) const override;
-  duk_ret_t push(const JValue &, bool inScript, const AdditionalData *) const override;
+  JValue pop(bool inScript) const override;
+  JValue popArray(uint32_t count, bool expanded, bool inScript) const override;
+  duk_ret_t push(const JValue &, bool inScript) const override;
+  duk_ret_t pushArray(const JniLocalRef<jarray> &values, bool expand, bool inScript) const override;
 #elif defined(QUICKJS)
-  JValue toJava(JSValueConst, bool inScript, const AdditionalData *) const override;
-  JSValue fromJava(const JValue &, bool inScript, const AdditionalData *) const override;
+  JValue toJava(JSValueConst, bool inScript) const override;
+  JValue toJavaArray(JSValueConst, bool inScript) const override;
+  JSValue fromJava(const JValue &, bool inScript) const override;
+  JSValue fromJavaArray(const JniLocalRef<jarray> &values, bool inScript) const override;
 #endif
 
-  AdditionalData *createAdditionalPushData(const JniRef<jsBridgeParameter> &) const override;
-  AdditionalData *createAdditionalPopData(const JniRef<jsBridgeParameter> &) const override;
-
 private:
-  class AdditionalPushData;
-  class AdditionalPopData;
+  const JniRef<jsBridgeMethod> &getJniJavaMethod() const;
+  const std::shared_ptr<JavaMethod> &getCppJavaMethod() const;
+
+  JniGlobalRef<jsBridgeParameter> m_parameter;
+  mutable JniGlobalRef<jsBridgeMethod> m_lazyJniJavaMethod;
+  mutable std::shared_ptr<JavaMethod> m_lazyCppJavaMethod;
 };
 
 }  // namespace JavaTypes

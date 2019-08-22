@@ -15,6 +15,7 @@
  */
 #include "JavaScriptLambda.h"
 
+#include "JavaType.h"
 #include "JsBridgeContext.h"
 #include "JavaScriptMethod.h"
 #include "jni-helpers/JValue.h"

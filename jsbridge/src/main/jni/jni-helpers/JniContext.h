@@ -36,6 +36,7 @@ public:
 
   JniLocalRefStats *getLocalRefStats() const { return m_localRefStats; }
 
+  const JniRef<jclass> &getObjectClass() const { return m_objectClass; }
   const JniRef<jobject> &getJsBridgeObject() const { return m_jsBridgeJavaObject; }
   const JniRef<jclass> &getJsBridgeMethodClass() const { return m_jsBridgeMethodClass; }
   const JniRef<jclass> &getJsBridgeParameterClass() const { return m_jsBridgeParameterClass; }
@@ -148,6 +149,13 @@ public:
     return ret;
   }
 
+  template <class ObjT, typename ...InputArgs>
+  jdouble callDoubleMethod(const JniRef<ObjT> &t, jmethodID methodId, InputArgs &&...args) const {
+    assert(m_jniEnv);
+
+    return m_jniEnv->CallDoubleMethod(t.get(), methodId, JniValueConverter::toJniValues(std::forward<InputArgs>(args))...);
+  }
+
   template <class ObjT>
   jdouble callDoubleMethodA(const JniRef<ObjT> &t, jmethodID methodId, const std::vector<JValue> &args) const {
     assert(m_jniEnv);
@@ -156,6 +164,13 @@ public:
     jdouble ret = m_jniEnv->CallDoubleMethodA(t.get(), methodId, rawArgs);
     delete[] rawArgs;
     return ret;
+  }
+
+  template <class ObjT, typename ...InputArgs>
+  jfloat callFloatMethod(const JniRef<ObjT> &t, jmethodID methodId, InputArgs &&...args) const {
+    assert(m_jniEnv);
+
+    return m_jniEnv->CallFloatMethod(t.get(), methodId, JniValueConverter::toJniValues(std::forward<InputArgs>(args))...);
   }
 
   template <class ObjT>
@@ -231,11 +246,14 @@ private:
   friend class InternalScopedContext;
 
   JNIEnv *m_jniEnv;
+
+  // TODO: move it to JniCache!
   JniLocalRefStats *m_localRefStats;
   JniGlobalRef<jclass> m_jsBridgeJavaClass;
   JniGlobalRef<jobject> m_jsBridgeJavaObject;
   JniGlobalRef<jclass> m_jsBridgeMethodClass;
   JniGlobalRef<jclass> m_jsBridgeParameterClass;
+  JniGlobalRef<jclass> m_objectClass;
 };
 
 #endif

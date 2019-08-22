@@ -26,8 +26,8 @@ namespace {
 
 namespace JavaTypes {
 
-JsValue::JsValue(const JsBridgeContext *jsBridgeContext, const JniGlobalRef<jclass> &classRef)
-  : JavaType(jsBridgeContext, classRef) {
+JsValue::JsValue(const JsBridgeContext *jsBridgeContext)
+ : JavaType(jsBridgeContext, JavaTypeId::JsValue) {
 }
 
 #if defined(DUKTAPE)
@@ -35,7 +35,7 @@ JsValue::JsValue(const JsBridgeContext *jsBridgeContext, const JniGlobalRef<jcla
 #include "StackChecker.h"
 
 // JS to native JsValue
-JValue JsValue::pop(bool inScript, const AdditionalData *) const {
+JValue JsValue::pop(bool inScript) const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
   JNIEnv *env = m_jniContext->getJNIEnv();
@@ -44,11 +44,15 @@ JValue JsValue::pop(bool inScript, const AdditionalData *) const {
   static int jsValueCount = 0;
   std::string jsValueGlobalName = JSVALUE_GLOBAL_NAME_PREFIX + std::to_string(++jsValueCount);
 
+  JniLocalRef<jclass> javaClass = getJavaClass();
+
   // Create a new JS value with a new global name
   const JniRef<jobject> &jsBridgeObject = m_jniContext->getJsBridgeObject();
   JStringLocalRef jsValueName(m_jniContext, jsValueGlobalName.c_str());
-  jmethodID newJsValue = m_jniContext->getMethodID(getClass(), "<init>", "(Lde/prosiebensat1digital/oasisjsbridge/JsBridge;Ljava/lang/String;)V");
-  JniLocalRef<jobject> jsValue = m_jniContext->newObject<jobject>(getClass(), newJsValue, jsBridgeObject, jsValueName);
+  jmethodID newJsValue = m_jniContext->getMethodID(getJavaClass(), "<init>", "(Lde/prosiebensat1digital/oasisjsbridge/JsBridge;Ljava/lang/String;)V");
+  JniLocalRef<jobject> jsValue = m_jniContext->newObject<jobject>(javaClass, newJsValue, jsBridgeObject, jsValueName);
+
+  javaClass.release();
 
   // Set value
   duk_put_global_string(m_ctx, jsValueGlobalName.c_str());
@@ -56,7 +60,7 @@ JValue JsValue::pop(bool inScript, const AdditionalData *) const {
 }
 
 // Native JsValue to JS
-duk_ret_t JsValue::push(const JValue &value, bool inScript, const AdditionalData *) const {
+duk_ret_t JsValue::push(const JValue &value, bool inScript) const {
   CHECK_STACK_OFFSET(m_ctx, 1);
 
   const JniLocalRef<jobject> &jValue = value.getLocalRef();
@@ -67,9 +71,9 @@ duk_ret_t JsValue::push(const JValue &value, bool inScript, const AdditionalData
   }
 
   // Get JsValue JS name from Java
-  jmethodID getJsName = m_jniContext->getMethodID(getClass(), "getAssociatedJsName", "()Ljava/lang/String;");
+  jmethodID getJsName = m_jniContext->getMethodID(getJavaClass(), "getAssociatedJsName", "()Ljava/lang/String;");
   JStringLocalRef jsName(m_jniContext->callObjectMethod<jstring>(jValue, getJsName));
-    m_jsBridgeContext->checkRethrowJsError();
+  m_jsBridgeContext->checkRethrowJsError();
 
   // Push the global JS value with that name
   duk_get_global_string(m_ctx, jsName.c_str());
@@ -78,18 +82,22 @@ duk_ret_t JsValue::push(const JValue &value, bool inScript, const AdditionalData
 
 #elif defined(QUICKJS)
 
-JValue JsValue::toJava(JSValueConst v, bool inScript, const AdditionalData *) const {
+JValue JsValue::toJava(JSValueConst v, bool inScript) const {
   JNIEnv *env = m_jniContext->getJNIEnv();
   assert(env != nullptr);
 
   static int jsValueCount = 0;
   std::string jsValueGlobalName = JSVALUE_GLOBAL_NAME_PREFIX + std::to_string(++jsValueCount);
 
+  JniLocalRef<jclass> javaClass = getJavaClass();
+
   // Create a new JS value with a new global name
   const JniRef<jobject> &jsBridgeObject = m_jniContext->getJsBridgeObject();
   JStringLocalRef jsValueName(m_jniContext, jsValueGlobalName.c_str());
-  jmethodID newJsValue = m_jniContext->getMethodID(getClass(), "<init>", "(Lde/prosiebensat1digital/oasisjsbridge/JsBridge;Ljava/lang/String;)V");
-  JniLocalRef<jobject> jsValue = m_jniContext->newObject<jobject>(getClass(), newJsValue, jsBridgeObject, jsValueName);
+  jmethodID newJsValue = m_jniContext->getMethodID(javaClass, "<init>", "(Lde/prosiebensat1digital/oasisjsbridge/JsBridge;Ljava/lang/String;)V");
+  JniLocalRef<jobject> jsValue = m_jniContext->newObject<jobject>(javaClass, newJsValue, jsBridgeObject, jsValueName);
+
+  javaClass.release();
 
   // Set value
   JSValue globalObj = JS_GetGlobalObject(m_ctx);
@@ -98,7 +106,7 @@ JValue JsValue::toJava(JSValueConst v, bool inScript, const AdditionalData *) co
   return JValue(jsValue);
 }
 
-JSValue JsValue::fromJava(const JValue &value, bool inScript, const AdditionalData *) const {
+JSValue JsValue::fromJava(const JValue &value, bool inScript) const {
   const JniLocalRef<jobject> &jValue = value.getLocalRef();
 
   if (jValue.isNull()) {
@@ -106,7 +114,7 @@ JSValue JsValue::fromJava(const JValue &value, bool inScript, const AdditionalDa
   }
 
   // Get JsValue JS name from Java
-  jmethodID getJsName = m_jniContext->getMethodID(getClass(), "getAssociatedJsName", "()Ljava/lang/String;");
+  jmethodID getJsName = m_jniContext->getMethodID(getJavaClass(), "getAssociatedJsName", "()Ljava/lang/String;");
   JStringLocalRef jsName(m_jniContext->callObjectMethod<jstring>(jValue, getJsName));
   m_jsBridgeContext->checkRethrowJsError();
 
