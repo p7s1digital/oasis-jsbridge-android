@@ -120,12 +120,12 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, void *js
 
   // Set up the call - push the object, method name, and arguments onto the stack
   duk_push_heapptr(ctx, jsHeapPtr);
-  duk_idx_t jsObjectIdx = duk_normalize_index(ctx, -1);
+  duk_idx_t jsLambdaOrObjectIdx = duk_normalize_index(ctx, -1);
 
   if (m_isLambda) {
-    duk_require_function(ctx, jsObjectIdx);
-    duk_dup(ctx, jsObjectIdx);
+    duk_require_function(ctx, jsLambdaOrObjectIdx);
   } else {
+    duk_require_object(ctx, jsLambdaOrObjectIdx);
     duk_push_string(ctx, m_methodName.c_str());
   }
 
@@ -141,17 +141,17 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, void *js
       }
       argumentLoader->push(arg);
     } catch (const std::invalid_argument &e) {
-      // Pop the stack entries pushed above, and any args pushed so far.
-      duk_pop_n(ctx, m_isLambda ? 3 : 2 + i);
+      duk_pop_n(ctx, (m_isLambda ? 1 : 2) + i);  // lambda: func + args, method: obj + methodName + args
       throw e;
     }
   }
 
   duk_ret_t ret;
   if (m_isLambda) {
-    ret = duk_pcall(ctx, numArguments);
+    ret = duk_pcall(ctx, numArguments);  // [... func arg1 ... argN] -> [... retval]
   } else {
-    ret = duk_pcall_prop(ctx, jsObjectIdx, numArguments);
+    ret = duk_pcall_prop(ctx, jsLambdaOrObjectIdx, numArguments);  // [... obj ... key arg1 ... argN] -> [... obj ... retval]
+    duk_remove(ctx, jsLambdaOrObjectIdx);
   }
   if (ret == DUK_EXEC_SUCCESS) {
     try {
@@ -163,16 +163,14 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, void *js
         result = m_returnValueLoader->pop();
       }
     } catch (const std::invalid_argument &e) {
-      duk_pop(ctx);  // jsHeapPtr
       throw e;
     }
   } else {
     std::string strError = duk_safe_to_string(ctx, -1);
-    duk_pop_2(ctx);  // pcall error + jsHeapPtr
-    throw std::runtime_error(std::string("Error when calling JS lambda: ") + strError);
+    duk_pop(ctx);  // ret (pcall error)
+    throw std::runtime_error(std::string("Error while calling JS ") + (m_isLambda ? "lambda" : "method") + ": " + strError);
   }
 
-  duk_pop(ctx);  // jsHeapPtr
   return result;
 };
 
@@ -210,7 +208,7 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, JSValueC
 
   if (JS_IsException(ret)) {
     JS_FreeValue(ctx, ret);
-    throw std::runtime_error("Error when calling JS lambda");
+    throw std::runtime_error("Error while calling JS lambda");
   }
 
   try {

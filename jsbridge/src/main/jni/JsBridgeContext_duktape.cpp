@@ -42,7 +42,6 @@
 
 namespace {
 
-  // Internal names used for properties in the Duktape context's global stash and bound variables.
   // The \xff\xff part keeps the variable hidden from JavaScript (visible through C API only).
   const char *JAVA_THIS_PROP_NAME = "\xff\xffjava_this";
   const char *JAVA_METHOD_PROP_NAME = "\xff\xffjava_method";
@@ -70,16 +69,22 @@ namespace {
       // Get JavaMethod instance bound to the function itself
       duk_push_current_function(ctx);
       duk_get_prop_string(ctx, -1, JAVA_METHOD_PROP_NAME);
-      auto method = static_cast<JavaMethod *>(duk_require_pointer(ctx, -1));
-      duk_pop_2(ctx);  // Java method + current function
-
-      if (method == nullptr) {
+      if (duk_is_null_or_undefined(ctx, -1)) {
+        duk_error(ctx, DUK_ERR_TYPE_ERROR, "Cannot execute Java method: Java method not found!");
+        duk_pop_2(ctx);
         return DUK_RET_ERROR;
       }
+      auto method = static_cast<JavaMethod *>(duk_require_pointer(ctx, -1));
+      duk_pop_2(ctx);  // Java method + current function
 
       // JS this -> Java this
       duk_push_this(ctx);
       duk_get_prop_string(ctx, -1, JAVA_THIS_PROP_NAME);
+      if (duk_is_null_or_undefined(ctx, -1)) {
+        duk_error(ctx, DUK_ERR_TYPE_ERROR, "Cannot execute Java method: Java object not found!");
+        duk_pop_2(ctx);
+        return DUK_RET_ERROR;
+      }
       auto thisObjectRaw = reinterpret_cast<jobject>(duk_require_pointer(ctx, -1));
       JniLocalRef<jobject> thisObject(jniContext, env->NewLocalRef(thisObjectRaw));
       duk_pop_2(ctx);
@@ -505,7 +510,7 @@ duk_idx_t JsBridgeContext::pushJavaObject(const char *instanceName, const JniLoc
 
 void JsBridgeContext::assignJsValue(const std::string &strGlobalName, const std::string &strCode) {
   if (duk_peval_string(m_context, strCode.c_str()) != DUK_EXEC_SUCCESS) {
-    alog("Could not evaluate string:\n%s", strCode.c_str());
+    alog("Could assign JS value:\n%s", strCode.c_str());
     queueJavaExceptionForJsError();
     duk_pop(m_context);
     return;

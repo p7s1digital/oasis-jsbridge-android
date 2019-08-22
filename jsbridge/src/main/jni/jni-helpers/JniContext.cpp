@@ -23,7 +23,6 @@ namespace {
   const char *JSBRIDGE_JAVA_CLASS_NAME = "de/prosiebensat1digital/oasisjsbridge/JsBridge";
   const char *JSBRIDGE_METHOD_CLASS_NAME = "de/prosiebensat1digital/oasisjsbridge/Method";
   const char *JSBRIDGE_PARAMETER_CLASS_NAME = "de/prosiebensat1digital/oasisjsbridge/Parameter";
-  const char* JAVA_EXCEPTION_PROP_NAME = "\xff\xffjava_exception";
 }
 
 

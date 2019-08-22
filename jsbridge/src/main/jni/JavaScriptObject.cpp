@@ -110,30 +110,27 @@ JValue JavaScriptObject::call(const JniLocalRef<jobject> &javaMethod, const JObj
   const JniRef<jclass> &methodClass = jniContext->getJsBridgeMethodClass();
   jmethodID methodId = jniContext->fromReflectedMethod(javaMethod);
 
-#ifndef NDEBUG
-  jmethodID getName = jniContext->getMethodID(jniContext->getObjectClass(javaMethod), "getName", "()Ljava/lang/String;");
-  std::string strMethodName = JStringLocalRef(jniContext->callObjectMethod<jstring>(javaMethod, getName)).str();
-#else
-  std::string strMethodName = "<unknown_name>";
-#endif
-  //alog("Invoking JS method %s.%s...", m_name.c_str(), strMethodName.c_str());
+  auto getMethodName = [&]() {
+    jmethodID getName = jniContext->getMethodID(jniContext->getObjectClass(javaMethod), "getName", "()Ljava/lang/String;");
+    return JStringLocalRef(jniContext->callObjectMethod<jstring>(javaMethod, getName)).str();
+  };
+
+  //alog("Invoking JS method %s.%s...", m_name.c_str(), getMethodName().c_str());
 
   const auto methodIt = m_methods.find(methodId);
 
   try {
     if (methodIt == m_methods.end()) {
-      throw std::runtime_error("Could not find method " + m_name + "." + strMethodName);
+      throw std::runtime_error("Could not find method " + m_name + "." + getMethodName());
     }
 
     // Method found -> call it
     const auto &jsMethod = methodIt->second;
     return jsMethod->invoke(m_jsBridgeContext, m_jsHeapPtr, args, false);
   } catch (const std::runtime_error &e) {
-    std::string strError("Error while calling JS method " + m_name + "." + strMethodName + ": " + e.what());
+    std::string strError("Error while calling JS method " + m_name + "." + getMethodName() + ": " + e.what());
     throw std::runtime_error(strError);
   }
-
-  return JValue();
 }
 
 #elif defined(QUICKJS)
@@ -204,21 +201,18 @@ JValue JavaScriptObject::call(const JniLocalRef<jobject> &javaMethod, const JObj
   const JniRef<jclass> &methodClass = jniContext->getJsBridgeMethodClass();
   jmethodID methodId = jniContext->fromReflectedMethod(javaMethod);
 
-#ifdef NDEBUG
-  // Release
-  std::string strMethodName = "<unknown_name>";
-#else
-  // Debug
-  jmethodID getName = jniContext->getMethodID(jniContext->getObjectClass(javaMethod), "getName", "()Ljava/lang/String;");
-  std::string strMethodName = JStringLocalRef(jniContext->callObjectMethod<jstring>(javaMethod, getName)).str();
-#endif
-  //alog("Invoking JS method %s.%s...", m_name.c_str(), strMethodName.c_str());
+  auto getMethodName = [&]() {
+    jmethodID getName = jniContext->getMethodID(jniContext->getObjectClass(javaMethod), "getName", "()Ljava/lang/String;");
+    return JStringLocalRef(jniContext->callObjectMethod<jstring>(javaMethod, getName)).str();
+  };
+
+  //alog("Invoking JS method %s.%s...", m_name.c_str(), getMethodName().c_str());
 
   const auto methodIt = m_methods.find(methodId);
 
   try {
     if (methodIt == m_methods.end()) {
-      throw std::runtime_error("Could not find method " + m_name + "." + strMethodName);
+      throw std::runtime_error("Could not find method " + m_name + "." + getMethodName());
     }
 
     const JavaScriptMethod *jsMethod = methodIt->second.get();
@@ -226,12 +220,12 @@ JValue JavaScriptObject::call(const JniLocalRef<jobject> &javaMethod, const JObj
     JSValue jsMethodValue = JS_GetPropertyStr(ctx, m_jsValue, jsMethod->getName().c_str());
     if (!JS_IsFunction(ctx, jsMethodValue)) {
       JS_FreeValue(ctx, jsMethodValue);
-      throw std::runtime_error("Error when calling JS method");
+      throw std::runtime_error("Error while calling JS method");
     }
 
     return jsMethod->invoke(m_jsBridgeContext, jsMethodValue, m_jsValue, args, false);
   } catch (const std::runtime_error &e) {
-    std::string strError("Error while calling JS method " + m_name + "." + strMethodName + ": " + e.what());
+    std::string strError("Error while calling JS method " + m_name + "." + getMethodName() + ": " + e.what());
     throw std::runtime_error(strError);
   }
 

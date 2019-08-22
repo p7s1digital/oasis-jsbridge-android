@@ -28,9 +28,10 @@ namespace {
   // Internal names used for properties in a proxied JS object.
   // The \xff\xff part keeps the variable hidden from JS (visible through C API only).
 
-  // We stuff JavaScriptObject pointers into an array and attach it to the proxied instance so we are
+  // We stuff JavaScriptObject pointers into an object and attach it to the proxied instance so we are
   // able to detach our local reference to the object when it is garbage collected in the JS VM.
   const char *CPP_OBJECT_MAP_PROP_NAME = "\xff\xff_cpp_object_map";
+
 }
 
 void JavaScriptObjectMapper::add(duk_context *ctx, const std::string &globalName, std::function<JavaScriptObjectBase *(void *jsHeapPtr)> &&cppObjectFactory) const {
