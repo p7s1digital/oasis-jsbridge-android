@@ -21,12 +21,29 @@
 
 #define LOG_TAG "JsBridgeJni"
 
-void alog(const char *format, ...) {
-  va_list args;
-  va_start(args, format);
-
-  __android_log_vprint(ANDROID_LOG_INFO, LOG_TAG, format, args);
-
+#define _JSBRIDGE_ALOG_HELPER(priority, format) \
+  va_list args;\
+  va_start(args, format);\
+  __android_log_vprint(priority, LOG_TAG, format, args);\
   va_end(args);
+
+void alog(const char *format, ...) {
+  _JSBRIDGE_ALOG_HELPER(ANDROID_LOG_DEBUG, format);
+}
+
+void alog_info(const char *format, ...) {
+  _JSBRIDGE_ALOG_HELPER(ANDROID_LOG_INFO, format);
+}
+
+void alog_warn(const char *format, ...) {
+  _JSBRIDGE_ALOG_HELPER(ANDROID_LOG_WARN, format);
+}
+
+void alog_error(const char *format, ...) {
+  _JSBRIDGE_ALOG_HELPER(ANDROID_LOG_ERROR, format);
+}
+
+void alog_fatal(const char *format, ...) {
+  _JSBRIDGE_ALOG_HELPER(ANDROID_LOG_FATAL, format);
 }
 

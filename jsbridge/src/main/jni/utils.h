@@ -24,6 +24,10 @@ extern "C" {
 #endif
 
 void alog(const char *format, ...);
+void alog_info(const char *format, ...);
+void alog_warn(const char *format, ...);
+void alog_error(const char *format, ...);
+void alog_fatal(const char *format, ...);
 
 #ifdef __cplusplus
 }

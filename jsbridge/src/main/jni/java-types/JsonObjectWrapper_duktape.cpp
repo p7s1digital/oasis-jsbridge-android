@@ -51,7 +51,7 @@ JValue JsonObjectWrapper::pop(bool inScript, const AdditionalData *) const {
   duk_require_object_coercible(m_ctx, -1);
 
   if (custom_stringify(m_ctx, -1) != DUK_EXEC_SUCCESS) {
-    alog("Could not stringify object!");
+    alog_warn("Could not stringify object!");
     m_jsBridgeContext->queueJavaExceptionForJsError();
     duk_pop(m_ctx);
     return JValue();
@@ -95,7 +95,7 @@ duk_ret_t JsonObjectWrapper::push(const JValue &value, bool inScript, const Addi
 
   if (duk_safe_call(m_ctx, tryJsonDecode, nullptr, 1, 1) != DUK_EXEC_SUCCESS) {
     std::string err = duk_safe_to_string(m_ctx, -1);
-    alog("WARNING: error while pushing JsonObjectWrapper value: %s", err.c_str());
+    alog_warn("Error while pushing JsonObjectWrapper value: %s", err.c_str());
     duk_pop(m_ctx);
     duk_push_undefined(m_ctx);
     if (!inScript) {

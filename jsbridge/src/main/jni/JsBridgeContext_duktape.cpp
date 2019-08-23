@@ -49,7 +49,7 @@ namespace {
   const char* JAVA_EXCEPTION_PROP_NAME = "\xff\xffjava_exception";
 
   void debugger_detached(duk_context */*ctx*/, void *udata) {
-      alog("Debugger detached, udata: %p\n", udata);
+      alog_info("Debugger detached, udata: %p\n", udata);
   }
 
   // Native functions called from JS
@@ -229,10 +229,10 @@ void JsBridgeContext::initDebugger() {
   // Call Java onDebuggerPending()
   jniContext()->callJsBridgeVoidMethod("onDebuggerPending", "()V");
 
-  alog("Debugger enabled, create socket and wait for connection\n");
+  alog_info("Debugger enabled, create socket and wait for connection\n");
   duk_trans_socket_init();
   duk_trans_socket_waitconn();
-  alog("Debugger connected, call duk_debugger_attach() and then execute requested file(s)/eval\n");
+  alog_info("Debugger connected, call duk_debugger_attach() and then execute requested file(s)/eval\n");
 
   // Call Java onDebuggerReady()
   jniContext()->callJsBridgeVoidMethod("onDebuggerReady", "()V");
@@ -251,7 +251,7 @@ void JsBridgeContext::initDebugger() {
 }
 
 void JsBridgeContext::cancelDebug() {
-    alog("Cancelling Duktape debug...");
+    alog_info("Cancelling Duktape debug...");
     duk_trans_socket_finish();
 }
 

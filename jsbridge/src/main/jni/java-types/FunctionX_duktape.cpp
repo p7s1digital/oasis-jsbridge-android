@@ -160,7 +160,7 @@ JavaType::AdditionalData *FunctionX::createAdditionalPushData(const JniRef<jsBri
   jmethodID getInvokeMethod = m_jniContext->getMethodID(jsBridgeParameterClass, "getInvokeMethod", "()Lde/prosiebensat1digital/oasisjsbridge/Method;");
   JniLocalRef<jsBridgeMethod> method = m_jniContext->callObjectMethod<jsBridgeMethod>(parameter, getInvokeMethod);
   if (method.isNull()) {
-      alog("WARNING: could not get JsBridge Method instance from parameter!");
+      alog_warn("Could not get JsBridge Method instance from parameter!");
       return nullptr;
   }
 

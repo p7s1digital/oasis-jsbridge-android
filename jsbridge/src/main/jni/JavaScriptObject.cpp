@@ -54,7 +54,7 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
   }
 
   if (duk_has_prop_string(ctx, -1, "then")) {
-    alog("WARNING: registering a JS object from a promise: you probably need to call JsValue.await(), first!");
+    alog_warn("Registering a JS object from a promise... You probably need to call JsValue.await(), first!");
   }
 
   // Make sure that the object has all of the methods we want and add them
@@ -154,7 +154,7 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
   }
 
   if (utils->hasPropertyStr(v, "then")) {
-    alog("WARNING: registering a JS object from a promise: you probably need to call JsValue.await(), first!");
+    alog_warn("Registering a JS object from a promise... You probably need to call JsValue.await(), first!");
   }
 
   // Make sure that the object has all of the methods we want and add them

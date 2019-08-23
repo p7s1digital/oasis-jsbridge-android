@@ -79,7 +79,7 @@ JSValue JsonObjectWrapper::fromJava(const JValue &value, bool inScript, const Ad
   str.release();
 
   if (JS_IsException(decodedValue)) {
-    alog("WARNING: error while reading JsonObjectWrapper value");
+    alog_warn("Error while reading JsonObjectWrapper value");
     JS_FreeValue(m_ctx, decodedValue);
     if (!inScript) {
       throw std::invalid_argument("Could not decode JsonObjectWrapper");
