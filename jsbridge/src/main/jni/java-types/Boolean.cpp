@@ -23,6 +23,7 @@
 
 #ifdef DUKTAPE
 # include "JsBridgeContext.h"
+# include "StackChecker.h"
 # include "StackUnwinder.h"
 #endif
 
@@ -35,6 +36,8 @@ Boolean::Boolean(const JsBridgeContext *jsBridgeContext, const JniGlobalRef<jcla
 #if defined(DUKTAPE)
 
 JValue Boolean::pop(bool inScript, const AdditionalData *) const {
+  CHECK_STACK_OFFSET(m_ctx, -1);
+
   if (!inScript && !duk_is_boolean(m_ctx, -1)) {
     const auto message = std::string("Cannot convert return value ") + duk_safe_to_string(m_ctx, -1) + " to boolean";
     duk_pop(m_ctx);
@@ -54,6 +57,7 @@ JValue Boolean::popArray(uint32_t count, bool expanded, bool inScript, const Add
   const StackUnwinder _(m_ctx, expanded ? 0 : 1);
 
   count = expanded ? count : static_cast<uint32_t>(duk_get_length(m_ctx, -1));
+
   JArrayLocalRef<jboolean> boolArray(m_jniContext, count);
   m_jsBridgeContext->checkRethrowJsError();
 

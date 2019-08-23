@@ -19,12 +19,6 @@
 #include "jni-helpers/JStringLocalRef.h"
 #include "../JsBridgeContext.h"
 
-#if defined(DUKTAPE)
-#include "JsBridgeContext.h"
-#elif defined(QUICKJS)
-#include "JsBridgeContext.h"
-#endif
-
 namespace {
   const char *JSVALUE_GLOBAL_NAME_PREFIX = "javaTypes_jsValue_";
 }
@@ -38,8 +32,12 @@ JsValue::JsValue(const JsBridgeContext *jsBridgeContext, const JniGlobalRef<jcla
 
 #if defined(DUKTAPE)
 
+#include "StackChecker.h"
+
 // JS to native JsValue
 JValue JsValue::pop(bool inScript, const AdditionalData *) const {
+  CHECK_STACK_OFFSET(m_ctx, -1);
+
   JNIEnv *env = m_jniContext->getJNIEnv();
   assert(env != nullptr);
 
@@ -59,6 +57,8 @@ JValue JsValue::pop(bool inScript, const AdditionalData *) const {
 
 // Native JsValue to JS
 duk_ret_t JsValue::push(const JValue &value, bool inScript, const AdditionalData *) const {
+  CHECK_STACK_OFFSET(m_ctx, 1);
+
   const JniLocalRef<jobject> &jValue = value.getLocalRef();
 
   if (jValue.isNull()) {

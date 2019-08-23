@@ -67,7 +67,11 @@ JavaType::AdditionalData *Array::createAdditionalPushData(const JniRef<jsBridgeP
 
 #if defined(DUKTAPE)
 
+#include "StackChecker.h"
+
 JValue Array::pop(bool inScript, const AdditionalData *additionalData) const {
+  CHECK_STACK_OFFSET(m_ctx, -1);
+
   if (duk_is_null_or_undefined(m_ctx, -1)) {
     duk_pop(m_ctx);
     return JValue();
@@ -96,6 +100,8 @@ JValue Array::pop(bool inScript, const AdditionalData *additionalData) const {
 }
 
 duk_ret_t Array::push(const JValue &value, bool inScript, const AdditionalData *additionalData) const {
+  CHECK_STACK_OFFSET(m_ctx, 1);
+
   JniLocalRef<jarray> jArray(value.getLocalRef().staticCast<jarray>());
 
   if (jArray.isNull()) {

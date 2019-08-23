@@ -17,6 +17,7 @@
 
 #include "ArgumentLoader.h"
 #include "JsBridgeContext.h"
+#include "StackChecker.h"
 #include "jni-helpers/JniContext.h"
 #include "../../../main/jni/JsBridgeContext.h"
 
@@ -32,7 +33,9 @@ namespace {
 
   extern "C" {
     duk_ret_t onPromiseFulfilled(duk_context *ctx) {
-      alog("Deferred::onPromiseFulfilled1()");
+      int argCount = duk_get_top(ctx);
+      assert(argCount <= 1);
+      CHECK_STACK_OFFSET(ctx, 0 - argCount);
 
       JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
       assert(jsBridgeContext != nullptr);
@@ -43,7 +46,7 @@ namespace {
       duk_push_current_function(ctx);
 
       if (!duk_get_prop_string(ctx, -1, PAYLOAD_PROP_NAME)) {
-        duk_pop_2(ctx);  // (undefined) OnPromiseFulfilledPayload + current function
+        duk_pop_n(ctx, 2 + argCount);  // (undefined) OnPromiseFulfilledPayload + current function + function args
         return DUK_RET_ERROR;
       }
 
@@ -51,19 +54,25 @@ namespace {
       duk_pop_2(ctx);  // OnPromiseFulfilledPayload + current function
 
       // Pop promise value
-      JValue value = payload->argumentLoader.pop();
-
-      alog("Deferred::onPromiseFulfilled2()");
+      JValue value;
+      if (argCount == 1) {
+        value = payload->argumentLoader.pop();
+      } else if (argCount > 1) {
+        duk_pop_n(ctx, argCount);
+      }
 
       // Complete the native Deferred
       jniContext->callJsBridgeVoidMethod("resolveDeferred",
                                          "(Lkotlinx/coroutines/CompletableDeferred;Ljava/lang/Object;)V",
                                          payload->javaDeferred, value);
-      alog("Deferred::onPromiseFulfilled3()");
       return 0;
     }
 
     duk_ret_t onPromiseRejected(duk_context *ctx) {
+      int argCount = duk_get_top(ctx);
+      assert(argCount <= 1);
+      CHECK_STACK_OFFSET(ctx, 0 - argCount);
+
       JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
       assert(jsBridgeContext != nullptr);
 
@@ -73,7 +82,7 @@ namespace {
       duk_push_current_function(ctx);
 
       if (!duk_get_prop_string(ctx, -1, PAYLOAD_PROP_NAME)) {
-        duk_pop_2(ctx);  // (undefined) OnPromiseRejectedPayload + current function
+        duk_pop_n(ctx, 2 + argCount);  // (undefined) OnPromiseRejectedPayload + current function + function args
         return DUK_RET_ERROR;
       }
       auto payload = reinterpret_cast<const OnPromisePayload *>(duk_require_pointer(ctx, -1));
@@ -81,15 +90,22 @@ namespace {
       duk_pop_2(ctx);  // OnPromiseRejectedPayload + current function
 
       //JValue value = payload->argumentLoader.pop();
-      JValue value(jsBridgeContext->getJavaExceptionForJsError());
+      JValue value;
+      if (argCount == 1) {
+        value = JValue(jsBridgeContext->getJavaExceptionForJsError());
+      }
+      duk_pop_n(ctx, argCount);  // function args
 
       // Reject the native Deferred
       jniContext->callJsBridgeVoidMethod("rejectDeferred", "(Lkotlinx/coroutines/CompletableDeferred;Lde/prosiebensat1digital/oasisjsbridge/JsException;)V", payload->javaDeferred, value);
       jsBridgeContext->checkRethrowJsError();
+
       return 0;
     }
 
     duk_ret_t finalizeOnPromise(duk_context *ctx) {
+      CHECK_STACK(ctx);
+
       JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
       assert(jsBridgeContext != nullptr);
 
@@ -97,12 +113,14 @@ namespace {
         delete reinterpret_cast<OnPromisePayload *>(duk_require_pointer(ctx, -1));
       }
 
-      duk_pop_2(ctx);  // OnPromisePayload + finalized object
+      duk_pop(ctx);  // OnPromisePayload
       return 0;
     }
 
     // Add resolve and reject to bound PromiseObject instance
     duk_ret_t promiseFunction(duk_context *ctx) {
+      CHECK_STACK(ctx);
+
       JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
       assert(jsBridgeContext != nullptr);
 
@@ -170,6 +188,8 @@ JValue Deferred::pop(bool inScript, const AdditionalData *additionalData) const 
 }
 
 JValue Deferred::pop(bool inScript, const JavaType *genericArgumentType, const JniRef<jsBridgeParameter> &genericArgumentParameter) const {
+  CHECK_STACK_OFFSET(m_ctx, -1);
+
   // Create a native Deferred instance
   JniLocalRef<jobject> javaDeferred =
       m_jniContext->callJsBridgeObjectMethod("createCompletableDeferred", "()Lkotlinx/coroutines/CompletableDeferred;");
@@ -253,6 +273,8 @@ JavaType::AdditionalData *Deferred::createAdditionalPushData(const JniRef<jsBrid
 
 // Native Deferred to JS Promise
 duk_ret_t Deferred::push(const JValue &value, bool inScript, const AdditionalData *additionalData) const {
+  CHECK_STACK_OFFSET(m_ctx, 1);
+
   auto additionalPushData = dynamic_cast<const AdditionalPushData *>(additionalData);
   assert(additionalPushData != nullptr);
 

@@ -16,6 +16,7 @@
 #include "JsonObjectWrapper.h"
 
 #include "JsBridgeContext.h"
+#include "StackChecker.h"
 #include "custom_stringify.h"
 #include "jni-helpers/JniContext.h"
 
@@ -36,6 +37,8 @@ JsonObjectWrapper::JsonObjectWrapper(const JsBridgeContext *jsBridgeContext, con
 }
 
 JValue JsonObjectWrapper::pop(bool inScript, const AdditionalData *) const {
+  CHECK_STACK_OFFSET(m_ctx, -1);
+
   if (!inScript && !duk_is_object(m_ctx, -1) && !duk_is_null(m_ctx, -1)) {
     const auto message = std::string("Cannot convert return value to Object");
     duk_pop(m_ctx);
@@ -70,6 +73,7 @@ JValue JsonObjectWrapper::pop(bool inScript, const AdditionalData *) const {
 }
 
 duk_ret_t JsonObjectWrapper::push(const JValue &value, bool inScript, const AdditionalData *) const {
+  CHECK_STACK_OFFSET(m_ctx, 1);
 
   const JniLocalRef<jobject> &jWrapper = value.getLocalRef();
   if (jWrapper.isNull()) {

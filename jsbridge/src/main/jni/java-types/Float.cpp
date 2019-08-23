@@ -16,14 +16,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <utils.h>
 #include "Float.h"
 
-#include "../JsBridgeContext.h"
+#include "JsBridgeContext.h"
+#include "utils.h"
 #include "jni-helpers/JArrayLocalRef.h"
 
 #ifdef DUKTAPE
 # include "JsBridgeContext.h"
+# include "StackChecker.h"
 # include "StackUnwinder.h"
 #endif
 
@@ -36,6 +37,8 @@ Float::Float(const JsBridgeContext *jsBridgeContext, const JniGlobalRef<jclass>&
 #if defined(DUKTAPE)
 
 JValue Float::pop(bool inScript, const AdditionalData *) const {
+  CHECK_STACK_OFFSET(m_ctx, -1);
+
   if (!inScript && !duk_is_number(m_ctx, -1)) {
     const auto message =
         std::string("Cannot convert return value ") + duk_safe_to_string(m_ctx, -1) + " to float";

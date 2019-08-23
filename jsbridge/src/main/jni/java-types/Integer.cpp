@@ -23,6 +23,7 @@
 
 #if defined(DUKTAPE)
 # include "JsBridgeContext.h"
+# include "StackChecker.h"
 # include "StackUnwinder.h"
 #endif
 
@@ -35,6 +36,8 @@ Integer::Integer(const JsBridgeContext *jsBridgeContext, const JniGlobalRef<jcla
 #if defined(DUKTAPE)
 
 JValue Integer::pop(bool inScript, const AdditionalData *) const {
+  CHECK_STACK_OFFSET(m_ctx, -1);
+
   if (!inScript && !duk_is_number(m_ctx, -1)) {
     const auto message = std::string("Cannot convert return value ") + duk_safe_to_string(m_ctx, -1) + " to int";
     duk_pop(m_ctx);

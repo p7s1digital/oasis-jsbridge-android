@@ -19,10 +19,6 @@
 #include "Void.h"
 #include "../JsBridgeContext.h"
 
-#ifdef DUKTAPE
-# include "JsBridgeContext.h"
-#endif
-
 namespace JavaTypes {
 
 Void::Void(const JsBridgeContext *jsBridgeContext, const JniGlobalRef<jclass> &classRef, bool pushUndefined, bool popObject)

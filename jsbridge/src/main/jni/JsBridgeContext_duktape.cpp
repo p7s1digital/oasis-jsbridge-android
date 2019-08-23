@@ -58,7 +58,6 @@ namespace {
   extern "C" {
     // Called by Duktape when JS invokes a method on our bound Java object.
     duk_ret_t javaMethodHandler(duk_context *ctx) {
-
       JsBridgeContext *duktapeContext = JsBridgeContext::getInstance(ctx);
       assert(duktapeContext != nullptr);
 
@@ -94,7 +93,6 @@ namespace {
 
     // Called by Duktape when JS invokes a bound Java function
     duk_ret_t javaLambdaHandler(duk_context *ctx) {
-
       JsBridgeContext *duktapeContext = JsBridgeContext::getInstance(ctx);
       assert(duktapeContext != nullptr);
 
@@ -109,11 +107,6 @@ namespace {
       auto method = static_cast<JavaMethod *>(duk_require_pointer(ctx, -1));
       duk_pop(ctx);  // Java method
 
-      if (method == nullptr) {
-        duk_pop(ctx);  // current function
-        return DUK_RET_ERROR;
-      }
-
       // Java this is a property of the JS method
       duk_get_prop_string(ctx, -1, JAVA_THIS_PROP_NAME);
       auto thisObjectRaw = reinterpret_cast<jobject>(duk_require_pointer(ctx, -1));
@@ -125,6 +118,7 @@ namespace {
 
     // Called by Duktape to handle finalization of bound Java objects
     duk_ret_t javaObjectFinalizer(duk_context *ctx) {
+      CHECK_STACK(ctx);
 
       JsBridgeContext *duktapeContext = JsBridgeContext::getInstance(ctx);
       assert(duktapeContext != nullptr);
@@ -149,13 +143,14 @@ namespace {
         duk_pop_3(ctx);
       }
 
-      // Pop the enum and the object passed in as an argument
-      duk_pop_2(ctx);
+      // Pop the enum
+      duk_pop(ctx);
       return 0;
     }
 
     // Called by Duktape to handle finalization of bound Java lambdas
     duk_ret_t javaLambdaFinalizer(duk_context *ctx) {
+      CHECK_STACK(ctx);
 
       JsBridgeContext *duktapeContext = JsBridgeContext::getInstance(ctx);
       assert(duktapeContext != nullptr);
@@ -172,12 +167,11 @@ namespace {
         duk_pop(ctx);
       }
 
-      duk_pop(ctx);
       return 0;
     }
 
     void fatalErrorHandler(void *, const char* msg) {
-      alog("Fatal error: %s", msg);
+      alog_fatal("Fatal error: %s", msg);
       throw std::runtime_error(msg);
     }
   }  // extern "C"
@@ -257,6 +251,7 @@ void JsBridgeContext::cancelDebug() {
 
 JValue JsBridgeContext::evaluateString(const std::string &strCode, const JniLocalRef<jsBridgeParameter> &returnParameter,
                                       bool awaitJsPromise) const {
+  CHECK_STACK(m_context);
 
   JNIEnv *env = jniContext()->getJNIEnv();
   assert(env != nullptr);
@@ -443,7 +438,6 @@ JValue JsBridgeContext::callJsMethod(const std::string &objectName,
 JValue JsBridgeContext::callJsLambda(const std::string &strFunctionName,
                                     const JObjectArrayLocalRef &args,
                                     bool awaitJsPromise) {
-
   CHECK_STACK(m_context);
 
   auto jsLambda = dynamic_cast<JavaScriptLambda *>(m_jsGlobalMap.get(m_context, strFunctionName));
@@ -457,6 +451,8 @@ JValue JsBridgeContext::callJsLambda(const std::string &strFunctionName,
 }
 
 duk_idx_t JsBridgeContext::pushJavaObject(const char *instanceName, const JniLocalRef<jobject> &object, const JObjectArrayLocalRef &methods) const {
+
+  CHECK_STACK_OFFSET(m_context, 1);
 
   const duk_idx_t objIndex = duk_push_object(m_context);
 
@@ -509,8 +505,10 @@ duk_idx_t JsBridgeContext::pushJavaObject(const char *instanceName, const JniLoc
 }
 
 void JsBridgeContext::assignJsValue(const std::string &strGlobalName, const std::string &strCode) {
+  CHECK_STACK(m_context);
+
   if (duk_peval_string(m_context, strCode.c_str()) != DUK_EXEC_SUCCESS) {
-    alog("Could assign JS value:\n%s", strCode.c_str());
+    alog("Could not assign JS value:\n%s", strCode.c_str());
     queueJavaExceptionForJsError();
     duk_pop(m_context);
     return;
@@ -520,6 +518,8 @@ void JsBridgeContext::assignJsValue(const std::string &strGlobalName, const std:
 }
 
 void JsBridgeContext::newJsFunction(const std::string &strGlobalName, const JObjectArrayLocalRef &args, const std::string &strCode) {
+  CHECK_STACK(m_context);
+
   // Push global Function (which can be constructed with "new Function"
   duk_get_global_string(m_context, "Function");
   //TODO (duktape 2.4): duk_require_constructor_call(m_context);
@@ -545,6 +545,7 @@ void JsBridgeContext::newJsFunction(const std::string &strGlobalName, const JObj
 }
 
 void JsBridgeContext::completeJsPromise(const std::string &strId, bool isFulfilled, const JniLocalRef<jobject> &value, const JniLocalRef<jclass> &valueClass) {
+  CHECK_STACK(m_context);
 
   // Get the global PromiseObject
   if (!duk_get_global_string(m_context, strId.c_str())) {
@@ -635,6 +636,8 @@ void JsBridgeContext::queueJavaExceptionForJsError() const {
 
 // TODO: use duk_safe_to_stacktrace (Duktape >= 2.4)
 JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
+  CHECK_STACK(m_context);
+
   JniLocalRef<jclass> exceptionClass = jniContext()->findClass("de/prosiebensat1digital/oasisjsbridge/JsException");
 
   jmethodID newException = jniContext()->getMethodID(
@@ -642,12 +645,11 @@ JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
 
   // Create the JSON string
   const char *jsonStringRaw = nullptr;
-  duk_dup(m_context, -1);
   if (custom_stringify(m_context, -1) == DUK_EXEC_SUCCESS) {
     jsonStringRaw = duk_require_string(m_context, -1);
   }
   JStringLocalRef jsonString(jniContext(), jsonStringRaw);
-  duk_pop(m_context);
+  duk_pop(m_context);  // stringified string
 
   // If it's a Duktape error object, try to pull out the full stacktrace.
   if (duk_is_error(m_context, -1) && duk_has_prop_string(m_context, -1, "stack")) {
@@ -664,10 +666,10 @@ JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
       duk_get_prop_string(m_context, -2, JAVA_EXCEPTION_PROP_NAME);
       cause = JniLocalRef<jthrowable>(jniContext(),
                                    static_cast<jthrowable>(duk_get_pointer(m_context, -1)));
+      duk_pop(m_context);  // Java exception
     }
 
-    // Pop the stack text
-    duk_pop(m_context);
+    duk_pop(m_context);  // stack text
 
     return jniContext()->newObject<jthrowable>(
         exceptionClass,
@@ -681,7 +683,6 @@ JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
 
   // Not an error or no stacktrace, just convert to a string.
   JStringLocalRef strThrownValue(jniContext(), duk_safe_to_string(m_context, -1));
-  duk_pop(m_context);
 
   return jniContext()->newObject<jthrowable>(
       exceptionClass,

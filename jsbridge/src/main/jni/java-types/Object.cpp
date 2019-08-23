@@ -23,9 +23,8 @@
 #include "../JsBridgeContext.h"
 
 #if defined(DUKTAPE)
-# include "JsBridgeContext.h"
+# include "StackChecker.h"
 #elif defined(QUICKJS)
-# include "JsBridgeContext.h"
 # include "QuickJsUtils.h"
 #endif
 
@@ -42,6 +41,8 @@ Object::Object(const JsBridgeContext *jsBridgeContext, const JniGlobalRef <jclas
 #if defined(DUKTAPE)
 
 JValue Object::pop(bool inScript, const AdditionalData *) const {
+  CHECK_STACK_OFFSET(m_ctx, -1);
+
   switch (duk_get_type(m_ctx, -1)) {
     case DUK_TYPE_NULL:
     case DUK_TYPE_UNDEFINED:
@@ -79,6 +80,8 @@ JValue Object::pop(bool inScript, const AdditionalData *) const {
 }
 
 duk_ret_t Object::push(const JValue &value, bool inScript, const AdditionalData *) const {
+  CHECK_STACK_OFFSET(m_ctx, 1);
+
   const JniLocalRef<jobject> &jObject = value.getLocalRef();
 
   if (jObject.isNull()) {

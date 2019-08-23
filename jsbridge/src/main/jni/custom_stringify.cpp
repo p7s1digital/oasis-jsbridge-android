@@ -37,8 +37,12 @@ global.__jsBridge__stringify = function(err) {
 
 #if defined(DUKTAPE)
 
+#include "StackChecker.h"
+
 // [... object ...] -> [... object ... jsonString]
 duk_int_t custom_stringify(duk_context *ctx, duk_idx_t idx) {
+  CHECK_STACK_OFFSET(ctx, 1);
+
   idx = duk_normalize_index(ctx, idx);
 
 #if 0

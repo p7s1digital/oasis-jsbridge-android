@@ -17,11 +17,12 @@
 
 #include "JsBridgeContext.h"
 #include "JavaScriptMethod.h"
-#include "StackChecker.h"
 #include "jni-helpers/JValue.h"
 #include "jni-helpers/JniContext.h"
 
 #if defined(DUKTAPE)
+
+#include "StackChecker.h"
 
 JavaScriptLambda::JavaScriptLambda(const JsBridgeContext *jsBridgeContext, const JniRef<jsBridgeMethod> &method, std::string strName, void *jsHeapPtr)
  : JavaScriptObjectBase()

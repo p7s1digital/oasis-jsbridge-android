@@ -13,16 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "java-types/FunctionX.h"
+#include "FunctionX.h"
 
+#include "StackChecker.h"
 #include "JsBridgeContext.h"
 #include "JavaMethod.h"
 #include "JavaScriptLambda.h"
 #include "JavaScriptObjectMapper.h"
+#include "utils.h"
 #include "jni-helpers/JniGlobalRef.h"
 #include "jni-helpers/JniContext.h"
 #include "jni-helpers/JObjectArrayLocalRef.h"
-#include "utils.h"
 #include "duktape/duktape.h"
 #include <memory>
 
@@ -37,7 +38,6 @@ namespace {
 
   extern "C" {
     duk_ret_t callJavaLambda(duk_context *ctx) {
-
       duk_push_current_function(ctx);
       if (!duk_get_prop_string(ctx, -1, PAYLOAD_PROP_NAME)) {
         duk_pop_2(ctx);  // (undefined) javaThis + current function
@@ -54,6 +54,8 @@ namespace {
     }
 
     duk_ret_t finalizeJavaLambda(duk_context *ctx) {
+      CHECK_STACK(ctx);
+
       JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
       assert(jsBridgeContext != nullptr);
 
@@ -61,7 +63,7 @@ namespace {
         delete reinterpret_cast<const CallJavaLambdaPayload *>(duk_require_pointer(ctx, -1));
       }
 
-      duk_pop_2(ctx);  // Payload + finalized object
+      duk_pop(ctx);  // Payload
       return 0;
     }
   }
@@ -107,6 +109,8 @@ JavaType::AdditionalData *FunctionX::createAdditionalPopData(const JniRef<jsBrid
 // - C++ -> Java: call createJsLambdaProxy with <functionId> as argument
 // - Java -> C++: call callJsLambda (with <functionId> + args parameters)
 JValue FunctionX::pop(bool inScript, const AdditionalData *additionalData) const {
+  CHECK_STACK_OFFSET(m_ctx, -1);
+
   // 1. Get JS brige Method from additional data
   auto additionalPopData = dynamic_cast<const AdditionalPopData *>(additionalData);
   assert(additionalPopData != nullptr);
@@ -183,6 +187,7 @@ JavaType::AdditionalData *FunctionX::createAdditionalPushData(const JniRef<jsBri
 
 // Get a native function, register it and push a JS wrapper
 duk_ret_t FunctionX::push(const JValue &value, bool inScript, const AdditionalData *additionalData) const {
+  CHECK_STACK_OFFSET(m_ctx, 1);
 
   // 1. Get JavaMethod from additional data
   auto additionalPushData = dynamic_cast<const AdditionalPushData *>(additionalData);

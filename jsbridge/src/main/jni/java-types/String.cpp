@@ -19,8 +19,9 @@
 #include "String.h"
 #include "../JsBridgeContext.h"
 
-#if defined(QUICKJS)
-# include "JsBridgeContext.h"
+#if defined(DUKTAPE)
+# include "StackChecker.h"
+#elif defined(QUICKJS)
 # include "QuickJsUtils.h"
 #endif
 
@@ -33,6 +34,8 @@ String::String(const JsBridgeContext *jsBridgeContext, const JniGlobalRef<jclass
 #if defined(DUKTAPE)
 
 JValue String::pop(bool inScript, const AdditionalData *) const {
+  CHECK_STACK_OFFSET(m_ctx, -1);
+
   if (!inScript && !duk_is_string(m_ctx, -1) && !duk_is_null(m_ctx, -1)) {
     const auto message =
         std::string("Cannot convert popped JS value ") + duk_safe_to_string(m_ctx, -1) + " to String";
@@ -52,6 +55,8 @@ JValue String::pop(bool inScript, const AdditionalData *) const {
 }
 
 duk_ret_t String::push(const JValue &value, bool inScript, const AdditionalData *) const {
+  CHECK_STACK_OFFSET(m_ctx, 1);
+
   if (value.isNull()) {
     duk_push_null(m_ctx);
     return 1;

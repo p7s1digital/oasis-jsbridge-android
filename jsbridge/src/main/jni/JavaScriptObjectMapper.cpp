@@ -115,18 +115,20 @@ JavaScriptObjectBase *JavaScriptObjectMapper::get(duk_context *ctx, const std::s
 
 // static
 duk_ret_t JavaScriptObjectMapper::cppObjectMapFinalizer(duk_context *ctx) {
+  CHECK_STACK(ctx);
+
   // For each 'cppObject' instance wrapped in the map
   duk_enum(ctx, -1, DUK_ENUM_INCLUDE_HIDDEN | DUK_ENUM_OWN_PROPERTIES_ONLY);
   while (duk_next(ctx, -1, 1 /*getValue*/)) {
     auto cppObject = reinterpret_cast<JavaScriptObjectBase *>(duk_get_pointer(ctx, -1));
     if (cppObject == nullptr) {
-      duk_pop_2(ctx);  // enum key + value
+      duk_pop(ctx);  // enum key
       continue;
     }
 
     delete cppObject;
 
-    duk_pop_2(ctx);  // enum key + value
+    duk_pop(ctx);  // enum key
   }
 
   return 0;

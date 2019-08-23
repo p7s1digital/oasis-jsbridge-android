@@ -22,7 +22,7 @@
 
 #if defined(DUKTAPE)
 # include "JsBridgeContext.h"
-# include "StackUnwinder.h"
+# include "StackChecker.h"
 #elif defined(QUICKJS)
 # include "JsBridgeContext.h"
 #endif
@@ -39,6 +39,8 @@ BoxedPrimitive::BoxedPrimitive(const JsBridgeContext *jsBridgeContext, const Pri
 #if defined(DUKTAPE)
 
 JValue BoxedPrimitive::pop(bool inScript, const AdditionalData *) const {
+  CHECK_STACK_OFFSET(m_ctx, -1);
+
   if (duk_is_null_or_undefined(m_ctx, -1)) {
     duk_pop(m_ctx);
     return JValue();
@@ -52,6 +54,8 @@ JValue BoxedPrimitive::pop(bool inScript, const AdditionalData *) const {
 }
 
 duk_ret_t BoxedPrimitive::push(const JValue &value, bool inScript, const AdditionalData *) const {
+  CHECK_STACK_OFFSET(m_ctx, 1);
+
   const JniLocalRef<jobject> &jObject = value.getLocalRef();
   if (jObject.isNull()) {
     duk_push_null(m_ctx);

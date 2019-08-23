@@ -21,6 +21,7 @@
 
 #include "duktape/duktape.h"
 #include "utils.h"
+#include "JsBridgeContext.h"
 #include <string>
 #include <stdexcept>
 
@@ -28,6 +29,7 @@
 // elements at the end of the C++ scope than where the object was constructed.  This will show a
 // trace and Duktape stack details in logcat when running in the debugger. Use CHECK_STACK()
 // below for a convenient way to add stack validation to debug builds only.
+// Give a negative offset when a pop() is expected and a positive one when a push() is expected.
 class StackChecker {
 public:
   explicit StackChecker(duk_context *ctx, int offset)
@@ -42,21 +44,24 @@ public:
       return;
     }
     const auto actual = duk_get_top(m_context);
+    const char *stackStr;
     try {
       duk_push_context_dump(m_context);
-      throw stack_error(m_top, actual, duk_get_string(m_context, -1));
-    } catch (const std::exception &e) {  // TODO
-      throw stack_error(m_top, actual, "<no stack info>");
+      stackStr = duk_get_string(m_context, -1);
+    } catch (const std::exception &) {
+      stackStr = "<unknown_stack>";
     }
+    logError(actual, stackStr);
+    duk_pop(m_context);
   }
 
 private:
-  struct stack_error : public std::runtime_error {
-    stack_error(duk_idx_t expected, duk_idx_t actual, const std::string& stack)
-      : std::runtime_error("expected: " + std::to_string(expected) +
-                           ", actual: " + std::to_string(actual) +
-                           " - stack: " + stack) {
-    }
+  void logError(int actual, const char *stack) {
+    alog_error("StackChecker ERROR: expected: %d, actual: %d\n-> stack: %s", m_top + m_offset,
+               actual, stack);
+    JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(m_context);
+    backtraceToLogcat(jsBridgeContext->jniContext()->getJNIEnv());
+    exit(0);
   };
 
   duk_context* m_context;
@@ -66,9 +71,10 @@ private:
 
 #ifdef NDEBUG
 #define CHECK_STACK(ctx) ((void)0)
+#define CHECK_STACK_OFFSET(ctx, offset) ((void)0)
 #else
-#define CHECK_STACK(ctx) const StackChecker _(ctx, 0)
-#define CHECK_STACK_OFFSET(ctx, offset) const StackChecker _(ctx, offset)
+#define CHECK_STACK(ctx) const StackChecker _checkStack(ctx, 0)
+#define CHECK_STACK_OFFSET(ctx, offset) const StackChecker _checkStack(ctx, offset)
 #endif
 
 #endif

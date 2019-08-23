@@ -47,3 +47,9 @@ void alog_fatal(const char *format, ...) {
   _JSBRIDGE_ALOG_HELPER(ANDROID_LOG_FATAL, format);
 }
 
+void backtraceToLogcat(JNIEnv *env) {
+#ifndef NDEBUG
+  // Abuse the JNI to produce an error with stack trace in debug mode (see https://stackoverflow.com/a/35586148)
+  env->FindClass(NULL);
+#endif
+}

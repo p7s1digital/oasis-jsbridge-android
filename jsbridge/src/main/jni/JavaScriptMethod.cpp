@@ -20,7 +20,6 @@
 #include "ArgumentLoader.h"
 #include "JsBridgeContext.h"
 #include "JavaType.h"
-#include "StackChecker.h"
 #include "jni-helpers/JniContext.h"
 #include "jni-helpers/JniTypes.h"
 #include "jni-helpers/JObjectArrayLocalRef.h"
@@ -111,6 +110,8 @@ JavaScriptMethod::~JavaScriptMethod() {
 }
 
 #if defined(DUKTAPE)
+
+#include "StackChecker.h"
 
 JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, void *jsHeapPtr, const JObjectArrayLocalRef &args, bool awaitJsPromise) const {
   duk_context *ctx = jsBridgeContext->getCContext();

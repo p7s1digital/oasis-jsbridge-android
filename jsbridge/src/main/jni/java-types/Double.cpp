@@ -24,6 +24,7 @@
 
 #ifdef DUKTAPE
 # include "JsBridgeContext.h"
+# include "StackChecker.h"
 # include "StackUnwinder.h"
 #endif
 
@@ -36,6 +37,8 @@ Double::Double(const JsBridgeContext *jsBridgeContext, const JniGlobalRef<jclass
 #if defined(DUKTAPE)
 
 JValue Double::pop(bool inScript, const AdditionalData *) const {
+  CHECK_STACK_OFFSET(m_ctx, -1);
+
   if (!inScript && !duk_is_number(m_ctx, -1)) {
     const auto message =
         std::string("Cannot convert return value ") + duk_safe_to_string(m_ctx, -1) + " to double";

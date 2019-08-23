@@ -19,6 +19,8 @@
 #ifndef _JSBRIDGE_UTILS_H
 #define _JSBRIDGE_UTILS_H
 
+#include <jni.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -28,6 +30,8 @@ void alog_info(const char *format, ...);
 void alog_warn(const char *format, ...);
 void alog_error(const char *format, ...);
 void alog_fatal(const char *format, ...);
+
+void backtraceToLogcat(JNIEnv *);
 
 #ifdef __cplusplus
 }
