@@ -1,4 +1,6 @@
 /*
+ *  Taken from https://github.com/svaarala/duktape/blob/master/polyfills/promise.js
+ *
  *  Minimal ES2015+ Promise polyfill
  *
  *  Limitations (also see XXX in source):

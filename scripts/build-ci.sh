@@ -1,5 +1,9 @@
 #!/bin/sh
 
+#
+# Copyright (c) ProsiebenSat1. Digital GmbH 2019.
+#
+
 source $HOME/.profile
 
 setTagVariableIfOnTag() {

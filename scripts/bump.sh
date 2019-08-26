@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+#
+# Copyright (c) ProsiebenSat1. Digital GmbH 2019.
+#
+
 #set -x # outputs every line of script, uncomment for debugging
 
 # fail fast

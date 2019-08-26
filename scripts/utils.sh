@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+#
+# Copyright (c) ProsiebenSat1. Digital GmbH 2019.
+#
+
 # Use colors, but only if connected to a terminal, and that terminal
 # supports them. Travis doesn't support tput and will fail if it is called
 tput=$(which tput)

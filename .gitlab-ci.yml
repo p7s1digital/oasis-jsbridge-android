@@ -16,7 +16,6 @@ build_and_deploy:
     - master
 
   variables:
-  # all secret vars (PROD_S3_ACCESS_KEY etc.) are stored in <repo>/settings/ci_cd/Secret variables or CI_machine's ~/.profile
 
   artifacts:
     paths:
