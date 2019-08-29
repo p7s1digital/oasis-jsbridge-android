@@ -46,7 +46,10 @@ namespace {
     jniContext->callJsBridgeVoidMethod("resolveDeferred",
                                        "(Lkotlinx/coroutines/CompletableDeferred;Ljava/lang/Object;)V",
                                        payload->javaDeferred, value);
-    jsBridgeContext->checkRethrowJsError();
+    if (jsBridgeContext->hasPendingJniException()) {
+      jsBridgeContext->rethrowJniException();
+      return JS_EXCEPTION;
+    }
 
     return JS_UNDEFINED;
   }
@@ -65,9 +68,12 @@ namespace {
 
     // Reject the native Deferred
     jniContext->callJsBridgeVoidMethod("rejectDeferred", "(Lkotlinx/coroutines/CompletableDeferred;Lde/prosiebensat1digital/oasisjsbridge/JsException;)V", payload->javaDeferred, value);
-    jsBridgeContext->checkRethrowJsError();
+    if (jsBridgeContext->hasPendingJniException()) {
+      jsBridgeContext->rethrowJniException();
+      return JS_EXCEPTION;
+    }
 
-    return JS_EXCEPTION;
+    return JS_UNDEFINED;
   }
 
   // Add resolve and reject to bound PromiseObject instance
@@ -104,7 +110,10 @@ JValue Deferred::toJava(JSValueConst v, bool inScript) const {
   // Create a native Deferred instance
   JniLocalRef<jobject> javaDeferred =
       m_jniContext->callJsBridgeObjectMethod("createCompletableDeferred", "()Lkotlinx/coroutines/CompletableDeferred;");
-  m_jsBridgeContext->checkRethrowJsError();
+  if (m_jsBridgeContext->hasPendingJniException()) {
+    m_jsBridgeContext->rethrowJniException();
+    return JValue();
+  }
 
   bool isPromise = JS_IsObject(v) && utils->hasPropertyStr(v, "then");
   if (!isPromise) {
@@ -114,7 +123,11 @@ JValue Deferred::toJava(JSValueConst v, bool inScript) const {
     m_jniContext->callJsBridgeVoidMethod("resolveDeferred",
                                          "(Lkotlinx/coroutines/CompletableDeferred;Ljava/lang/Object;)V",
                                          javaDeferred, value);
-    m_jsBridgeContext->checkRethrowJsError();
+    if (m_jsBridgeContext->hasPendingJniException()) {
+      m_jsBridgeContext->rethrowJniException();
+      return JValue();
+    }
+
     return JValue(javaDeferred);
   }
 
@@ -149,7 +162,10 @@ JValue Deferred::toJava(JSValueConst v, bool inScript) const {
     m_jniContext->callJsBridgeVoidMethod("rejectDeferred",
                                          "(Lkotlinx/coroutines/CompletableDeferred;Ljava/lang/Object;)V",
                                          javaDeferred, javaException);
-    m_jsBridgeContext->checkRethrowJsError();
+    if (m_jsBridgeContext->hasPendingJniException()) {
+      m_jsBridgeContext->rethrowJniException();
+      return JValue();
+    }
   }
 
   JS_FreeValue(m_ctx, ret);
@@ -198,7 +214,10 @@ JSValue Deferred::fromJava(const JValue &value, bool inScript) const {
   // Call Java setUpJsPromise()
   m_jniContext->callJsBridgeVoidMethod("setUpJsPromise", "(Ljava/lang/String;Lkotlinx/coroutines/Deferred;)V",
                                        JStringLocalRef(m_jniContext, promiseObjectGlobalName.c_str()), jDeferred);
-  m_jsBridgeContext->checkRethrowJsError();
+  if (m_jsBridgeContext->hasPendingJniException()) {
+    m_jsBridgeContext->rethrowJniException();
+    return JS_EXCEPTION;
+  }
 
   return promiseInstance;
 }

@@ -63,7 +63,6 @@ JValue Boolean::popArray(uint32_t count, bool expanded, bool inScript) const {
   }
 
   JArrayLocalRef<jboolean> boolArray(m_jniContext, count);
-  m_jsBridgeContext->checkRethrowJsError();
 
   for (int i = count - 1; i >= 0; --i) {
     if (!expanded) {
@@ -130,7 +129,6 @@ JValue Boolean::toJavaArray(JSValueConst v, bool inScript) const {
   for (uint32_t i = 0; i < count; ++i) {
     JValue elementValue = toJava(JS_GetPropertyUint32(m_ctx, v, i), inScript);
     boolArray.setElement(i, elementValue.getBool());
-    m_jsBridgeContext->checkRethrowJsError();
   }
 
   return JValue(boolArray);
@@ -166,10 +164,14 @@ JValue Boolean::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
                            const std::vector<JValue> &args) const {
 
   jboolean retVal = m_jniContext->callBooleanMethodA(javaThis, methodId, args);
-  m_jsBridgeContext->checkRethrowJsError();
 
   // Explicitly release all values now because they won't be used afterwards
   JValue::releaseAll(args);
+
+  if (m_jsBridgeContext->hasPendingJniException()) {
+    m_jsBridgeContext->rethrowJniException();
+    return JValue();
+  }
 
   return JValue((bool) retVal);
 }

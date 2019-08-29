@@ -64,7 +64,14 @@ JValue JavaType::popArray(uint32_t count, bool expanded, bool inScript) const {
   JValue elementValue = pop(inScript);
   const JniLocalRef<jobject> &jElement = elementValue.getLocalRef();
   objectArray.setElement(i, jElement);
-  m_jsBridgeContext->checkRethrowJsError();
+
+  if (m_jsBridgeContext->hasPendingJniException()) {
+    if (!expanded) {
+      duk_pop_n(m_ctx, count - i - 1);  // pop remaining array elements
+    }
+    m_jsBridgeContext->rethrowJniException();
+    return JValue();
+  }
  }
 
  return JValue(objectArray);
@@ -86,8 +93,8 @@ duk_ret_t JavaType::pushArray(const JniLocalRef<jarray>& values, bool expand, bo
     duk_put_prop_index(m_ctx, -2, static_cast<duk_uarridx_t>(i));
    }
   } catch (std::invalid_argument &e) {
-   duk_pop_n(m_ctx, expand ? i : 1);
-   throw e;
+    duk_pop_n(m_ctx, expand ? i : 1);
+    throw e;
   }
  }
  return expand ? size : 1;
@@ -116,7 +123,10 @@ JValue JavaType::toJavaArray(JSValueConst jsValue, bool inScript) const {
     JS_FreeValue(m_ctx, elementJsValue);
     const JniLocalRef<jobject> &jElement = elementJavaValue.getLocalRef();
     objectArray.setElement(i, jElement);
-    m_jsBridgeContext->checkRethrowJsError();
+
+    if (m_jsBridgeContext->hasPendingJniException()) {
+      m_jsBridgeContext->rethrowJniException();
+    }
   }
 
   return JValue(objectArray);
@@ -147,10 +157,14 @@ JSValue JavaType::fromJavaArray(const JniLocalRef<jarray>& values, bool inScript
 JValue JavaType::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis, const std::vector<JValue> &args) const {
 
  JniLocalRef<jobject> returnValue = m_jniContext->callObjectMethodA(javaThis, methodId, args);
- m_jsBridgeContext->checkRethrowJsError();
 
  // Release all values now because they won't be used afterwards
  JValue::releaseAll(args);
+
+ if (m_jsBridgeContext->hasPendingJniException()) {
+  m_jsBridgeContext->rethrowJniException();
+  return JValue();
+ }
 
  return JValue(returnValue);
 }

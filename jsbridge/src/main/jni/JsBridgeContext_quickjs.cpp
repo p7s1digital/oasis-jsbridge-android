@@ -372,8 +372,11 @@ void JsBridgeContext::queueJsException(const std::string &message) const {
 //void JsBridgeContext::queueNullPointerException(const std::string &message) const {
 //}
 
-// TODO: rename and document it!
-void JsBridgeContext::checkRethrowJsError() const {
+bool JsBridgeContext::hasPendingJniException() const {
+  return jniContext()->exceptionCheck();
+}
+
+void JsBridgeContext::rethrowJniException() const {
   if (!jniContext()->exceptionCheck()) {
     return;
   }
@@ -381,6 +384,7 @@ void JsBridgeContext::checkRethrowJsError() const {
   // Get (and clear) the Java exception and read its message
   auto exception = JniLocalRef<jthrowable>(jniContext(), jniContext()->exceptionOccurred(), true);
   jniContext()->exceptionClear();
+
   auto exceptionClass = jniContext()->getObjectClass(exception);
   jmethodID getMessage = jniContext()->getMethodID(exceptionClass, "getMessage","()Ljava/lang/String;");
   JStringLocalRef message(jniContext()->callObjectMethod<jstring>(exception, getMessage));

@@ -78,7 +78,7 @@ JValue Object::pop(bool inScript) const {
       duk_pop(m_ctx);
       CHECK_STACK_NOW();
       m_jsBridgeContext->throwTypeException(message, inScript);
-      return JValue();  // unreachable
+      return JValue();
     }
   }
 }

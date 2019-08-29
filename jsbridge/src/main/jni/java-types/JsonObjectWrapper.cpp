@@ -91,7 +91,10 @@ duk_ret_t JsonObjectWrapper::push(const JValue &value, bool inScript) const {
   jmethodID method = m_jniContext->getMethodID(getJavaClass(), "getJsonString", "()Ljava/lang/String;");
   JStringLocalRef str(m_jniContext->callObjectMethod<jstring>(jWrapper, method));
 
-  m_jsBridgeContext->checkRethrowJsError();
+  if (m_jsBridgeContext->hasPendingJniException()) {
+    duk_push_undefined(m_ctx);
+    m_jsBridgeContext->rethrowJniException();
+  }
 
   // Undefined values are returned as an empty string
   if (strlen(str.c_str()) == 0) {
@@ -156,7 +159,10 @@ JSValue JsonObjectWrapper::fromJava(const JValue &value, bool inScript) const {
   jmethodID method = m_jniContext->getMethodID(getJavaClass(), "getJsonString", "()Ljava/lang/String;");
   JStringLocalRef str(m_jniContext->callObjectMethod<jstring>(jWrapper, method));
 
-  m_jsBridgeContext->checkRethrowJsError();
+  if (m_jsBridgeContext->hasPendingJniException()) {
+    m_jsBridgeContext->rethrowJniException();
+    return JS_EXCEPTION;
+  }
 
   // Undefined values are returned as an empty string
   if (strlen(str.c_str()) == 0) {

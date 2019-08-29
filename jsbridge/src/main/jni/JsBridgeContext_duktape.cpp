@@ -418,8 +418,11 @@ void JsBridgeContext::queueJsException(const std::string &message) const {
 //  m_jniEnv->ThrowNew(exceptionClass.create(), message.c_str());
 //}
 
-// Check for pending JNI exceptions and throw a corresponding JS/Duktape error
-void JsBridgeContext::checkRethrowJsError() const {
+bool JsBridgeContext::hasPendingJniException() const {
+  return jniContext()->exceptionCheck();
+}
+
+void JsBridgeContext::rethrowJniException() const {
   if (!jniContext()->exceptionCheck()) {
     return;
   }
@@ -427,6 +430,7 @@ void JsBridgeContext::checkRethrowJsError() const {
   // Get (and clear) the Java exception and read its message
   auto exception = JniLocalRef<jthrowable>(jniContext(), jniContext()->exceptionOccurred(), true);
   jniContext()->exceptionClear();
+  
   auto exceptionClass = jniContext()->getObjectClass(exception);
   jmethodID getMessage = jniContext()->getMethodID(exceptionClass, "getMessage","()Ljava/lang/String;");
   JStringLocalRef message(jniContext()->callObjectMethod<jstring>(exception, getMessage));
@@ -435,6 +439,7 @@ void JsBridgeContext::checkRethrowJsError() const {
   duk_push_error_object(m_ctx, DUK_ERR_ERROR, message.c_str());
   duk_push_pointer(m_ctx, exception.toNewRawLocalRef());
   duk_put_prop_string(m_ctx, -2, JAVA_EXCEPTION_PROP_NAME);
+
   duk_throw(m_ctx);
 }
 

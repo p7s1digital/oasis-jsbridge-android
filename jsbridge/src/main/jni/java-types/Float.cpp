@@ -63,7 +63,6 @@ JValue Float::popArray(uint32_t count, bool expanded, bool inScript) const {
   }
 
   JArrayLocalRef<jfloat> floatArray(m_jniContext, count);
-  m_jsBridgeContext->checkRethrowJsError();
 
   for (int i = count - 1; i >= 0; --i) {
     if (!expanded) {
@@ -142,7 +141,6 @@ JValue Float::toJavaArray(JSValueConst v, bool inScript) const {
   for (uint32_t i = 0; i < count; ++i) {
     JValue elementValue = toJava(JS_GetPropertyUint32(m_ctx, v, i), inScript);
     floatArray.setElement(i, elementValue.getFloat());
-    m_jsBridgeContext->checkRethrowJsError();
   }
 
   return JValue(floatArray);
@@ -178,10 +176,14 @@ JValue Float::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
                          const std::vector<JValue> &args) const {
 
   jfloat f = m_jniContext->callFloatMethodA(javaThis, methodId, args);
-  m_jsBridgeContext->checkRethrowJsError();
 
   // Explicitly release all values now because they won't be used afterwards
   JValue::releaseAll(args);
+
+  if (m_jsBridgeContext->hasPendingJniException()) {
+    m_jsBridgeContext->rethrowJniException();
+    return JValue();
+  }
 
   return JValue(f);
 }

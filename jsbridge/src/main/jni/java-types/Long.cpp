@@ -140,7 +140,6 @@ JValue Long::toJavaArray(JSValueConst v, bool inScript) const {
   for (uint32_t i = 0; i < count; ++i) {
     JValue elementValue = toJava(JS_GetPropertyUint32(m_ctx, v, i), inScript);
     longArray.setElement(i, elementValue.getLong());
-    m_jsBridgeContext->checkRethrowJsError();
   }
 
   return JValue(longArray);
@@ -173,12 +172,16 @@ JSValue Long::fromJavaArray(const JniLocalRef<jarray> &values, bool inScript) co
 #endif
 
 JValue Long::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
-                  const std::vector<JValue> &args) const {
+                        const std::vector<JValue> &args) const {
   jlong l = m_jniContext->callLongMethodA(javaThis, methodId, args);
-  m_jsBridgeContext->checkRethrowJsError();
 
   // Explicitly release all values now because they won't be used afterwards
   JValue::releaseAll(args);
+
+  if (m_jsBridgeContext->hasPendingJniException()) {
+    m_jsBridgeContext->rethrowJniException();
+    return JValue();
+  }
 
   return JValue(l);
 }

@@ -78,7 +78,8 @@ public:
   void queueIllegalArgumentException(const std::string &message) const;
   void queueJsException(const std::string &message) const;
   //void queueNullPointerException(const std::string &message) const;
-  void checkRethrowJsError() const;
+  bool hasPendingJniException() const;
+  void rethrowJniException() const;
   void queueJavaExceptionForJsError() const;
 
   JniContext *jniContext() const { return m_currentJniContext; }
@@ -112,5 +113,15 @@ private:
   QuickJsUtils *m_utils = nullptr;
 #endif
 };
+
+#define RETHROW_JNI_EXCEPTION_AND(jsBridgeContext, block) \
+  if (!jsBridgeContext->jniContext()->exceptionCheck()) {\
+    return block();\
+  }
+
+#define JNI_EXCEPTION_TO_JS_ERROR(jsBridgeContext, block) \
+  if (!jsBridgeContext->jniContext()->exceptionCheck()) {\
+    return block(JSValue());\
+  }
 
 #endif

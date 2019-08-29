@@ -144,7 +144,9 @@ JValue FunctionX::pop(bool inScript) const {
   JniLocalRef<jobject> javaFunction = m_jniContext->callJsBridgeObjectMethod(
       "createJsLambdaProxy", "(Ljava/lang/String;Lde/prosiebensat1digital/oasisjsbridge/Method;)Lkotlin/Function;",
       JStringLocalRef(m_jniContext, jsFunctionGlobalName.c_str()), javaMethod);
-  m_jsBridgeContext->checkRethrowJsError();
+  if (m_jsBridgeContext->hasPendingJniException()) {
+    m_jsBridgeContext->rethrowJniException();
+  }
 
   return JValue(javaFunction);
 }
@@ -228,7 +230,9 @@ JValue FunctionX::toJava(JSValueConst v, bool inScript) const {
   JniLocalRef<jobject> javaFunction = m_jniContext->callJsBridgeObjectMethod(
       "createJsLambdaProxy", "(Ljava/lang/String;Lde/prosiebensat1digital/oasisjsbridge/Method;)Lkotlin/Function;",
       JStringLocalRef(m_jniContext, jsFunctionGlobalName.c_str()), jniJavaMethod);
-  m_jsBridgeContext->checkRethrowJsError();
+  if (m_jsBridgeContext->hasPendingJniException()) {
+    m_jsBridgeContext->rethrowJniException();
+  }
 
   return JValue(javaFunction);
 }

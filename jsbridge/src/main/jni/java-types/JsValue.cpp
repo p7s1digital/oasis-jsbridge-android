@@ -73,7 +73,9 @@ duk_ret_t JsValue::push(const JValue &value, bool inScript) const {
   // Get JsValue JS name from Java
   jmethodID getJsName = m_jniContext->getMethodID(getJavaClass(), "getAssociatedJsName", "()Ljava/lang/String;");
   JStringLocalRef jsName(m_jniContext->callObjectMethod<jstring>(jValue, getJsName));
-  m_jsBridgeContext->checkRethrowJsError();
+  if (m_jsBridgeContext->hasPendingJniException()) {
+    m_jsBridgeContext->rethrowJniException();
+  }
 
   // Push the global JS value with that name
   duk_get_global_string(m_ctx, jsName.c_str());
@@ -116,7 +118,11 @@ JSValue JsValue::fromJava(const JValue &value, bool inScript) const {
   // Get JsValue JS name from Java
   jmethodID getJsName = m_jniContext->getMethodID(getJavaClass(), "getAssociatedJsName", "()Ljava/lang/String;");
   JStringLocalRef jsName(m_jniContext->callObjectMethod<jstring>(jValue, getJsName));
-  m_jsBridgeContext->checkRethrowJsError();
+
+  if (m_jsBridgeContext->hasPendingJniException()) {
+    m_jsBridgeContext->rethrowJniException();
+    return JS_EXCEPTION;
+  }
 
   // Get the global JS value with that name
   JSValue globalObj = JS_GetGlobalObject(m_ctx);

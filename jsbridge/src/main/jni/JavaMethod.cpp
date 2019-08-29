@@ -210,7 +210,10 @@ JValue JavaMethod::callLambda(const JsBridgeContext *jsBridgeContext, const JniR
   jmethodID callNativeLambda = jniContext->getMethodID(methodClass, "callNativeLambda", "(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
   JniLocalRef<jobject> ret = jniContext->callObjectMethod(method, callNativeLambda, javaThis, argArray);
 
-  jsBridgeContext->checkRethrowJsError();
+  if (jsBridgeContext->hasPendingJniException()) {
+    jsBridgeContext->rethrowJniException();
+    return JValue();
+  }
   return JValue(ret);
 }
 

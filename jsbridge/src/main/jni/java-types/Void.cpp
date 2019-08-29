@@ -112,10 +112,13 @@ JValue Void::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
   } else {
     m_jniContext->callVoidMethodA(javaThis, methodId, args);
   }
-  m_jsBridgeContext->checkRethrowJsError();
 
   // Explicitly release all values now because they won't be used afterwards
   JValue::releaseAll(args);
+
+  if (m_jsBridgeContext->hasPendingJniException()) {
+    m_jsBridgeContext->rethrowJniException();
+  }
 
   return JValue();
 }
