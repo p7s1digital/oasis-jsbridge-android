@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <utils.h>
 #include "Deferred.h"
 
 #include "ArgumentLoader.h"
 #include "JsBridgeContext.h"
 #include "QuickJsUtils.h"
+#include "log.h"
 #include "jni-helpers/JniContext.h"
 
 namespace {

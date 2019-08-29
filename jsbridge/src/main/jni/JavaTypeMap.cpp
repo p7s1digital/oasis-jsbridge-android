@@ -18,7 +18,6 @@
  */
 #include "JavaTypeMap.h"
 #include "JavaType.h"
-#include "utils.h"
 #include "java-types/Array.h"
 #include "java-types/Boolean.h"
 #include "java-types/BoxedPrimitive.h"

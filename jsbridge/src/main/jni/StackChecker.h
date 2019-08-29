@@ -19,9 +19,9 @@
 #ifndef _JSBRIDGE_STACK_CHECKER_H
 #define _JSBRIDGE_STACK_CHECKER_H
 
-#include "duktape/duktape.h"
-#include "utils.h"
 #include "JsBridgeContext.h"
+#include "duktape/duktape.h"
+#include "log.h"
 #include <string>
 #include <stdexcept>
 

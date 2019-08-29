@@ -20,7 +20,6 @@
 
 #include "JsBridgeContext.h"
 #include "StackUnwinder.h"
-#include "utils.h"
 #include "jni-helpers/JObjectArrayLocalRef.h"
 #include "jni-helpers/JValue.h"
 #include "jni-helpers/JniLocalRef.h"

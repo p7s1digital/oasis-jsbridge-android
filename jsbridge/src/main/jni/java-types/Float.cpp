@@ -19,7 +19,6 @@
 #include "Float.h"
 
 #include "JsBridgeContext.h"
-#include "utils.h"
 #include "jni-helpers/JArrayLocalRef.h"
 
 #ifdef DUKTAPE

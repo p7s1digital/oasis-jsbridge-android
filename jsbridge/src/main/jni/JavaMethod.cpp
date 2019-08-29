@@ -20,7 +20,6 @@
 #include "ArgumentLoader.h"
 #include "JavaType.h"
 #include "JsBridgeContext.h"
-#include "utils.h"
 #include "jni-helpers/JniLocalRef.h"
 #include "jni-helpers/JniLocalFrame.h"
 #include "jni-helpers/JniContext.h"

@@ -24,7 +24,7 @@
 #include "JavaScriptObject.h"
 #include "StackChecker.h"
 #include "custom_stringify.h"
-#include "utils.h"
+#include "log.h"
 #include "duk_console.h"
 #include "java-types/Deferred.h"
 #include "jni-helpers/JniGlobalRef.h"

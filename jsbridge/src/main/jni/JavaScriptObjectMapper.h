@@ -20,7 +20,6 @@
 #define _JSBRIDGE_JAVASCRIPTOBJECTMAP_H
 
 #include "duktape/duktape.h"
-#include "utils.h"
 #include <functional>
 #include <string>
 

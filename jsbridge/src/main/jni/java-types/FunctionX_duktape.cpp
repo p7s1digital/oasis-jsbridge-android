@@ -20,7 +20,7 @@
 #include "JavaMethod.h"
 #include "JavaScriptLambda.h"
 #include "JavaScriptObjectMapper.h"
-#include "utils.h"
+#include "log.h"
 #include "jni-helpers/JniGlobalRef.h"
 #include "jni-helpers/JniContext.h"
 #include "jni-helpers/JObjectArrayLocalRef.h"

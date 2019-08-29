@@ -19,10 +19,10 @@
 #include "JavaMethod.h"
 #include "JavaScriptLambda.h"
 #include "QuickJsUtils.h"
+#include "log.h"
 #include "jni-helpers/JniContext.h"
 #include "jni-helpers/JniGlobalRef.h"
 #include "jni-helpers/JObjectArrayLocalRef.h"
-#include "utils.h"
 #include <memory>
 
 namespace {

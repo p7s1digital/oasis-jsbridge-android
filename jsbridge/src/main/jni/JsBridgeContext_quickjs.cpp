@@ -22,7 +22,7 @@
 #include "JavaType.h"
 #include "QuickJsUtils.h"
 #include "quickjs_console.h"
-#include "utils.h"
+#include "log.h"
 #include "custom_stringify.h"
 #include <functional>
 

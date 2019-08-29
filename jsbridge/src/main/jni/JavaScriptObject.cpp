@@ -24,7 +24,7 @@
 #include "jni-helpers/JniLocalRef.h"
 #include "jni-helpers/JniLocalFrame.h"
 #include "jni-helpers/JObjectArrayLocalRef.h"
-#include "utils.h"
+#include "log.h"
 #include <stdexcept>
 #include <string>
 #include <vector>

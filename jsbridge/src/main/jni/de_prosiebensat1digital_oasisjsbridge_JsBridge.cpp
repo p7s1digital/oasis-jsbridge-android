@@ -18,7 +18,7 @@
  */
 #include "de_prosiebensat1digital_oasisjsbridge_JsBridge.h"
 #include "JsBridgeContext.h"
-#include "utils.h"
+#include "log.h"
 #include "jni-helpers/JniLocalRefStats.h"
 #include "jni-helpers/JniLocalRef.h"
 #include "jni-helpers/JObjectArrayLocalRef.h"

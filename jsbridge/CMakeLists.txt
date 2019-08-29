@@ -22,7 +22,7 @@ add_library(
     src/main/jni/JavaScriptMethod.cpp
     src/main/jni/JavaScriptObject.cpp
     src/main/jni/JavaTypeMap.cpp
-    src/main/jni/utils.cpp
+    src/main/jni/log.cpp
     src/main/jni/java-types/Array.cpp
     src/main/jni/java-types/Boolean.cpp
     src/main/jni/java-types/BoxedPrimitive.cpp

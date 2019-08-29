@@ -12,7 +12,7 @@
 
 #include "duk_console.h"
 #include "JsBridgeContext.h"
-#include "utils.h"
+#include "log.h"
 #include "jni-helpers/JStringLocalRef.h"
 #include "jni-helpers/JniLocalRef.h"
 #include "duktape/duktape.h"
