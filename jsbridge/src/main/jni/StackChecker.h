@@ -35,11 +35,20 @@ public:
   explicit StackChecker(duk_context *ctx, int offset)
     : m_context(ctx)
     , m_offset(offset)
-    , m_top(duk_get_top(m_context)) {
+    , m_top(duk_get_top(m_context))
+    , m_checked(false) {
   }
 
 // TODO: do not throw here but provides a more appropriate mechanism to forward the exception!
   ~StackChecker() {
+    if (!m_checked) {
+      checkNow();
+    }
+  }
+
+  void checkNow() const {
+    m_checked = true;
+
     if (m_top + m_offset == duk_get_top(m_context)) {
       return;
     }
@@ -56,7 +65,7 @@ public:
   }
 
 private:
-  void logError(int actual, const char *stack) {
+  void logError(int actual, const char *stack) const {
     alog_error("StackChecker ERROR: expected: %d, actual: %d\n-> stack: %s", m_top + m_offset,
                actual, stack);
     JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(m_context);
@@ -64,17 +73,20 @@ private:
     exit(0);
   };
 
-  duk_context* m_context;
+  duk_context *m_context;
   int m_offset;
   const duk_idx_t m_top;
+  mutable bool m_checked;
 };
 
 #ifdef NDEBUG
 #define CHECK_STACK(ctx) ((void)0)
 #define CHECK_STACK_OFFSET(ctx, offset) ((void)0)
+#define CHECK_STACK_NOW() ((void)0)
 #else
 #define CHECK_STACK(ctx) const StackChecker _checkStack(ctx, 0)
 #define CHECK_STACK_OFFSET(ctx, offset) const StackChecker _checkStack(ctx, offset)
+#define CHECK_STACK_NOW() _checkStack.checkNow()
 #endif
 
 #endif

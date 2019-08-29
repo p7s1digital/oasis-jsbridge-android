@@ -38,6 +38,8 @@ namespace {
 
   extern "C" {
     duk_ret_t callJavaLambda(duk_context *ctx) {
+      CHECK_STACK(ctx);
+
       duk_push_current_function(ctx);
       if (!duk_get_prop_string(ctx, -1, PAYLOAD_PROP_NAME)) {
         duk_pop_2(ctx);  // (undefined) javaThis + current function
@@ -50,6 +52,7 @@ namespace {
       JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
       assert(jsBridgeContext != nullptr);
 
+      CHECK_STACK_NOW();
       return payload->javaMethodPtr->invoke(jsBridgeContext, payload->javaThis);
     }
 

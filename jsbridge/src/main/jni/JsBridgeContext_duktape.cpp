@@ -58,6 +58,8 @@ namespace {
   extern "C" {
     // Called by Duktape when JS invokes a method on our bound Java object.
     duk_ret_t javaMethodHandler(duk_context *ctx) {
+      CHECK_STACK(ctx);
+
       JsBridgeContext *duktapeContext = JsBridgeContext::getInstance(ctx);
       assert(duktapeContext != nullptr);
 
@@ -88,11 +90,14 @@ namespace {
       JniLocalRef<jobject> thisObject(jniContext, env->NewLocalRef(thisObjectRaw));
       duk_pop_2(ctx);
 
+      CHECK_STACK_NOW();
       return method->invoke(duktapeContext, thisObject);
     }
 
     // Called by Duktape when JS invokes a bound Java function
     duk_ret_t javaLambdaHandler(duk_context *ctx) {
+      CHECK_STACK(ctx);
+
       JsBridgeContext *duktapeContext = JsBridgeContext::getInstance(ctx);
       assert(duktapeContext != nullptr);
 
@@ -113,6 +118,7 @@ namespace {
       JniLocalRef<jobject> thisObject(jniContext, env->NewLocalRef(thisObjectRaw));
       duk_pop_2(ctx);  // Java this + current function
 
+      CHECK_STACK_NOW();
       return method->invoke(duktapeContext, thisObject);
     }
 
