@@ -5,8 +5,11 @@ $ python tools/configure.py --source-directory src-input --output-directory tmp-
   -DDUK_USE_SYMBOL_BUILTIN \
   -DDUK_USE_DEBUGGER_SUPPORT -DDUK_USE_INTERRUPT_COUNTER -DDUK_USE_DEBUGGER_INSPECT \
   -DDUK_USE_DEBUGGER_PAUSE_UNCAUGHT -DDUK_USE_DEBUGGER_FWD_LOGGING \
-  -DDUK_USE_DEBUGGER_FWD_PRINTALERT -DDUK_USE_DEBUGGER_THROW_NOTIFY
-- copy duktape.h, duktape.c, duk_config into jsbridge/src/duktape/cpp/duktape
+  -DDUK_USE_DEBUGGER_FWD_PRINTALERT -DDUK_USE_DEBUGGER_THROW_NOTIFY \
+  -DDUK_USE_CPP_EXCEPTIONS
+- copy duktape.h, duktape.c, duk_config.c from tmp-output into jsbridge/src/duktape/cpp/duktape
+- rename duktape.c into duktape.cpp
+
 
 Note 1: duk_console is based on the version in duktape/extras/console but adjusted to use Timber via JNI
 Note 2: promise.js is based on the version in duktape/polyfills but adjusted to properly handle errors
