@@ -19,7 +19,6 @@
 #ifndef _JSBRIDGE_JAVASCRIPTOBJECT_H
 #define _JSBRIDGE_JAVASCRIPTOBJECT_H
 
-#include "JavaScriptObjectBase.h"
 #include "jni-helpers/JniTypes.h"
 #include "jni-helpers/JValue.h"
 #include "jni-helpers/JniLocalRef.h"
@@ -41,12 +40,12 @@ class JObjectArrayLocalRef;
 //
 // It contains the whole information (mostly: methods with parameter and Java types) needed to call
 // the object methods from Java.
-class JavaScriptObject : public JavaScriptObjectBase {
+class JavaScriptObject {
 public:
   typedef std::unordered_map<jmethodID, std::shared_ptr<JavaScriptMethod>> MethodMap;
 
 #if defined(DUKTAPE)
-  JavaScriptObject(const JsBridgeContext *, std::string strName, void *jsHeapPtr, const JObjectArrayLocalRef &methods);
+  JavaScriptObject(const JsBridgeContext *, std::string strName, duk_idx_t jsObjectIndex, const JObjectArrayLocalRef &methods);
 #elif defined(QUICKJS)
   JavaScriptObject(const JsBridgeContext *, std::string strName, JSValue, const JObjectArrayLocalRef &methods);
 #endif

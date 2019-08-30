@@ -19,6 +19,7 @@
 #include "JsBridgeContext.h"
 
 #include "ArgumentLoader.h"
+#include "DuktapeUtils.h"
 #include "JavaMethod.h"
 #include "JavaScriptLambda.h"
 #include "JavaScriptObject.h"
@@ -188,8 +189,7 @@ namespace {
 // ---
 
 JsBridgeContext::JsBridgeContext()
- : m_javaTypes()
- , m_jsGlobalMap() {
+ : m_javaTypes() {
 }
 
 JsBridgeContext::~JsBridgeContext() {
@@ -206,6 +206,8 @@ void JsBridgeContext::init(JniContext *jniContext) {
   if (!m_context) {
     throw std::bad_alloc();
   }
+
+  m_utils = new DuktapeUtils(jniContext, m_context);
 
   // Stash the JsBridgeContext instance in the context, so we can find our way back from a Duktape C callback.
   duk_push_global_stash(m_context);
@@ -400,60 +402,96 @@ void JsBridgeContext::registerJavaLambda(const std::string &strName, const JniLo
 }
 
 void JsBridgeContext::registerJsObject(const std::string &strName,
-                                      const JObjectArrayLocalRef &methods) {
-
+                                       const JObjectArrayLocalRef &methods) {
   CHECK_STACK(m_context);
 
-  // TODO: check that it is not a Promise
+  duk_get_global_string(m_context, strName.c_str());
 
-  auto jsObjectFactory = [&](void *jsHeapPtr) -> JavaScriptObjectBase * {
-    return new JavaScriptObject(this, strName, jsHeapPtr, methods);
-  };
+  if (!duk_is_object(m_context, -1) || duk_is_null(m_context, -1)) {
+    duk_pop(m_context);
+    throw std::invalid_argument("Cannot register " + strName + ". It does not exist or is not a valid object");
+  }
 
-  m_jsGlobalMap.add(m_context, strName, jsObjectFactory);
+  // Check that it is not a promise!
+  if (duk_is_object(m_context, -1) && duk_has_prop_string(m_context, -1, "then")) {
+    alog_warn("Attempting to register a JS promise (%s)... JsValue.await() should probably be called, first...");
+  }
+
+  // Create the JavaScriptObject instance (which takes over jsObjectValue and will free it in its destructor)
+  auto cppJsObject = new JavaScriptObject(this, strName, -1, methods);  // auto-deleted
+
+  // Wrap it inside the JS object
+  m_utils->createMappedCppPtrValue(cppJsObject, -1, strName.c_str());
+
+  duk_pop(m_context);  // JS object
 }
 
 void JsBridgeContext::registerJsLambda(const std::string &strName,
-                                      const JniLocalRef<jsBridgeMethod> &method) {
-
+                                       const JniLocalRef<jsBridgeMethod> &method) {
   CHECK_STACK(m_context);
 
-  auto jsLambdaFactory = [&](void *jsHeapPtr) -> JavaScriptObjectBase * {
-    return new JavaScriptLambda(this, method, strName, jsHeapPtr);
-  };
+  duk_get_global_string(m_context, strName.c_str());
 
-  m_jsGlobalMap.add(m_context, strName, jsLambdaFactory);
+  if (!duk_is_function(m_context, -1)) {
+    duk_pop(m_context);
+    throw std::invalid_argument("Cannot register " + strName + ". It does not exist or is not a valid function.");
+  }
+
+  // Create the JavaScriptObject instance
+  auto cppJsLambda = new JavaScriptLambda(this, method, strName, -1);  // auto-deleted
+
+  // Wrap it inside the JS object
+  m_utils->createMappedCppPtrValue(cppJsLambda, -1, strName.c_str());
+
+  duk_pop(m_context);  // JS lambda
 }
 
 JValue JsBridgeContext::callJsMethod(const std::string &objectName,
-                                    const JniLocalRef<jobject> &javaMethod,
-                                    const JObjectArrayLocalRef &args) {
-
+                                     const JniLocalRef<jobject> &javaMethod,
+                                     const JObjectArrayLocalRef &args) {
   CHECK_STACK(m_context);
 
-  auto jsObject = dynamic_cast<JavaScriptObject *>(m_jsGlobalMap.get(m_context, objectName));
-  if (jsObject == nullptr) {
-    queueJsException("Cannot call method of the JS object " + objectName +
-                     " because it does not exist or has been deleted!");
-    return JValue();
+  // Get the JS object
+  duk_get_global_string(m_context, objectName.c_str());
+  if (!duk_is_object(m_context, -1) || duk_is_null(m_context, -1)) {
+    duk_pop(m_context);
+    throw std::invalid_argument("The JS object " + objectName + " cannot be accessed (not an object)");
   }
 
-  return jsObject->call(javaMethod, args);
+  // Get C++ JavaScriptObject instance
+  auto cppJsObject = m_utils->getMappedCppPtrValue<JavaScriptObject>(-1, objectName.c_str());
+  if (cppJsObject == nullptr) {
+    throw std::invalid_argument("Cannot access the JS object " + objectName +
+                                " because it does not exist or has been deleted!");
+  }
+
+  duk_pop(m_context);
+  return cppJsObject->call(javaMethod, args);
 }
 
 JValue JsBridgeContext::callJsLambda(const std::string &strFunctionName,
-                                    const JObjectArrayLocalRef &args,
-                                    bool awaitJsPromise) {
+                                     const JObjectArrayLocalRef &args,
+                                     bool awaitJsPromise) {
   CHECK_STACK(m_context);
 
-  auto jsLambda = dynamic_cast<JavaScriptLambda *>(m_jsGlobalMap.get(m_context, strFunctionName));
-  if (jsLambda == nullptr) {
-    queueJsException("Cannot invoke the JS function " + strFunctionName +
-                     " because it does not exist or has been deleted!");
-    return JValue();
+  // Get the JS lambda
+  duk_get_global_string(m_context, strFunctionName.c_str());
+  if (!duk_is_function(m_context, -1)) {
+    duk_pop(m_context);
+    throw std::invalid_argument("The JS method " + strFunctionName + " cannot be called (not a function)");
   }
 
-  return jsLambda->call(this, args, awaitJsPromise);
+  // Get C++ JavaScriptLambda instance
+  auto cppJsLambda = m_utils->getMappedCppPtrValue<JavaScriptLambda>(-1, strFunctionName.c_str());
+  if (cppJsLambda == nullptr) {
+    throw std::invalid_argument("Cannot access the JS object " + strFunctionName +
+                                " because it does not exist or has been deleted!");
+  }
+
+  duk_pop(m_context);
+  CHECK_STACK_NOW();
+
+  return cppJsLambda->call(this, args, awaitJsPromise);
 }
 
 duk_idx_t JsBridgeContext::pushJavaObject(const char *instanceName, const JniLocalRef<jobject> &object, const JObjectArrayLocalRef &methods) const {

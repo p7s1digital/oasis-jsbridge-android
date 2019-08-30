@@ -48,10 +48,9 @@ if (FLAVOR STREQUAL "DUKTAPE")
         src/main/jni/duk_console.cpp
         src/main/jni/duktape/duk_trans_socket_unix.c
         src/main/jni/duktape/duktape.cpp
-        src/main/jni/JavaScriptObjectMapper.cpp
-        src/main/jni/JsBridgeContext_duktape.cpp
         src/main/jni/DuktapeUtils.cpp
         src/main/jni/JavaType_duktape.cpp
+        src/main/jni/JsBridgeContext_duktape.cpp
         src/main/jni/java-types/Deferred_duktape.cpp
         src/main/jni/java-types/FunctionX_duktape.cpp
         src/main/jni/java-types/JsonObjectWrapper_duktape.cpp
@@ -64,13 +63,13 @@ elseif (FLAVOR STREQUAL "QUICKJS")
 
     target_sources(${JNI_LIB_NAME} PUBLIC
         src/main/jni/quickjs_console.cpp
-        src/main/jni/QuickJsUtils.cpp
         src/main/jni/quickjs/cutils.c
         src/main/jni/quickjs/libregexp.c
         src/main/jni/quickjs/libunicode.c
         src/main/jni/quickjs/quickjs.c
-        src/main/jni/JsBridgeContext_quickjs.cpp
         src/main/jni/JavaType_quickjs.cpp
+        src/main/jni/JsBridgeContext_quickjs.cpp
+        src/main/jni/QuickJsUtils.cpp
         src/main/jni/java-types/Deferred_quickjs.cpp
         src/main/jni/java-types/FunctionX_quickjs.cpp
         src/main/jni/java-types/JsonObjectWrapper_quickjs.cpp

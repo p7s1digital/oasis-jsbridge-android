@@ -16,10 +16,10 @@
 #include "FunctionX.h"
 
 #include "StackChecker.h"
+#include "DuktapeUtils.h"
 #include "JsBridgeContext.h"
 #include "JavaMethod.h"
 #include "JavaScriptLambda.h"
-#include "JavaScriptObjectMapper.h"
 #include "log.h"
 #include "jni-helpers/JniGlobalRef.h"
 #include "jni-helpers/JniContext.h"
@@ -125,6 +125,8 @@ JValue FunctionX::pop(bool inScript, const AdditionalData *additionalData) const
     throw std::invalid_argument(message);
   }
 
+  const DuktapeUtils *utils = m_jsBridgeContext->getUtils();
+
   // 1. Get the JS function which needs to be triggered from native
   duk_require_function(m_ctx, -1);
   duk_idx_t jsFuncIdx = duk_normalize_index(m_ctx, -1);
@@ -136,14 +138,12 @@ JValue FunctionX::pop(bool inScript, const AdditionalData *additionalData) const
   duk_push_global_object(m_ctx);
   duk_dup(m_ctx, jsFuncIdx);
   duk_put_prop_string(m_ctx, -2, jsFunctionGlobalName.c_str());
-  duk_pop_2(m_ctx);  // global stash + duplicated JS function
+  duk_pop(m_ctx);  // global object
 
-  // 3. Create JavaScriptLambda C++ object and add it to the global mapper
-  auto javaScriptLambdaFactory = [&](void *jsHeapPtr) {
-    return new JavaScriptLambda(m_jsBridgeContext, javaMethod, jsFunctionGlobalName, jsHeapPtr);
-  };
-  const JavaScriptObjectMapper &jsObjectMapper = m_jsBridgeContext->getJsObjectMapper();
-  jsObjectMapper.add(m_ctx, jsFunctionGlobalName, javaScriptLambdaFactory);
+  // 3. Create JavaScriptLambda C++ object and wrap it inside the JS function
+  auto javaScriptLambda = new JavaScriptLambda(m_jsBridgeContext, javaMethod, jsFunctionGlobalName, -1);
+  utils->createMappedCppPtrValue<JavaScriptLambda>(javaScriptLambda, -1, jsFunctionGlobalName.c_str());
+  duk_pop(m_ctx);  // JS function
 
   // 4. Call native createJsLambdaProxy(id, javaMethod)
   JniLocalRef<jobject> javaFunction = m_jniContext->callJsBridgeObjectMethod(

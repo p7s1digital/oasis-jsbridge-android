@@ -33,9 +33,8 @@
 
 #include "StackChecker.h"
 
-JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::string strName, void *jsHeapPtr, const JObjectArrayLocalRef &methods)
+JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::string strName, duk_idx_t jsObjectIndex, const JObjectArrayLocalRef &methods)
  : m_name(std::move(strName))
- , m_jsHeapPtr(jsHeapPtr)
  , m_jsBridgeContext(jsBridgeContext) {
 
   duk_context *ctx = jsBridgeContext->getCContext();
@@ -43,14 +42,15 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
 
   CHECK_STACK(ctx);
 
+  m_jsHeapPtr = duk_get_heapptr(ctx, jsObjectIndex);
+  duk_push_heapptr(ctx, m_jsHeapPtr);
+
   const JniRef<jclass> &methodClass = jniContext->getJsBridgeMethodClass();
   jmethodID getJavaMethod = jniContext->getMethodID(methodClass, "getJavaMethod", "()Ljava/lang/reflect/Method;");  // TODO: cache it
 
-  duk_push_heapptr(ctx, m_jsHeapPtr);
-
-  if (!duk_is_object(ctx, -1)) {
+  if (!duk_is_object(ctx, -1) || duk_is_null(ctx, -1)) {
     duk_pop(ctx);
-    throw std::runtime_error("JavaScript object " + m_name + "cannot be accessed from its weak ptr");
+    throw std::runtime_error("JavaScript object " + m_name + "cannot be accessed");
   }
 
   if (duk_has_prop_string(ctx, -1, "then")) {
@@ -61,7 +61,7 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
   jmethodID getName = nullptr;
   const jsize numMethods = methods.getLength();
   for (jsize i = 0; i < numMethods; ++i) {
-    JniLocalRef<jsBridgeMethod > method = methods.getElement<jsBridgeMethod>(i);
+    JniLocalRef<jsBridgeMethod> method = methods.getElement<jsBridgeMethod>(i);
 
     if (getName == nullptr) {
       getName = jniContext->getMethodID(methodClass, "getName", "()Ljava/lang/String;");

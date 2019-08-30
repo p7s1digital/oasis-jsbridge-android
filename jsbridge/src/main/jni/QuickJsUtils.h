@@ -81,7 +81,7 @@ public:
       JS_SetPropertyStr(m_ctx, jsValue, CPP_OBJECT_MAP_PROP_NAME, JS_DupValue(m_ctx, cppObjectMapValue));
     }
 
-    // Store it in jsLambda.cppObjectMap["lambda_global_name"]
+    // Store it in jsValue.cppObjectMap["lambda_global_name"]
     auto cppValue = createCppPtrValue<T>(obj, true /*deleteOnFinalize*/);
     JS_SetPropertyStr(m_ctx, cppObjectMapValue, key, cppValue);
     // No JS_FreeValue(m_ctx, cppValue) after JS_SetPropertyStr
@@ -95,8 +95,6 @@ public:
     // Get CPP object map
     JSValue cppObjectMapValue = JS_GetPropertyStr(m_ctx, jsValue, CPP_OBJECT_MAP_PROP_NAME);
     if (JS_IsUndefined(cppObjectMapValue)) {
-      //queueIllegalArgumentException(
-      //    "The JS object " + objectName + " cannot be accessed (not registered)");
       JS_FreeValue(m_ctx, cppObjectMapValue);
       return nullptr;
     }

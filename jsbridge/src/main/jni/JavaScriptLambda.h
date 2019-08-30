@@ -16,13 +16,14 @@
 #ifndef _JSBRIDGE_JAVASCRIPTLAMBDA_H
 #define _JSBRIDGE_JAVASCRIPTLAMBDA_H
 
-#include "JavaScriptObjectBase.h"
 #include "jni-helpers/JniRef.h"
 #include "jni-helpers/JniTypes.h"
 #include "jni-helpers/JValue.h"
 #include <string>
 
-#ifdef QUICKJS
+#if defined(DUKTAPE)
+# include "duktape/duktape.h"
+#elif defined(QUICKJS)
 # include "quickjs/quickjs.h"
 #endif
 
@@ -35,15 +36,15 @@ class JObjectArrayLocalRef;
 //
 // It contains the whole information needed (mostly: parameters and Java types) to call the
 // function from Java.
-class JavaScriptLambda : public JavaScriptObjectBase {
+class JavaScriptLambda {
 public:
 #if defined(DUKTAPE)
-  JavaScriptLambda(const JsBridgeContext *, const JniRef<jsBridgeMethod> &method, std::string strName, void *jsHeapPtr);
+  JavaScriptLambda(const JsBridgeContext *, const JniRef<jsBridgeMethod> &method, std::string strName, duk_idx_t jsLambdaIndex);
 #elif defined(QUICKJS)
   JavaScriptLambda(const JsBridgeContext *, const JniRef<jsBridgeMethod> &method, std::string strName, JSValue);
 #endif
 
-  ~JavaScriptLambda() override;
+  ~JavaScriptLambda();
 
   JavaScriptLambda(const JavaScriptLambda &) = delete;
   JavaScriptLambda& operator=(const JavaScriptLambda &) = delete;

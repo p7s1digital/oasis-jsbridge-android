@@ -27,12 +27,12 @@
 #include <string>
 
 #if defined(DUKTAPE)
-# include "JavaScriptObjectMapper.h"
 # include "duktape/duktape.h"
 #else
 # include "quickjs/quickjs.h"
 #endif
 
+class DuktapeUtils;
 class JavaType;
 class JObjectArrayLocalRef;
 class QuickJsUtils;
@@ -88,7 +88,7 @@ public:
 #if defined(DUKTAPE)
   static JsBridgeContext *getInstance(duk_context *);
 
-  const JavaScriptObjectMapper &getJsObjectMapper() const { return m_jsGlobalMap; }
+  DuktapeUtils *getUtils() const { return m_utils; }
   duk_context *getCContext() const { return m_context; };
 #elif defined(QUICKJS)
   static JsBridgeContext *getInstance(JSContext *);
@@ -108,7 +108,7 @@ private:
   duk_idx_t pushJavaObject(const char *instanceName, const JniLocalRef<jobject> &object, const JObjectArrayLocalRef &methods) const;
 
   duk_context *m_context = nullptr;
-  JavaScriptObjectMapper m_jsGlobalMap;
+  DuktapeUtils *m_utils = nullptr;
 #elif defined(QUICKJS)
   JSValue createJavaObject(const char *instanceName, const JniLocalRef<jobject> &object, const JObjectArrayLocalRef &methods) const;
 

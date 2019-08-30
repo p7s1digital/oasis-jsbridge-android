@@ -243,17 +243,19 @@ void JsBridgeContext::registerJavaLambda(const std::string &strName, const JniLo
 }
 
 void JsBridgeContext::registerJsObject(const std::string &strName,
-                                      const JObjectArrayLocalRef &methods) {
+                                       const JObjectArrayLocalRef &methods) {
   JSValue globalObj = JS_GetGlobalObject(m_ctx);
   JSValue jsObjectValue = JS_GetPropertyStr(m_ctx, globalObj, strName.c_str());
   JS_FreeValue(m_ctx, globalObj);
 
-  // TODO: check that it is not a promise!
-
-  if (!JS_IsObject(jsObjectValue)) {
-    // TODO: error message!
+  if (!JS_IsObject(jsObjectValue) || JS_IsNull(jsObjectValue)) {
     JS_FreeValue(m_ctx, jsObjectValue);
-    return;
+    throw std::invalid_argument("Cannot register " + strName + ". It does not exist or is not a valid object.");
+  }
+
+  // Check that it is not a promise!
+  if (m_utils->hasPropertyStr(jsObjectValue, "then")) {
+    alog_warn("Attempting to register a JS promise (%s)... JsValue.await() should probably be called, first...");
   }
 
   // Create the JavaScriptObject instance (which takes over jsObjectValue and will free it in its destructor)
@@ -270,45 +272,35 @@ void JsBridgeContext::registerJsLambda(const std::string &strName,
   JS_FreeValue(m_ctx, globalObj);
 
   if (!JS_IsFunction(m_ctx, jsLambdaValue)) {
-    // TODO: error message!
     JS_FreeValue(m_ctx, jsLambdaValue);
-    return;
+    throw std::invalid_argument("Cannot register " + strName + ". It does not exist or is not a valid function.");
   }
 
   // Create the JavaScriptObject instance (which takes over jsLambdaValue and will free it in its destructor)
   auto cppJsLambda = new JavaScriptLambda(this, method, strName, jsLambdaValue);  // auto-deleted
-
-  // Get or create CPP object map
-  JSValue cppObjectMapValue = JS_GetPropertyStr(m_ctx, jsLambdaValue, CPP_OBJECT_MAP_PROP_NAME);
-  if (JS_IsUndefined(cppObjectMapValue)) {
-    cppObjectMapValue = JS_NewObject(m_ctx);
-    JS_SetPropertyStr(m_ctx, jsLambdaValue, CPP_OBJECT_MAP_PROP_NAME, JS_DupValue(m_ctx, cppObjectMapValue));
-  }
 
   // Wrap it inside the JS object
   m_utils->createMappedCppPtrValue(cppJsLambda, jsLambdaValue, strName.c_str());
 }
 
 JValue JsBridgeContext::callJsMethod(const std::string &objectName,
-                                    const JniLocalRef<jobject> &javaMethod,
-                                    const JObjectArrayLocalRef &args) {
+                                     const JniLocalRef<jobject> &javaMethod,
+                                     const JObjectArrayLocalRef &args) {
 
   // Get the JS object
   JSValue globalObj = JS_GetGlobalObject(m_ctx);
   JSValue jsObjectValue = JS_GetPropertyStr(m_ctx, globalObj, objectName.c_str());
-  if (!JS_IsObject(jsObjectValue)) {
-    queueIllegalArgumentException("The JS object " + objectName + " cannot be accessed (not an object)");
-    JS_FreeValue(m_ctx, globalObj);
-    return JValue();
-  }
   JS_FreeValue(m_ctx, globalObj);
+
+  if (!JS_IsObject(jsObjectValue)) {
+    throw std::invalid_argument("The JS object " + objectName + " cannot be accessed (not an object)");
+  }
 
   // Get C++ JavaScriptObject instance
   auto cppJsObject = m_utils->getMappedCppPtrValue<JavaScriptObject>(jsObjectValue, objectName.c_str());
   if (cppJsObject == nullptr) {
-    queueJsException("Cannot access the JS object " + objectName +
-                     " because it does not exist or has been deleted!");
-    return JValue();
+    throw std::invalid_argument("Cannot access the JS object " + objectName +
+                                " because it does not exist or has been deleted!");
   }
 
   JS_FreeValue(m_ctx, jsObjectValue);
@@ -322,12 +314,11 @@ JValue JsBridgeContext::callJsLambda(const std::string &strFunctionName,
   // Get the JS function
   JSValue globalObj = JS_GetGlobalObject(m_ctx);
   JSValue jsLambdaValue = JS_GetPropertyStr(m_ctx, globalObj, strFunctionName.c_str());
-  if (!JS_IsFunction(m_ctx, jsLambdaValue)) {
-    queueIllegalArgumentException("The JS method " + strFunctionName + " cannot be called (not a function)");
-    JS_FreeValue(m_ctx, globalObj);
-    return JValue();
-  }
   JS_FreeValue(m_ctx, globalObj);
+
+  if (!JS_IsFunction(m_ctx, jsLambdaValue)) {
+    throw std::invalid_argument("The JS method " + strFunctionName + " cannot be called (not a function)");
+  }
 
   // Get C++ JavaScriptLambda instance
   auto cppJsLambda = m_utils->getMappedCppPtrValue<JavaScriptLambda>(jsLambdaValue, strFunctionName.c_str());

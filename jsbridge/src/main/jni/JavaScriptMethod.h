@@ -21,7 +21,6 @@
 
 #include "jni-helpers/JniTypes.h"
 #include "jni-helpers/JniRef.h"
-#include "JavaScriptObjectBase.h"
 #include <string>
 #include <vector>
 

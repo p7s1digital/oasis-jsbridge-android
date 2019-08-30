@@ -24,23 +24,20 @@
 
 #include "StackChecker.h"
 
-JavaScriptLambda::JavaScriptLambda(const JsBridgeContext *jsBridgeContext, const JniRef<jsBridgeMethod> &method, std::string strName, void *jsHeapPtr)
- : JavaScriptObjectBase()
- , m_method(nullptr)
- , m_jsHeapPtr(jsHeapPtr) {
-
+JavaScriptLambda::JavaScriptLambda(const JsBridgeContext *jsBridgeContext, const JniRef<jsBridgeMethod> &method, std::string strName, duk_idx_t jsLambdaIndex)
+ : m_method(nullptr) {
   duk_context *ctx = jsBridgeContext->getCContext();
   CHECK_STACK(ctx);
 
+  m_jsHeapPtr = duk_get_heapptr(ctx, jsLambdaIndex);
   duk_push_heapptr(ctx, m_jsHeapPtr);
 
-  if (!duk_is_object(ctx, -1)) {
+  if (!duk_is_function(ctx, -1)) {
     duk_pop(ctx);
-    throw std::runtime_error("JavaScript object " + strName + "cannot be accessed from its weak ptr");
+    throw std::runtime_error("JavaScript object " + strName + "cannot be accessed");
   }
 
   m_method = new JavaScriptMethod(jsBridgeContext, method, std::move(strName), true);
-
   duk_pop(ctx);  // JS lambda
 }
 
