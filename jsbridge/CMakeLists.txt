@@ -50,6 +50,7 @@ if (FLAVOR STREQUAL "DUKTAPE")
         src/main/jni/duktape/duktape.cpp
         src/main/jni/JavaScriptObjectMapper.cpp
         src/main/jni/JsBridgeContext_duktape.cpp
+        src/main/jni/DuktapeUtils.cpp
         src/main/jni/JavaType_duktape.cpp
         src/main/jni/java-types/Deferred_duktape.cpp
         src/main/jni/java-types/FunctionX_duktape.cpp
