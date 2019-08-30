@@ -118,9 +118,12 @@ JavaMethod::~JavaMethod() {
 
 #if defined(DUKTAPE)
 
-duk_ret_t JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRef<jobject> &javaThis) const {
+#include "StackChecker.h"
 
+duk_ret_t JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRef<jobject> &javaThis) const {
   duk_context *ctx = jsBridgeContext->getCContext();
+  CHECK_STACK(ctx);
+
   JniContext *jniContext = jsBridgeContext->jniContext();
 
   const auto argCount = duk_get_top(ctx);
@@ -139,6 +142,8 @@ duk_ret_t JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRe
   const JniLocalFrame localFrame(jniContext, m_argumentLoaders.size());
 
   std::vector<JValue> args(m_argumentLoaders.size());
+
+  CHECK_STACK_NOW();
 
   // Load the arguments off the stack and convert to Java types.
   // Note we're going backwards since the last argument is at the top of the stack.
