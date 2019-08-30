@@ -16,7 +16,7 @@
 #include "JsBridgeContext.h"
 
 #include "ArgumentLoader.h"
-#include "JavaMethod.h"
+#include "JavaObject.h"
 #include "JavaScriptLambda.h"
 #include "JavaScriptObject.h"
 #include "JavaType.h"
@@ -34,33 +34,10 @@ namespace {
   // Internal names used for properties in the QuickJS context's global stash and bound variables
   const char *JSBRIDGE_CPP_CLASS_PROP_NAME = "__jsbridge_cpp";
   const char *JAVA_EXCEPTION_PROP_NAME = "__java_exception";
-  const char *JAVA_THIS_PROP_NAME = "__java_this";
 
   //int interrupt_handler(JSRuntime *rt, void *opaque) {
   //  return 0;
   //}
-
-  JSValue javaMethodHandler(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv, int magic, JSValueConst *datav) {
-    JsBridgeContext *quickJsContext = JsBridgeContext::getInstance(ctx);
-    assert(quickJsContext != nullptr);
-
-    // Get JavaMethod instance bound to the function itself
-    auto javaMethod = QuickJsUtils::getCppPtr<JavaMethod>(datav[0]);
-
-    // Java this is a property of the JS method
-    JniLocalRef<jobject> javaThis = quickJsContext->getUtils()->getJavaRef<jobject>(datav[1]);
-
-    JSValue ret = javaMethod->invoke(quickJsContext, javaThis, argc, argv);
-
-    // Manually check for pending exceptions
-    JSValue pendingException = JS_GetException(ctx);
-    if (!JS_IsNull(pendingException)) {
-      JS_Throw(ctx, pendingException);
-      return JS_EXCEPTION;
-    }
-
-    return ret;
-  }
 }
 
 
@@ -186,7 +163,7 @@ void JsBridgeContext::registerJavaObject(const std::string &strName, const JniLo
     return;
   }
 
-  JSValue javaObjectValue = createJavaObject(strName.c_str(), object, methods);
+  JSValue javaObjectValue = JavaObject::create(this, strName.c_str(), object, methods);
   if (JS_IsUndefined(javaObjectValue)) {
     JS_FreeValue(m_ctx, globalObj);
     return;
@@ -209,34 +186,13 @@ void JsBridgeContext::registerJavaLambda(const std::string &strName, const JniLo
     return;
   }
 
-  const JniRef<jclass> &methodClass = jniContext()->getJsBridgeMethodClass();
-
-  jmethodID getName = jniContext()->getMethodID(methodClass, "getName", "()Ljava/lang/String;");
-  std::string strMethodName = JStringLocalRef(jniContext()->callObjectMethod<jstring>(method, getName)).str();
-
-  std::string qualifiedMethodName = strName + "::" + strMethodName;
-
-  std::unique_ptr<JavaMethod> javaMethod;
-  try {
-    javaMethod = std::make_unique<JavaMethod>(this, method, qualifiedMethodName, true /*isLambda*/);
-  } catch (const std::invalid_argument &e) {
-    queueIllegalArgumentException(std::string() + "In bound method \"" + qualifiedMethodName + "\": " + e.what());
+  JSValue javaLambdaValue = JavaObject::createLambda(this, strName.c_str(), object, method);
+  if (JS_IsUndefined(javaLambdaValue)) {
     JS_FreeValue(m_ctx, globalObj);
     return;
   }
 
-  JSValue javaLambdaValue = m_utils->createCppPtrValue(javaMethod.release(), true /*deleteOnFinalize*/);  // wrap the C++ instance
-  JSValue javaThisValue = m_utils->createJavaRefValue(JniGlobalRef<jobject>(object));  // wrap the JNI ref
-  JSValueConst javaLambdaHandlerData[2];
-  javaLambdaHandlerData[0] = javaLambdaValue;
-  javaLambdaHandlerData[1] = javaThisValue;
-  JSValue javaLambdaHandlerValue = JS_NewCFunctionData(m_ctx, javaMethodHandler, 1 /*length*/, 0 /*magic*/, 2, javaLambdaHandlerData);
-
-  // Free data values (they are duplicated by JS_NewCFunctionData)
-  JS_FreeValue(m_ctx, javaLambdaValue);
-  JS_FreeValue(m_ctx, javaThisValue);
-
-  JS_SetPropertyStr(m_ctx, globalObj, strName.c_str(), javaLambdaHandlerValue);
+  JS_SetPropertyStr(m_ctx, globalObj, strName.c_str(), javaLambdaValue);
   // No JS_FreeValue(m_ctx, javaLambdaHandlerValue) after JS_SetPropertyStr()
 
   JS_FreeValue(m_ctx, globalObj);
@@ -556,54 +512,3 @@ JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
   //JS_FreeValue(m_ctx, exceptionValue);
   return ret;
 }
-
-JSValue JsBridgeContext::createJavaObject(const char *instanceName, const JniLocalRef<jobject> &object, const JObjectArrayLocalRef &methods) const {
-
-  JSValue javaObjectValue = JS_NewObject(m_ctx);
-
-  const JniRef<jclass> &methodClass = jniContext()->getJsBridgeMethodClass();
-
-  const jsize numMethods = methods.getLength();
-  std::string strInstanceName = instanceName;
-  for (jsize i = 0; i < numMethods; ++i) {
-    JniLocalRef<jsBridgeMethod> method = methods.getElement<jsBridgeMethod>(i);
-
-    jmethodID getName = jniContext()->getMethodID(methodClass, "getName", "()Ljava/lang/String;");
-    std::string strMethodName = JStringLocalRef(jniContext()->callObjectMethod<jstring>(method, getName)).str();
-
-    std::string qualifiedMethodName = strInstanceName.append("::").append(strMethodName);
-
-    std::unique_ptr<JavaMethod> javaMethod;
-    try {
-      javaMethod = std::make_unique<JavaMethod>(this, method, qualifiedMethodName, false /*isLambda*/);
-    } catch (const std::invalid_argument &e) {
-      queueIllegalArgumentException(std::string() + "In bound method \"" + qualifiedMethodName + "\": " + e.what());
-      JS_FreeValue(m_ctx, javaObjectValue);
-      return JS_UNDEFINED;
-    }
-
-    JSValue javaMethodValue = m_utils->createCppPtrValue(javaMethod.release(), true);
-    JSValue javaThisValue = m_utils->createJavaRefValue(JniGlobalRef<jobject>(object));
-    JSValueConst javaMethodHandlerData[2];
-    javaMethodHandlerData[0] = javaMethodValue;
-    javaMethodHandlerData[1] = javaThisValue;
-    JSValue javaMethodHandlerValue = JS_NewCFunctionData(m_ctx, javaMethodHandler, 1 /*length*/, 0 /*magic*/, 2, javaMethodHandlerData);
-
-    // Free data values (they are duplicated by JS_NewCFunctionData)
-    JS_FreeValue(m_ctx, javaMethodValue);
-    JS_FreeValue(m_ctx, javaThisValue);
-
-    // Add this method to the bound object
-    JS_SetPropertyStr(m_ctx, javaObjectValue, strMethodName.c_str(), javaMethodHandlerValue);
-    // No JS_FreeValue(m_ctx, javaMethodHandlerValue) after JS_SetPropertyStr()
-  }
-
-  // Keep a reference in JavaScript to the object being bound
-  // (which is properly released when the JSValue gets finalized)
-  auto javaThisValue = m_utils->createJavaRefValue<jobject>(object);
-  JS_SetPropertyStr(m_ctx, javaObjectValue, JAVA_THIS_PROP_NAME, javaThisValue);
-  // No JS_FreeValue(m_ctx, javaThisValue) after JS_SetPropertyStr()
-
-  return javaObjectValue;
-}
-

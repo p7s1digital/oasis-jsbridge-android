@@ -20,7 +20,7 @@
 
 #include "ArgumentLoader.h"
 #include "DuktapeUtils.h"
-#include "JavaMethod.h"
+#include "JavaObject.h"
 #include "JavaScriptLambda.h"
 #include "JavaScriptObject.h"
 #include "StackChecker.h"
@@ -42,10 +42,7 @@
 // ---
 
 namespace {
-
   // The \xff\xff part keeps the variable hidden from JavaScript (visible through C API only).
-  const char *JAVA_THIS_PROP_NAME = "\xff\xffjava_this";
-  const char *JAVA_METHOD_PROP_NAME = "\xff\xffjava_method";
   const char *JSBRIDGE_CPP_CLASS_PROP_NAME = "\xff\xffjsbridge_cpp";
   const char* JAVA_EXCEPTION_PROP_NAME = "\xff\xffjava_exception";
 
@@ -55,128 +52,7 @@ namespace {
 
   // Native functions called from JS
   // ---
-
   extern "C" {
-    // Called by Duktape when JS invokes a method on our bound Java object.
-    duk_ret_t javaMethodHandler(duk_context *ctx) {
-      CHECK_STACK(ctx);
-
-      JsBridgeContext *duktapeContext = JsBridgeContext::getInstance(ctx);
-      assert(duktapeContext != nullptr);
-
-      JniContext *jniContext = duktapeContext->jniContext();
-      JNIEnv *env = jniContext->getJNIEnv();
-      assert(env != nullptr);
-
-      // Get JavaMethod instance bound to the function itself
-      duk_push_current_function(ctx);
-      duk_get_prop_string(ctx, -1, JAVA_METHOD_PROP_NAME);
-      if (duk_is_null_or_undefined(ctx, -1)) {
-        duk_error(ctx, DUK_ERR_TYPE_ERROR, "Cannot execute Java method: Java method not found!");
-        duk_pop_2(ctx);
-        return DUK_RET_ERROR;
-      }
-      auto method = static_cast<JavaMethod *>(duk_require_pointer(ctx, -1));
-      duk_pop_2(ctx);  // Java method + current function
-
-      // JS this -> Java this
-      duk_push_this(ctx);
-      duk_get_prop_string(ctx, -1, JAVA_THIS_PROP_NAME);
-      if (duk_is_null_or_undefined(ctx, -1)) {
-        duk_error(ctx, DUK_ERR_TYPE_ERROR, "Cannot execute Java method: Java object not found!");
-        duk_pop_2(ctx);
-        return DUK_RET_ERROR;
-      }
-      auto thisObjectRaw = reinterpret_cast<jobject>(duk_require_pointer(ctx, -1));
-      JniLocalRef<jobject> thisObject(jniContext, env->NewLocalRef(thisObjectRaw));
-      duk_pop_2(ctx);
-
-      CHECK_STACK_NOW();
-      return method->invoke(duktapeContext, thisObject);
-    }
-
-    // Called by Duktape when JS invokes a bound Java function
-    duk_ret_t javaLambdaHandler(duk_context *ctx) {
-      CHECK_STACK(ctx);
-
-      JsBridgeContext *duktapeContext = JsBridgeContext::getInstance(ctx);
-      assert(duktapeContext != nullptr);
-
-      JniContext *jniContext = duktapeContext->jniContext();
-      JNIEnv *env = jniContext->getJNIEnv();
-      assert(env != nullptr);
-
-      duk_push_current_function(ctx);
-
-      // Get JavaMethod instance bound to the function itself
-      duk_get_prop_string(ctx, -1, JAVA_METHOD_PROP_NAME);
-      auto method = static_cast<JavaMethod *>(duk_require_pointer(ctx, -1));
-      duk_pop(ctx);  // Java method
-
-      // Java this is a property of the JS method
-      duk_get_prop_string(ctx, -1, JAVA_THIS_PROP_NAME);
-      auto thisObjectRaw = reinterpret_cast<jobject>(duk_require_pointer(ctx, -1));
-      JniLocalRef<jobject> thisObject(jniContext, env->NewLocalRef(thisObjectRaw));
-      duk_pop_2(ctx);  // Java this + current function
-
-      CHECK_STACK_NOW();
-      return method->invoke(duktapeContext, thisObject);
-    }
-
-    // Called by Duktape to handle finalization of bound Java objects
-    duk_ret_t javaObjectFinalizer(duk_context *ctx) {
-      CHECK_STACK(ctx);
-
-      JsBridgeContext *duktapeContext = JsBridgeContext::getInstance(ctx);
-      assert(duktapeContext != nullptr);
-
-      JniContext *jniContext = duktapeContext->jniContext();
-
-      if (duk_get_prop_string(ctx, -1, JAVA_THIS_PROP_NAME)) {
-        // Remove the global reference from the bound Java object
-        JniGlobalRef<jobject>::deleteRawGlobalRef(jniContext, static_cast<jobject>(duk_require_pointer(ctx, -1)));
-        duk_pop(ctx);
-        duk_del_prop_string(ctx, -1, JAVA_METHOD_PROP_NAME);
-      }
-
-      // Iterate over all of the properties, deleting all the JavaMethod objects we attached.
-      duk_enum(ctx, -1, DUK_ENUM_OWN_PROPERTIES_ONLY);
-      while (duk_next(ctx, -1, (duk_bool_t) true)) {
-        if (!duk_get_prop_string(ctx, -1, JAVA_METHOD_PROP_NAME)) {
-          duk_pop_2(ctx);
-          continue;
-        }
-        delete static_cast<JavaMethod *>(duk_require_pointer(ctx, -1));
-        duk_pop_3(ctx);
-      }
-
-      // Pop the enum
-      duk_pop(ctx);
-      return 0;
-    }
-
-    // Called by Duktape to handle finalization of bound Java lambdas
-    duk_ret_t javaLambdaFinalizer(duk_context *ctx) {
-      CHECK_STACK(ctx);
-
-      JsBridgeContext *duktapeContext = JsBridgeContext::getInstance(ctx);
-      assert(duktapeContext != nullptr);
-
-      JniContext *jniContext = duktapeContext->jniContext();
-
-      if (duk_get_prop_string(ctx, -1, JAVA_THIS_PROP_NAME)) {
-        JniGlobalRef<jobject>::deleteRawGlobalRef(jniContext, static_cast<jobject>(duk_require_pointer(ctx, -1)));
-        duk_pop(ctx);
-      }
-
-      if (duk_get_prop_string(ctx, -1, JAVA_METHOD_PROP_NAME)) {
-        delete static_cast<JavaMethod *>(duk_require_pointer(ctx, -1));
-        duk_pop(ctx);
-      }
-
-      return 0;
-    }
-
     void fatalErrorHandler(void *, const char* msg) {
       alog_fatal("Fatal error: %s", msg);
       throw std::runtime_error(msg);
@@ -338,17 +214,17 @@ void JsBridgeContext::registerJavaObject(const std::string &strName, const JniLo
     return;
   }
 
-  if (pushJavaObject(strName.c_str(), object, methods) != DUK_INVALID_INDEX) {
-      // Make our bound Java object a property of the Duktape global object (so it's a JS global).
-      duk_put_prop_string(m_context, -2, strName.c_str());
-  }
+  JavaObject::push(this, strName, object, methods);
+
+  // Make our bound Java object a property of the Duktape global object (so it's a JS global).
+  duk_put_prop_string(m_context, -2, strName.c_str());
 
   // Pop the Duktape global object off the stack.
   duk_pop(m_context);
 }
 
 void JsBridgeContext::registerJavaLambda(const std::string &strName, const JniLocalRef<jobject> &object,
-                                        const JniLocalRef<jsBridgeMethod> &method) {
+                                         const JniLocalRef<jsBridgeMethod> &method) {
 
   CHECK_STACK(m_context);
 
@@ -360,39 +236,7 @@ void JsBridgeContext::registerJavaLambda(const std::string &strName, const JniLo
     return;
   }
 
-  const JniRef<jclass> &methodClass = jniContext()->getJsBridgeMethodClass();
-
-  jmethodID getName = jniContext()->getMethodID(methodClass, "getName", "()Ljava/lang/String;");
-  std::string strMethodName = JStringLocalRef(jniContext()->callObjectMethod<jstring>(method, getName)).str();
-
-  std::string qualifiedMethodName = strName + "::" + strMethodName;
-
-  std::unique_ptr<JavaMethod> javaMethod;
-  try {
-    javaMethod = std::make_unique<JavaMethod>(this, method, qualifiedMethodName, true /*isLambda*/);
-  } catch (const std::invalid_argument &e) {
-    queueIllegalArgumentException(std::string() + "In bound method \"" + qualifiedMethodName + "\": " + e.what());
-    // Pop the object being bound
-    duk_pop(m_context);
-    return;
-  }
-
-  // Use VARARGS here to allow us to manually validate that the proper number of arguments are
-  // given in the call. If we specify the actual number of arguments needed, Duktape will try to
-  // be helpful by discarding extra or providing missing arguments. That's not quite what we want.
-  // See http://duktape.org/api.html#duk_push_c_function for details.
-  const duk_idx_t funcIndex = duk_push_c_function(m_context, javaLambdaHandler, DUK_VARARGS);
-
-  duk_push_pointer(m_context, javaMethod.release());
-  duk_put_prop_string(m_context, funcIndex, JAVA_METHOD_PROP_NAME);
-
-  // Keep a reference in JavaScript to the object being bound.
-  duk_push_pointer(m_context, object.toNewRawGlobalRef());  // JNI global ref will be deleted via JS finalizer
-  duk_put_prop_string(m_context, funcIndex, JAVA_THIS_PROP_NAME);
-
-  // Set a finalizer
-  duk_push_c_function(m_context, javaLambdaFinalizer, 1);
-  duk_set_finalizer(m_context, funcIndex);
+  JavaObject::pushLambda(this, strName, object, method);
 
   // Make our Java lambda a property of the Duktape global object (so it's a JS global).
   duk_put_prop_string(m_context, -2, strName.c_str());
@@ -492,60 +336,6 @@ JValue JsBridgeContext::callJsLambda(const std::string &strFunctionName,
   CHECK_STACK_NOW();
 
   return cppJsLambda->call(this, args, awaitJsPromise);
-}
-
-duk_idx_t JsBridgeContext::pushJavaObject(const char *instanceName, const JniLocalRef<jobject> &object, const JObjectArrayLocalRef &methods) const {
-
-  CHECK_STACK_OFFSET(m_context, 1);
-
-  const duk_idx_t objIndex = duk_push_object(m_context);
-
-  // Hook up a finalizer to decrement the refcount and clean up our JavaMethods.
-  duk_push_c_function(m_context, javaObjectFinalizer, 1);
-  duk_set_finalizer(m_context, objIndex);
-
-  const JniRef<jclass> &methodClass = jniContext()->getJsBridgeMethodClass();
-
-  const jsize numMethods = methods.getLength();
-  std::string strInstanceName = instanceName;
-  for (jsize i = 0; i < numMethods; ++i) {
-    JniLocalRef<jsBridgeMethod> method = methods.getElement<jsBridgeMethod>(i);
-
-    jmethodID getName = jniContext()->getMethodID(methodClass, "getName", "()Ljava/lang/String;");
-    std::string strMethodName = JStringLocalRef(jniContext()->callObjectMethod<jstring>(method, getName)).str();
-
-    std::string qualifiedMethodName = strInstanceName.append("::").append(strMethodName);
-
-    std::unique_ptr<JavaMethod> javaMethod;
-    try {
-      javaMethod = std::make_unique<JavaMethod>(this, method, qualifiedMethodName, false /*isLambda*/);
-    } catch (const std::invalid_argument &e) {
-      queueIllegalArgumentException(std::string() + "In bound method \"" + qualifiedMethodName + "\": " + e.what());
-      // Pop the object being bound
-      duk_pop(m_context);
-      return DUK_INVALID_INDEX;
-    }
-
-    // Use VARARGS here to allow us to manually validate that the proper number of arguments are
-    // given in the call. If we specify the actual number of arguments needed, Duktape will try to
-    // be helpful by discarding extra or providing missing arguments. That's not quite what we want.
-    // See http://duktape.org/api.html#duk_push_c_function for details.
-    const duk_idx_t func = duk_push_c_function(m_context, javaMethodHandler, DUK_VARARGS);
-    duk_push_pointer(m_context, javaMethod.release());
-    duk_put_prop_string(m_context, func, JAVA_METHOD_PROP_NAME);
-
-    // Add this method to the bound object.
-    duk_put_prop_string(m_context, objIndex, strMethodName.c_str());
-  }
-
-  JNIEnv *env = jniContext()->getJNIEnv();
-  assert(env != nullptr);
-
-  // Keep a reference in JavaScript to the object being bound.
-  duk_push_pointer(m_context, object.toNewRawGlobalRef());  // JNI global ref will be deleted via JS finalizer
-  duk_put_prop_string(m_context, objIndex, JAVA_THIS_PROP_NAME);
-
-  return objIndex;
 }
 
 void JsBridgeContext::assignJsValue(const std::string &strGlobalName, const std::string &strCode) {
