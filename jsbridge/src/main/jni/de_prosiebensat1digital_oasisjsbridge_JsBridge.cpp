@@ -20,7 +20,6 @@
 #include "JsBridgeContext.h"
 #include "log.h"
 #include "java-types/Deferred.h"
-#include "jni-helpers/JniLocalRefStats.h"
 #include "jni-helpers/JniLocalRef.h"
 #include "jni-helpers/JObjectArrayLocalRef.h"
 #include "jni-helpers/JStringLocalRef.h"
@@ -54,9 +53,6 @@
       if (m_jniContext == nullptr) {
         return;
       }
-
-      const JniLocalRefStats *localRefStats = m_jniContext->getLocalRefStats();
-      //alog("END OF JNI SCOPE, LOCAL REF COUNT: %d, MAX: %d", localRefStats->currentCount(), localRefStats->maxCount());
     }
 
     JsBridgeContext *getJsBridgeContext() const { return m_jsBridgeContext; }

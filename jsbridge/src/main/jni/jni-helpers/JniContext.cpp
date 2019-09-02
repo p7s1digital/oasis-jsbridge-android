@@ -20,7 +20,6 @@
 
 JniContext::JniContext(JNIEnv *env, jobject jsBridgeJavaObject)
  : m_jniEnv(env)
- , m_localRefStats(new JniLocalRefStats())
  , m_jsBridgeJavaClass(JniGlobalRef<jclass>(findClass(JSBRIDGE_PKG_PATH "/JsBridge")))
  , m_jsBridgeJavaObject(JniGlobalRef<jobject>(JniLocalRef<jobject>(this, jsBridgeJavaObject, true))) {
 
@@ -30,7 +29,6 @@ JniContext::JniContext(JNIEnv *env, jobject jsBridgeJavaObject)
 }
 
 JniContext::~JniContext() {
-  delete m_localRefStats;
 }
 
 jmethodID JniContext::getMethodID(const JniRef<jclass> &clazz, const char *name, const char *sig) const {

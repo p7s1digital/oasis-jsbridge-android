@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "JniLocalRefStats.h"
+#include "JniRefStats.h"
 
-void JniLocalRefStats::clear() {
+void JniRefStats::clear() {
   m_count = 0;
 }
 
-void JniLocalRefStats::add() {
+void JniRefStats::add() {
 #ifndef NDEBUG
   ++m_count;
   if (m_count > m_maxCount) {
@@ -30,7 +30,7 @@ void JniLocalRefStats::add() {
 #endif
 }
 
-void JniLocalRefStats::remove() {
+void JniRefStats::remove() {
 #ifndef NDEBUG
   --m_count;
 

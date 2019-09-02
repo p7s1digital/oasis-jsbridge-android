@@ -169,7 +169,6 @@ public:
   T toNewRawGlobalRef() const override {
     JNIEnv *env = JniRefHelper::getJNIEnv(m_jniContext);
     assert(env != nullptr);
-
     return m_object == nullptr ? nullptr : static_cast<T>(env->NewGlobalRef(m_object));
   }
 

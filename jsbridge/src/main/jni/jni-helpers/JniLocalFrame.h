@@ -19,7 +19,6 @@
 #ifndef _JSBRIDGE_LOCALFRAME_H
 #define _JSBRIDGE_LOCALFRAME_H
 
-#include "JniLocalRefStats.h"
 #include "JniContext.h"
 #include <jni.h>
 #include <memory>

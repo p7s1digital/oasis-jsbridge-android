@@ -19,7 +19,6 @@
 #include <jni.h>
 
 class JniContext;
-class JniLocalRefStats;
 
 class JniRefHelper {
 public:
@@ -30,7 +29,6 @@ public:
   ~JniRefHelper() = delete;
 
   static JNIEnv *getJNIEnv(const JniContext *);
-  static JniLocalRefStats *getLocalRefStats(const JniContext *);
 };
 
 #endif
