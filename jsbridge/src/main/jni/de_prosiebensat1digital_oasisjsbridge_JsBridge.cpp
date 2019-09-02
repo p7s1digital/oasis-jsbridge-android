@@ -20,8 +20,8 @@
 #include "JsBridgeContext.h"
 #include "log.h"
 #include "java-types/Deferred.h"
-#include "jni-helpers/JniLocalRefStats.h"
 #include "jni-helpers/JniLocalRef.h"
+#include "jni-helpers/JniRefStats.h"
 #include "jni-helpers/JObjectArrayLocalRef.h"
 #include "jni-helpers/JStringLocalRef.h"
 #include <new>
@@ -55,13 +55,25 @@
         return;
       }
 
-      const JniLocalRefStats *localRefStats = m_jniContext->getLocalRefStats();
-      //alog("END OF JNI SCOPE, LOCAL REF COUNT: %d, MAX: %d", localRefStats->currentCount(), localRefStats->maxCount());
+#ifdef DEBUG_JNI_LOCALREFS
+      const JniRefStats *localRefStats = m_jniContext->getLocalRefStats();
+      alog("END OF JNI SCOPE, LOCAL REF COUNT: %d, MAX: %d", localRefStats->currentCount(), localRefStats->maxCount());
+#endif
+
+#ifdef DEBUG_JNI_GLOBALREFS
+      const JniRefStats *globalRefStats = m_jniContext->getGlobalRefStats();
+      alog("END OF JNI SCOPE, GLOBAL REF COUNT: %d, MAX: %d", globalRefStats->currentCount(), globalRefStats->maxCount());
+#endif
     }
 
     JsBridgeContext *getJsBridgeContext() const { return m_jsBridgeContext; }
 
     void deleteJniContext() {
+#ifdef DEBUG_JNI_GLOBALREFS
+      const JniRefStats *globalRefStats = m_jniContext->getGlobalRefStats();
+      alog("DELETE JNI CONTEXT, GLOBAL REF COUNT: %d, MAX: %d", globalRefStats->currentCount(), globalRefStats->maxCount());
+#endif
+
       delete m_jniContext;
       m_jniContext = nullptr;
     }

@@ -5,6 +5,9 @@ cmake_minimum_required(VERSION 3.6.0)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -DANDROID_STL=c++_static -DANDROID_TOOLCHAIN=clang -DDUK_DEBUG_PORT=${DEBUGGER_SERVER_PORT}")
 
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDEBUG_JNI_LOCALREFS")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDEBUG_JNI_GLOBALREFS")
+
 message("CMake - Flavor = ${FLAVOR}")
 
 include_directories(
@@ -40,7 +43,7 @@ add_library(
     src/main/jni/java-types/Void.cpp
     src/main/jni/jni-helpers/JniContext.cpp
     src/main/jni/jni-helpers/JniLocalFrame.cpp
-    src/main/jni/jni-helpers/JniLocalRefStats.cpp
+    src/main/jni/jni-helpers/JniRefStats.cpp
     src/main/jni/jni-helpers/JniRefHelper.cpp
 )
 

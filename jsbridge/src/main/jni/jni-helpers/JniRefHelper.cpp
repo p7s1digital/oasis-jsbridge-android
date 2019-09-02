@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 #include "JniRefHelper.h"
+
 #include "JniContext.h"
 #include <cassert>
 
@@ -23,8 +24,18 @@ JNIEnv *JniRefHelper::getJNIEnv(const JniContext *jniContext) {
   return jniContext->getJNIEnv();
 }
 
+#ifdef DEBUG_JNI_LOCALREFS
 // static
-JniLocalRefStats *JniRefHelper::getLocalRefStats(const JniContext *jniContext) {
+JniRefStats *JniRefHelper::getLocalRefStats(const JniContext *jniContext) {
   assert(jniContext != nullptr);
   return jniContext->getLocalRefStats();
 };
+#endif
+
+#ifdef DEBUG_JNI_GLOBALREFS
+// static
+JniRefStats *JniRefHelper::getGlobalRefStats(const JniContext *jniContext) {
+  assert(jniContext != nullptr);
+  return jniContext->getGlobalRefStats();
+};
+#endif

@@ -25,7 +25,7 @@
 #include <jni.h>
 #include <string>
 
-// JNI functions wrapper with JniLocalRef/JniGlobalRef and JniLocalRefStats.
+// JNI functions wrapper with JniLocalRef/JniGlobalRef and JniRefStats.
 class JniContext {
 
 public:
@@ -34,7 +34,12 @@ public:
 
   JNIEnv *getJNIEnv() const { return m_jniEnv; }
 
-  JniLocalRefStats *getLocalRefStats() const { return m_localRefStats; }
+#ifdef DEBUG_JNI_LOCALREFS
+  JniRefStats *getLocalRefStats() const { return m_localRefStats; }
+#endif
+#ifdef DEBUG_JNI_GLOBALREFS
+  JniRefStats *getGlobalRefStats() const { return m_globalRefStats; }
+#endif
 
   const JniRef<jclass> &getObjectClass() const { return m_objectClass; }
   const JniRef<jobject> &getJsBridgeObject() const { return m_jsBridgeJavaObject; }
@@ -248,7 +253,12 @@ private:
   JNIEnv *m_jniEnv;
 
   // TODO: move it to JniCache!
-  JniLocalRefStats *m_localRefStats;
+#ifdef DEBUG_JNI_LOCALREFS
+  JniRefStats *m_localRefStats;
+#endif
+#ifdef DEBUG_JNI_GLOBALREFS
+  JniRefStats *m_globalRefStats;
+#endif
   JniGlobalRef<jclass> m_jsBridgeJavaClass;
   JniGlobalRef<jobject> m_jsBridgeJavaObject;
   JniGlobalRef<jclass> m_jsBridgeMethodClass;

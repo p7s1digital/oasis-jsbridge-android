@@ -19,7 +19,7 @@
 #include <jni.h>
 
 class JniContext;
-class JniLocalRefStats;
+class JniRefStats;
 
 class JniRefHelper {
 public:
@@ -30,7 +30,13 @@ public:
   ~JniRefHelper() = delete;
 
   static JNIEnv *getJNIEnv(const JniContext *);
-  static JniLocalRefStats *getLocalRefStats(const JniContext *);
+
+#ifdef DEBUG_JNI_LOCALREFS
+  static JniRefStats *getLocalRefStats(const JniContext *);
+#endif
+#ifdef DEBUG_JNI_GLOBALREFS
+  static JniRefStats *getGlobalRefStats(const JniContext *);
+#endif
 };
 
 #endif

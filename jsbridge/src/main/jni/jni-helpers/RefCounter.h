@@ -30,9 +30,10 @@ public:
     void decrement() { assert(m_count != 0); --m_count; }
     bool isZero() const { return m_count == 0; }
     void disable() { m_count = -1; }
+    bool isDisabled() const { return m_count < 0; }
 
 private:
     int m_count;
 };
 
-#endif //OASIS_NATIVE_ANDROID_REFCOUNTER_H
+#endif

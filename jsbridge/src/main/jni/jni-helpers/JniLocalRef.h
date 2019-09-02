@@ -19,7 +19,7 @@
 #ifndef _JSBRIDGE_LOCALREF_H
 #define _JSBRIDGE_LOCALREF_H
 
-#include "JniLocalRefStats.h"
+#include "JniRefStats.h"
 #include "JniRef.h"
 #include "JniRefHelper.h"
 #include "RefCounter.h"
@@ -48,7 +48,9 @@ public:
 
     if (!m_fromJniParam && m_object != nullptr) {
       assert(m_jniContext != nullptr);
+#ifdef DEBUG_JNI_LOCALREFS
       JniRefHelper::getLocalRefStats(m_jniContext)->add();
+#endif
     }
   }
 
@@ -163,6 +165,12 @@ public:
   }
 
   void detach() {
+#ifdef DEBUG_JNI_LOCALREFS
+    if (m_object != nullptr && !m_fromJniParam) {
+      JniRefHelper::getLocalRefStats(m_jniContext)->remove();
+    }
+#endif
+
     if (m_refCounter) {
       m_refCounter->disable();  // make sure that other instance with same counter don't get destroyed
     }
@@ -195,7 +203,9 @@ protected:
 
   virtual void releaseNow() {
     if (m_object != nullptr && !m_fromJniParam) {
+#ifdef DEBUG_JNI_LOCALREFS
       JniRefHelper::getLocalRefStats(m_jniContext)->remove();
+#endif
       JniRefHelper::getJNIEnv(m_jniContext)->DeleteLocalRef(m_object);
       //m_object = nullptr;
     }
@@ -214,6 +224,11 @@ private:
     if (m_refCounter->isZero()) {
       releaseNow();
     }
+#ifdef DEBUG_JNI_LOCALREFS
+    else if (m_refCounter->isDisabled()) {
+      JniRefHelper::getLocalRefStats(m_jniContext)->remove();
+    }
+#endif
   }
 
   const JniContext *m_jniContext;

@@ -52,6 +52,9 @@ public:
     if (otherAsGlobalRef == nullptr) {
       // Another JniRef instance (probably a JniLocalRef)
       if (!other.isNull()) {
+#ifdef DEBUG_JNI_GLOBALREFS
+        JniRefHelper::getGlobalRefStats(m_jniContext)->add();
+#endif
         m_object = static_cast<T>(JniRefHelper::getJNIEnv(m_jniContext)->NewGlobalRef(other.get()));
         m_refCounter = new RefCounter(1);
       }
@@ -169,7 +172,6 @@ public:
   T toNewRawGlobalRef() const override {
     JNIEnv *env = JniRefHelper::getJNIEnv(m_jniContext);
     assert(env != nullptr);
-
     return m_object == nullptr ? nullptr : static_cast<T>(env->NewGlobalRef(m_object));
   }
 
@@ -206,6 +208,9 @@ private:
     if (m_object != nullptr) {
       assert(m_jniContext != nullptr);
       JniRefHelper::getJNIEnv(m_jniContext)->DeleteGlobalRef(m_object);
+#ifdef DEBUG_JNI_GLOBALREFS
+      JniRefHelper::getGlobalRefStats(m_jniContext)->remove();
+#endif
     }
   }
 
