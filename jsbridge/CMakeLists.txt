@@ -47,7 +47,7 @@ if (FLAVOR STREQUAL "DUKTAPE")
     target_sources(${JNI_LIB_NAME} PUBLIC
         src/main/jni/duk_console.cpp
         src/main/jni/duktape/duk_trans_socket_unix.c
-        src/main/jni/duktape/duktape.c
+        src/main/jni/duktape/duktape.cpp
         src/main/jni/JavaScriptObjectMapper.cpp
         src/main/jni/JsBridgeContext_duktape.cpp
         src/main/jni/JavaType_duktape.cpp

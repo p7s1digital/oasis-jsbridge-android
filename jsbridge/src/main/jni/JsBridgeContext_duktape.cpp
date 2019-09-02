@@ -528,7 +528,9 @@ void JsBridgeContext::newJsFunction(const std::string &strGlobalName, const JObj
 
   // Push global Function (which can be constructed with "new Function"
   duk_get_global_string(m_context, "Function");
-  //TODO (duktape 2.4): duk_require_constructor_call(m_context);
+
+  // This fails with "constructor requires 'new'"
+  //duk_require_constructor_call(m_context);
 
   // Push all arguments (as string)
   jsize argCount = args.getLength();
@@ -640,7 +642,6 @@ void JsBridgeContext::queueJavaExceptionForJsError() const {
   jniContext()->throw_(getJavaExceptionForJsError());
 }
 
-// TODO: use duk_safe_to_stacktrace (Duktape >= 2.4)
 JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
   CHECK_STACK(m_context);
 
@@ -657,45 +658,28 @@ JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
   JStringLocalRef jsonString(jniContext(), jsonStringRaw);
   duk_pop(m_context);  // stringified string
 
-  // If it's a Duktape error object, try to pull out the full stacktrace.
-  if (duk_is_error(m_context, -1) && duk_has_prop_string(m_context, -1, "stack")) {
-    duk_get_prop_string(m_context, -1, "stack");
-    std::string stack = duk_safe_to_string(m_context, -1);
+  duk_dup(m_context, -1);  // JS error
+  const std::string stack = duk_safe_to_stacktrace(m_context, -1);
+  duk_pop(m_context);  // duplicated JS error
 
-    std::size_t firstEndOfLine = stack.find('\n');
-    std::string strFirstLine = firstEndOfLine == std::string::npos ? stack : stack.substr(0, firstEndOfLine);
-    std::string strJsStacktrace = firstEndOfLine == std::string::npos ? "" : stack.substr(firstEndOfLine, std::string::npos);
+  std::size_t firstEndOfLine = stack.find('\n');
+  std::string strFirstLine = firstEndOfLine == std::string::npos ? stack : stack.substr(0, firstEndOfLine);
+  std::string strJsStacktrace = firstEndOfLine == std::string::npos ? "" : stack.substr(firstEndOfLine, std::string::npos);
 
-    // Is there an exception thrown from a Java method?
-    JniLocalRef<jthrowable> cause;
-    if (duk_has_prop_string(m_context, -2, JAVA_EXCEPTION_PROP_NAME)) {
-      duk_get_prop_string(m_context, -2, JAVA_EXCEPTION_PROP_NAME);
-      cause = JniLocalRef<jthrowable>(jniContext(),
-                                   static_cast<jthrowable>(duk_get_pointer(m_context, -1)));
-      duk_pop(m_context);  // Java exception
-    }
-
-    duk_pop(m_context);  // stack text
-
-    return jniContext()->newObject<jthrowable>(
-        exceptionClass,
-        newException,
-        jsonString,  // jsonValue
-        JStringLocalRef(jniContext(), strFirstLine.c_str()),  // detailedMessage
-        JStringLocalRef(jniContext(), strJsStacktrace.c_str()),  // jsStackTrace
-        cause
-    );
+  // Is there an exception thrown from a Java method?
+  JniLocalRef<jthrowable> cause;
+  if (duk_is_object(m_context, -1) && !duk_is_null(m_context, -1) && duk_has_prop_string(m_context, -1, JAVA_EXCEPTION_PROP_NAME)) {
+    duk_get_prop_string(m_context, -1, JAVA_EXCEPTION_PROP_NAME);
+    cause = JniLocalRef<jthrowable>(jniContext(), static_cast<jthrowable>(duk_get_pointer(m_context, -1)));
+    duk_pop(m_context);  // Java exception
   }
-
-  // Not an error or no stacktrace, just convert to a string.
-  JStringLocalRef strThrownValue(jniContext(), duk_safe_to_string(m_context, -1));
 
   return jniContext()->newObject<jthrowable>(
       exceptionClass,
       newException,
-      jsonString,
-      strThrownValue,  // detailedMessage
-      JStringLocalRef(),  // jsStackTrace
-      JniLocalRef<jthrowable>()  // cause
+      jsonString,  // jsonValue
+      JStringLocalRef(jniContext(), strFirstLine.c_str()),  // detailedMessage
+      JStringLocalRef(jniContext(), strJsStacktrace.c_str()),  // jsStackTrace
+      cause
   );
 }

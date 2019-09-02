@@ -122,14 +122,14 @@ duk_ret_t JavaScriptObjectMapper::cppObjectMapFinalizer(duk_context *ctx) {
   while (duk_next(ctx, -1, 1 /*getValue*/)) {
     auto cppObject = reinterpret_cast<JavaScriptObjectBase *>(duk_get_pointer(ctx, -1));
     if (cppObject == nullptr) {
-      duk_pop(ctx);  // enum key
+      duk_pop_2(ctx);  // enum key + value
       continue;
     }
 
     delete cppObject;
-
-    duk_pop(ctx);  // enum key
+    duk_pop_2(ctx);  // enum key + value
   }
 
+  duk_pop(ctx);  // enum
   return 0;
 }
