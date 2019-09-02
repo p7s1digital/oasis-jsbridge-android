@@ -19,7 +19,6 @@
 #ifndef _JSBRIDGE_LOCALREF_H
 #define _JSBRIDGE_LOCALREF_H
 
-#include "JniLocalRefStats.h"
 #include "JniRef.h"
 #include "JniRefHelper.h"
 #include "RefCounter.h"
@@ -48,7 +47,6 @@ public:
 
     if (!m_fromJniParam && m_object != nullptr) {
       assert(m_jniContext != nullptr);
-      JniRefHelper::getLocalRefStats(m_jniContext)->add();
     }
   }
 
@@ -195,7 +193,6 @@ protected:
 
   virtual void releaseNow() {
     if (m_object != nullptr && !m_fromJniParam) {
-      JniRefHelper::getLocalRefStats(m_jniContext)->remove();
       JniRefHelper::getJNIEnv(m_jniContext)->DeleteLocalRef(m_object);
       //m_object = nullptr;
     }

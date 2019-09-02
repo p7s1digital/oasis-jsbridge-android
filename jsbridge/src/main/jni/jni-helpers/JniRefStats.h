@@ -16,12 +16,12 @@
 #ifndef _JSBRIDGE_LOCALREFSTATS_H
 #define _JSBRIDGE_LOCALREFSTATS_H
 
-class JniLocalRefStats {
+class JniRefStats {
 
 public:
-  JniLocalRefStats() = default;
-  JniLocalRefStats(const JniLocalRefStats &) = default;
-  JniLocalRefStats& operator=(const JniLocalRefStats &) = default;
+  JniRefStats() = default;
+  JniRefStats(const JniRefStats &) = default;
+  JniRefStats& operator=(const JniRefStats &) = default;
 
   void clear();
   void add();

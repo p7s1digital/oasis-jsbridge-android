@@ -41,7 +41,6 @@ add_library(
     src/main/jni/java-types/Void.cpp
     src/main/jni/jni-helpers/JniContext.cpp
     src/main/jni/jni-helpers/JniLocalFrame.cpp
-    src/main/jni/jni-helpers/JniLocalRefStats.cpp
     src/main/jni/jni-helpers/JniRefHelper.cpp
 )
 
