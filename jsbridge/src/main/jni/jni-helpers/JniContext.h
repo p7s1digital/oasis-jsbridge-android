@@ -29,7 +29,7 @@
 class JniContext {
 
 public:
-  JniContext(JNIEnv *env, jobject jsBridgeJavaObject);
+  explicit JniContext(JNIEnv *env);
   ~JniContext();
 
   JNIEnv *getJNIEnv() const { return m_jniEnv; }
@@ -40,11 +40,6 @@ public:
 #ifdef DEBUG_JNI_GLOBALREFS
   JniRefStats *getGlobalRefStats() const { return m_globalRefStats; }
 #endif
-
-  const JniRef<jclass> &getObjectClass() const { return m_objectClass; }
-  const JniRef<jobject> &getJsBridgeObject() const { return m_jsBridgeJavaObject; }
-  const JniRef<jclass> &getJsBridgeMethodClass() const { return m_jsBridgeMethodClass; }
-  const JniRef<jclass> &getJsBridgeParameterClass() const { return m_jsBridgeParameterClass; }
 
   jmethodID getMethodID(const JniRef<jclass> &, const char *name, const char *sig) const;
   jmethodID getStaticMethodID(const JniRef<jclass> &, const char *name, const char *sig) const;
@@ -80,12 +75,12 @@ public:
     return JniLocalRef<T>(this, o);
   }
 
-  void throw_(const JniRef<jthrowable> &throwable);
-  void throwNew(const JniRef<jclass> &clazz, const char *s);
+  void throw_(const JniRef<jthrowable> &throwable) const;
+  void throwNew(const JniRef<jclass> &clazz, const char *s) const;
 
   jboolean exceptionCheck() const;
   jthrowable exceptionOccurred() const;
-  void exceptionClear();
+  void exceptionClear() const;
 
   template <class ObjT, typename ...InputArgs>
   void callVoidMethod(const JniRef<ObjT> &t, jmethodID methodId, InputArgs &&...args) const {
@@ -196,6 +191,14 @@ public:
     return JniLocalRef<RetT>(this, jniRetVal);
   }
 
+  template <class ObjT, typename ...InputArgs>
+  JStringLocalRef callStringMethod(const JniRef<ObjT> &t, jmethodID methodId, InputArgs &&...args) const {
+    assert(m_jniEnv);
+
+    jstring jniRetVal = (jstring) m_jniEnv->CallObjectMethod(t.get(), methodId, JniValueConverter::toJniValues(std::forward<InputArgs>(args))...);
+    return JStringLocalRef(this, jniRetVal);
+  }
+
   template <class RetT = jobject, class ObjT>
   JniLocalRef<RetT> callObjectMethodA(const JniRef<ObjT> &t, jmethodID methodId, const std::vector<JValue> &args) const {
     assert(m_jniEnv);
@@ -231,39 +234,17 @@ public:
     return JniLocalRef<RetT>(this, o);
   }
 
-  template <typename ...InputArgs>
-  void callJsBridgeVoidMethod(const char *name, const char *sig, InputArgs &&...args) const {
-    assert(m_jniEnv);
-
-    jmethodID methodId = getMethodID(m_jsBridgeJavaClass, name, sig);
-    return callVoidMethod(m_jsBridgeJavaObject, methodId, args...);
-  }
-
-  template <class RetT = jobject, typename ...InputArgs>
-  JniLocalRef<RetT> callJsBridgeObjectMethod(const char *name, const char *sig, InputArgs &&...args) const {
-    assert(m_jniEnv);
-
-    jmethodID methodId = getMethodID(m_jsBridgeJavaClass, name, sig);
-    return callObjectMethod<RetT>(m_jsBridgeJavaObject, methodId, args...);
-  }
-
 private:
   friend class InternalScopedContext;
 
   JNIEnv *m_jniEnv;
 
-  // TODO: move it to JniCache!
 #ifdef DEBUG_JNI_LOCALREFS
   JniRefStats *m_localRefStats;
 #endif
 #ifdef DEBUG_JNI_GLOBALREFS
   JniRefStats *m_globalRefStats;
 #endif
-  JniGlobalRef<jclass> m_jsBridgeJavaClass;
-  JniGlobalRef<jobject> m_jsBridgeJavaObject;
-  JniGlobalRef<jclass> m_jsBridgeMethodClass;
-  JniGlobalRef<jclass> m_jsBridgeParameterClass;
-  JniGlobalRef<jclass> m_objectClass;
 };
 
 #endif

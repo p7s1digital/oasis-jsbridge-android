@@ -34,6 +34,7 @@
 
 class DuktapeUtils;
 class JavaType;
+class JniCache;
 class JObjectArrayLocalRef;
 class QuickJsUtils;
 
@@ -48,7 +49,7 @@ public:
   ~JsBridgeContext();
 
   // Must be called immediately after the constructor
-  void init(JniContext *jniContext);
+  void init(JniContext *jniContext, const JniLocalRef<jobject> &jsBridgeObject);
 
   void initDebugger();
   void cancelDebug();
@@ -81,9 +82,12 @@ public:
   void checkRethrowJsError() const;
   void queueJavaExceptionForJsError() const;
 
-  JniContext *jniContext() const { return m_currentJniContext; }
+  JniContext *jniContext() { return m_currentJniContext; }
+  const JniContext *jniContext() const { return m_currentJniContext; }
   const JavaTypeProvider &getJavaTypeProvider() const { return m_javaTypeProvider; }
   JniLocalRef<jthrowable> getJavaExceptionForJsError() const;
+
+  const JniCache *getJniCache() const { return m_jniCache; }
 
 #if defined(DUKTAPE)
   static JsBridgeContext *getInstance(duk_context *);
@@ -100,6 +104,7 @@ public:
 private:
   // Updated on each Java -> Native call (and reset to nullptr afterwards)
   JniContext *m_currentJniContext = nullptr;
+  JniCache *m_jniCache = nullptr;
 
   const JavaTypeProvider m_javaTypeProvider;
 

@@ -15,6 +15,7 @@
  */
 #include "JsonObjectWrapper.h"
 
+#include "JniCache.h"
 #include "JsBridgeContext.h"
 #include "custom_stringify.h"
 #include "log.h"
@@ -59,10 +60,7 @@ JValue JsonObjectWrapper::pop(bool inScript) const {
   JStringLocalRef str(m_jniContext, duk_require_string(m_ctx, -1));
   duk_pop(m_ctx);
 
-  JniLocalRef<jclass> javaClass = getJavaClass();
-  jmethodID method = m_jniContext->getMethodID(javaClass, "<init>", "(Ljava/lang/String;)V");
-  JniLocalRef<jobject> localRef = m_jniContext->newObject<jobject>(javaClass, method, str);
-  javaClass.release();
+  JniLocalRef<jobject> localRef = m_jniCache->newJsonObjectWrapper(str);
 
   duk_pop(m_ctx);
   return JValue(localRef);
@@ -77,8 +75,7 @@ duk_ret_t JsonObjectWrapper::push(const JValue &value, bool inScript) const {
     return 1;
   }
 
-  jmethodID method = m_jniContext->getMethodID(getJavaClass(), "getJsonString", "()Ljava/lang/String;");
-  JStringLocalRef str(m_jniContext->callObjectMethod<jstring>(jWrapper, method));
+  JStringLocalRef str = m_jniCache->getJsonObjectWrapperString(jWrapper);
 
   m_jsBridgeContext->checkRethrowJsError();
 
@@ -127,11 +124,7 @@ JValue JsonObjectWrapper::toJava(JSValueConst v, bool inScript) const {
   JS_FreeCString(m_ctx, jsonCStr);
   JS_FreeValue(m_ctx, jsonValue);
 
-  JniLocalRef<jclass> javaClass = getJavaClass();
-  jmethodID method = m_jniContext->getMethodID(javaClass, "<init>", "(Ljava/lang/String;)V");
-  JniLocalRef<jobject> localRef = m_jniContext->newObject<jobject>(javaClass, method, str);
-  javaClass.release();
-
+  JniLocalRef<jobject> localRef = m_jniCache->newJsonObjectWrapper(str);
   return JValue(localRef);
 }
 
@@ -142,8 +135,7 @@ JSValue JsonObjectWrapper::fromJava(const JValue &value, bool inScript) const {
     return JS_NULL;
   }
 
-  jmethodID method = m_jniContext->getMethodID(getJavaClass(), "getJsonString", "()Ljava/lang/String;");
-  JStringLocalRef str(m_jniContext->callObjectMethod<jstring>(jWrapper, method));
+  JStringLocalRef str = m_jniCache->getJsonObjectWrapperString(jWrapper);
 
   m_jsBridgeContext->checkRethrowJsError();
 

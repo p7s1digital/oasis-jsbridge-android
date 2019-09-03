@@ -185,13 +185,13 @@ JValue Long::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
 
 JValue Long::box(const JValue &longValue) const {
   // From long to Long
-  jmethodID boxId = m_jniContext->getStaticMethodID(getBoxedJavaClass(), "valueOf", "(J)Ljava/lang/Long;");
+  static thread_local jmethodID boxId = m_jniContext->getStaticMethodID(getBoxedJavaClass(), "valueOf", "(J)Ljava/lang/Long;");
   return JValue(m_jniContext->callStaticObjectMethod(getBoxedJavaClass(), boxId, longValue.getLong()));
 }
 
 JValue Long::unbox(const JValue &boxedValue) const {
   // From Long to long
-  jmethodID unboxId = m_jniContext->getMethodID(getBoxedJavaClass(), "longValue", "()J");
+  static thread_local jmethodID unboxId = m_jniContext->getMethodID(getBoxedJavaClass(), "longValue", "()J");
   return JValue(m_jniContext->callLongMethod(boxedValue.getLocalRef(), unboxId));
 }
 

@@ -187,13 +187,13 @@ JValue Double::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
 
 JValue Double::box(const JValue &doubleValue) const {
   // From double to Double
-  jmethodID boxId = m_jniContext->getStaticMethodID(getBoxedJavaClass(), "valueOf", "(D)Ljava/lang/Double;");
+  static thread_local jmethodID boxId = m_jniContext->getStaticMethodID(getBoxedJavaClass(), "valueOf", "(D)Ljava/lang/Double;");
   return JValue(m_jniContext->callStaticObjectMethod(getBoxedJavaClass(), boxId, doubleValue.getDouble()));
 }
 
 JValue Double::unbox(const JValue &boxedValue) const {
   // From Double to double
-  jmethodID unboxId = m_jniContext->getMethodID(getBoxedJavaClass(), "doubleValue", "()D");
+  static thread_local jmethodID unboxId = m_jniContext->getMethodID(getBoxedJavaClass(), "doubleValue", "()D");
   return JValue(m_jniContext->callDoubleMethod(boxedValue.getLocalRef(), unboxId));
 }
 

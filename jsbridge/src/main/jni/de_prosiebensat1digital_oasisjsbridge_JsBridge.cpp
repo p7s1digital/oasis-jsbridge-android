@@ -17,9 +17,11 @@
  * limitations under the License.
  */
 #include "de_prosiebensat1digital_oasisjsbridge_JsBridge.h"
+#include "JniCache.h"
 #include "JsBridgeContext.h"
 #include "log.h"
 #include "java-types/Deferred.h"
+#include "jni-helpers/JniContext.h"
 #include "jni-helpers/JniLocalRef.h"
 #include "jni-helpers/JniRefStats.h"
 #include "jni-helpers/JObjectArrayLocalRef.h"
@@ -46,7 +48,7 @@
 #ifndef NDEBUG
       // In debug mode: check that we are in the correct thread
       // (everything else will lead to unexpected behavior...)
-      m_jsBridgeContext->jniContext()->callJsBridgeVoidMethod("checkJsThread", "()V");
+      m_jsBridgeContext->getJniCache()->jsBridgeInterface().checkJsThread();
 #endif
     }
 
@@ -93,10 +95,10 @@ JNIEXPORT jlong JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniC
 
   auto jsBridgeContext = new JsBridgeContext();
 
-  auto jniContext = new JniContext(env, object);
+  auto jniContext = new JniContext(env);
 
   try {
-    jsBridgeContext->init(jniContext);
+    jsBridgeContext->init(jniContext, JniLocalRef<jobject>(jniContext, object, true /*fromJniParam*/));
 
     if (doDebug) {
       jsBridgeContext->initDebugger();

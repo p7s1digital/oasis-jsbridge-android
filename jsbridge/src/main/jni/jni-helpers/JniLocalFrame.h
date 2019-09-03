@@ -29,7 +29,7 @@ class JniContext;
 // RAII wrapper that allocates a new local reference frame for the JVM and releases it when leaving
 // scope.
 struct JniLocalFrame {
-  JniLocalFrame(JniContext *jniContext, std::size_t capacity)
+  JniLocalFrame(const JniContext *jniContext, std::size_t capacity)
       : m_env(jniContext->getJNIEnv()) {
 
     assert(m_env);
