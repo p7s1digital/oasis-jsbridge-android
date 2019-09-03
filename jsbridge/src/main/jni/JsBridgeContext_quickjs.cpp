@@ -20,6 +20,7 @@
 #include "JavaScriptObject.h"
 #include "JavaType.h"
 #include "JavaTypeProvider.h"
+#include "JniCache.h"
 #include "QuickJsUtils.h"
 #include "java-types/Deferred.h"
 #include "java-types/Object.h"
@@ -55,7 +56,7 @@ JsBridgeContext::~JsBridgeContext() {
   JS_FreeRuntime(m_runtime);
 }
 
-void JsBridgeContext::init(JniContext *jniContext) {
+void JsBridgeContext::init(JniContext *jniContext, const JniLocalRef<jobject> &jsBridgeObject) {
   m_currentJniContext = jniContext;
 
   m_runtime = JS_NewRuntime();
@@ -65,6 +66,7 @@ void JsBridgeContext::init(JniContext *jniContext) {
   m_ctx = JS_NewContext(m_runtime);
   JS_SetMaxStackSize(m_ctx, 1 * 1024 * 1024);  // default: 256kb, now: 1MB
 
+  m_jniCache = new JniCache(this, jsBridgeObject);
   m_utils = new QuickJsUtils(jniContext, m_ctx);
 
   // Store the JsBridgeContext instance in the global object so we can find our way back from a C callback
@@ -348,23 +350,15 @@ void JsBridgeContext::throwTypeException(const std::string &message, bool inScri
 }
 
 void JsBridgeContext::queueIllegalArgumentException(const std::string &message) const {
-  JniLocalRef<jclass> illegalArgumentException = jniContext()->findClass("java/lang/IllegalArgumentException");
-  jniContext()->throwNew(illegalArgumentException, message.c_str());
+  jniContext()->throwNew(m_jniCache->getIllegalArgumentExceptionClass(), message.c_str());
 }
 
 void JsBridgeContext::queueJsException(const std::string &message) const {
-  JniLocalRef<jclass> exceptionClass = jniContext()->findClass("de/prosiebensat1digital/oasisjsbridge/JsException");
-
-  jmethodID newException = jniContext()->getMethodID(
-      exceptionClass, "<init>", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)V");
-
-  auto exception = jniContext()->newObject<jthrowable>(
-      exceptionClass,
-      newException,
+  auto exception = m_jniCache->newJsException(
       JStringLocalRef(),  // jsonValue
       JStringLocalRef(jniContext(), message.c_str()),  // detailedMessage
       JStringLocalRef(),  // jsStackTrace
-      JniLocalRef<jthrowable>()
+      JniLocalRef<jthrowable>()  // cause
   );
   jniContext()->throw_(exception);
 }
@@ -386,8 +380,8 @@ void JsBridgeContext::rethrowJniException() const {
   jniContext()->exceptionClear();
 
   auto exceptionClass = jniContext()->getObjectClass(exception);
-  jmethodID getMessage = jniContext()->getMethodID(exceptionClass, "getMessage","()Ljava/lang/String;");
-  JStringLocalRef message(jniContext()->callObjectMethod<jstring>(exception, getMessage));
+  jmethodID getMessage = jniContext()->getMethodID(exceptionClass, "getMessage", "()Ljava/lang/String;");
+  JStringLocalRef message = jniContext()->callStringMethod(exception, getMessage);
 
 
   // Propagate Java exception to JavaScript (and store pointer to Java exception)
@@ -429,10 +423,6 @@ JsBridgeContext *JsBridgeContext::getInstance(JSContext *ctx) {
 JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
   JniLocalRef<jthrowable> ret;
 
-  JniLocalRef<jclass> exceptionClass = jniContext()->findClass("de/prosiebensat1digital/oasisjsbridge/JsException");
-  jmethodID newException = jniContext()->getMethodID(
-      exceptionClass, "<init>", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)V");
-
   JSValue exceptionValue = JS_GetException(m_ctx);
   JSValue jsonValue = custom_stringify(m_ctx, exceptionValue);
   JStringLocalRef jsonString = m_utils->toJString(jsonValue);
@@ -457,9 +447,7 @@ JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
     }
     JS_FreeValue(m_ctx, stackValue);
 
-    ret = jniContext()->newObject<jthrowable>(
-        exceptionClass,
-        newException,
+    ret = m_jniCache->newJsException(
         jsonString,  // jsonValue
         JStringLocalRef(jniContext(), msg.c_str()),  // detailedMessage
         JStringLocalRef(jniContext(), stack.c_str()),  // jsStackTrace
@@ -471,9 +459,7 @@ JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
     // Not an error or no stacktrace, just convert to a string.
     JStringLocalRef strThrownValue = m_utils->toJString(exceptionValue);
 
-    ret = jniContext()->newObject<jthrowable>(
-        exceptionClass,
-        newException,
+    ret = m_jniCache->newJsException(
         jsonString,  // jsonValue
         strThrownValue,  // detailedMessage
         JStringLocalRef(),  // jsStackTrace
@@ -485,3 +471,4 @@ JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
   //JS_FreeValue(m_ctx, exceptionValue);
   return ret;
 }
+

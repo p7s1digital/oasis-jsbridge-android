@@ -11,6 +11,8 @@
 // - fix some formatting issues (including support for Error)
 
 #include "duk_console.h"
+
+#include "JniCache.h"
 #include "JsBridgeContext.h"
 #include "log.h"
 #include "jni-helpers/JStringLocalRef.h"
@@ -64,9 +66,10 @@ static duk_ret_t duk__console_log_helper(duk_context *ctx, const char *logType, 
     JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
     assert(jsBridgeContext != nullptr);
 
-    JniContext *jniContext = jsBridgeContext->jniContext();
-    jniContext->callJsBridgeVoidMethod("consoleLogHelper", "(Ljava/lang/String;Ljava/lang/String;)V",
-        JStringLocalRef(jniContext, logType), JStringLocalRef(jniContext, str));
+    const JniContext *jniContext = jsBridgeContext->jniContext();
+    const JniCache *jniCache = jsBridgeContext->getJniCache();
+
+    jniCache->jsBridgeInterface().consoleLogHelper(JStringLocalRef(jniContext, logType), JStringLocalRef(jniContext, str));
 
     free(str);
     return 0;

@@ -4,6 +4,7 @@
 
 #include "quickjs_console.h"
 
+#include "JniCache.h"
 #include "JsBridgeContext.h"
 #include "log.h"
 #include "jni-helpers/JStringLocalRef.h"
@@ -34,8 +35,9 @@ static JSValue js_print(JSContext *ctx, JSValueConst this_val, int argc, JSValue
   assert(jsBridgeContext != nullptr);
 
   JniContext *jniContext = jsBridgeContext->jniContext();
-  jniContext->callJsBridgeVoidMethod("consoleLogHelper", "(Ljava/lang/String;Ljava/lang/String;)V",
-      JStringLocalRef(jniContext, logType), JStringLocalRef(jniContext, oss.str().c_str()));
+  const JniCache *jniCache = jsBridgeContext->getJniCache();
+
+  jniCache->jsBridgeInterface().consoleLogHelper(JStringLocalRef(jniContext, logType), JStringLocalRef(jniContext, str));
 
   return JS_UNDEFINED;
 }

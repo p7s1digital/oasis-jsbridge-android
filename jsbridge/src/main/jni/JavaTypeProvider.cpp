@@ -15,6 +15,7 @@
  */
 #include "JavaTypeProvider.h"
 
+#include "JniCache.h"
 #include "JsBridgeContext.h"
 #include "java-types/Array.h"
 #include "java-types/BoxedPrimitive.h"
@@ -137,63 +138,32 @@ std::unique_ptr<const JavaType> JavaTypeProvider::getDeferredType(const JniRef<j
   return std::make_unique<Deferred>(m_jsBridgeContext, makeUniqueType(parameter, true /*boxed*/));
 }
 
-// TODO: move it to JniCache?
-const JniGlobalRef<jclass> &JavaTypeProvider::getJavaClass(JavaTypeId id) const {
-  auto itFind = m_javaClasses.find(id);
-  if (itFind != m_javaClasses.end()) {
-    return itFind->second;
-  }
-
-  JniContext *jniContext = m_jsBridgeContext->jniContext();
-  assert(jniContext != nullptr);
-
-  const char *javaName = getJavaNameByJavaTypeId(id).c_str();
-  JniLocalRef<jclass> javaClass = jniContext->findClass(javaName);
-
-  // If the above findClass() call throws an exception, try to get the class from the primitive type
-  if (jniContext->exceptionCheck()) {
-    jniContext->exceptionClear();
-    JniLocalRef<jclass> classClass = jniContext->findClass("java/lang/Class");
-    jmethodID getPrimitiveClass = jniContext->getStaticMethodID(classClass, "getPrimitiveClass", "(Ljava/lang/String;)Ljava/lang/Class;");
-    javaClass = jniContext->callStaticObjectMethod<jclass>(classClass, getPrimitiveClass, JStringLocalRef(jniContext, javaName));
-  }
-  return m_javaClasses.emplace(id, JniGlobalRef<jclass>(javaClass)).first->second;
-}
-
 
 // Private methods
 // ---
 
 JavaTypeId JavaTypeProvider::getJavaTypeId(const JniRef<jsBridgeParameter> &parameter) const {
- JniContext *jniContext = m_jsBridgeContext->jniContext();
- assert(jniContext != nullptr);
+  const JniContext *jniContext = m_jsBridgeContext->jniContext();
+  assert(jniContext != nullptr);
 
- JniLocalRef<jclass> parameterClass = jniContext->getJsBridgeParameterClass();
- jmethodID getJavaName = jniContext->getMethodID(parameterClass, "getJavaName", "()Ljava/lang/String;");
+  auto strName = m_jsBridgeContext->getJniCache()->parameterInterface(parameter).getJavaName();
+  if (strName.isNull()) {
+    throw std::invalid_argument("Could not get Java name from Parameter!");
+  }
 
- auto strName = JStringLocalRef(jniContext->callObjectMethod<jstring>(parameter, getJavaName));
- if (strName.isNull()) {
-   throw std::invalid_argument("Could not get Java name from Parameter!");
- }
+  JavaTypeId id = getJavaTypeIdByJavaName(strName.str());
+  if (id == JavaTypeId::Unknown) {
+    throw std::invalid_argument(std::string("Unsupported Java type: ") + strName.str());
+  }
 
- JavaTypeId id = getJavaTypeIdByJavaName(strName.str());
- if (id == JavaTypeId::Unknown) {
-   throw std::invalid_argument(std::string("Unsupported Java type: ") + strName.str());
- }
-
- return id;
+  return id;
 }
 
 JniLocalRef<jsBridgeParameter> JavaTypeProvider::getGenericParameter(const JniRef<jsBridgeParameter> &parameter) const {
-  JniContext *jniContext = m_jsBridgeContext->jniContext();
-  assert(jniContext != nullptr);
-
-  JniLocalRef<jclass> parameterClass = jniContext->getJsBridgeParameterClass();
-  jmethodID getGenericParameter = jniContext->getMethodID(parameterClass, "getGenericParameter", "()Lde/prosiebensat1digital/oasisjsbridge/Parameter;");
-
-  return jniContext->callObjectMethod<jsBridgeParameter>(parameter, getGenericParameter);
+  return m_jsBridgeContext->getJniCache()->parameterInterface(parameter).getGenericParameter();
 }
 
 std::unique_ptr<const JavaType> JavaTypeProvider::getGenericParameterType(const JniRef<jsBridgeParameter> &parameter) const {
   return makeUniqueType(getGenericParameter(parameter), true /*boxed*/);
 }
+

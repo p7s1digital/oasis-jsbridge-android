@@ -196,7 +196,7 @@ JValue Float::box(const JValue &floatValue) const {
 
 JValue Float::unbox(const JValue &boxedValue) const {
   // From Float to float
-  jmethodID unboxId = m_jniContext->getMethodID(getBoxedJavaClass(), "floatValue", "()F");
+  static thread_local jmethodID unboxId = m_jniContext->getMethodID(getBoxedJavaClass(), "floatValue", "()F");
   return JValue(m_jniContext->callFloatMethod(boxedValue.getLocalRef(), unboxId));
 }
 

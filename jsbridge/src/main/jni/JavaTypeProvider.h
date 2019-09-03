@@ -45,15 +45,12 @@ public:
   const std::unique_ptr<const JavaType> &getObjectType() const;
   std::unique_ptr<const JavaType> getDeferredType(const JniRef<jsBridgeParameter> &) const;
 
-  const JniGlobalRef<jclass> &getJavaClass(JavaTypeId) const;
-
 private:
   const JsBridgeContext *m_jsBridgeContext;
   JavaTypeId getJavaTypeId(const JniRef<jsBridgeParameter> &) const;
   JniLocalRef<jsBridgeParameter> getGenericParameter(const JniRef<jsBridgeParameter> &) const;
   std::unique_ptr<const JavaType> getGenericParameterType(const JniRef<jsBridgeParameter> &) const;
   mutable std::unique_ptr<const JavaType> m_objectType;
-  mutable std::unordered_map<JavaTypeId, JniGlobalRef<jclass>> m_javaClasses;
 };
 
 #endif

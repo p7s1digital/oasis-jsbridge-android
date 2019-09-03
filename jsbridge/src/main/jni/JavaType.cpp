@@ -20,6 +20,7 @@
 
 #include "JsBridgeContext.h"
 #include "JavaTypeProvider.h"
+#include "JniCache.h"
 #include "java-types/Deferred.h"
 #include "java-types/FunctionX.h"
 #include "java-types/JsValue.h"
@@ -38,12 +39,13 @@ using namespace JavaTypes;
 JavaType::JavaType(const JsBridgeContext *jsBridgeContext, JavaTypeId id)
  : m_jsBridgeContext(jsBridgeContext)
  , m_jniContext(jsBridgeContext->jniContext())
+ , m_jniCache(jsBridgeContext->getJniCache())
  , m_ctx(m_jsBridgeContext->getCContext())
  , m_id(id) {
 }
 
 const JniRef<jclass> &JavaType::getJavaClass() const {
- return m_jsBridgeContext->getJavaTypeProvider().getJavaClass(m_id) ;
+ return m_jsBridgeContext->getJniCache()->getJavaClass(m_id) ;
 }
 
 #if defined(DUKTAPE)
