@@ -19,6 +19,7 @@
 #include "JavaScriptObject.h"
 #include "JavaScriptMethod.h"
 #include "JavaType.h"
+#include "JniCache.h"
 #include "JsBridgeContext.h"
 #include "jni-helpers/JniContext.h"
 #include "jni-helpers/JniLocalRef.h"
@@ -38,15 +39,13 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
  , m_jsBridgeContext(jsBridgeContext) {
 
   duk_context *ctx = jsBridgeContext->getCContext();
-  JniContext *jniContext = jsBridgeContext->jniContext();
+  const JniContext *jniContext = jsBridgeContext->jniContext();
+  const JniCache *jniCache = jsBridgeContext->getJniCache();
 
   CHECK_STACK(ctx);
 
   m_jsHeapPtr = duk_get_heapptr(ctx, jsObjectIndex);
   duk_push_heapptr(ctx, m_jsHeapPtr);
-
-  const JniRef<jclass> &methodClass = jniContext->getJsBridgeMethodClass();
-  jmethodID getJavaMethod = jniContext->getMethodID(methodClass, "getJavaMethod", "()Ljava/lang/reflect/Method;");  // TODO: cache it
 
   if (!duk_is_object(ctx, -1) || duk_is_null(ctx, -1)) {
     duk_pop(ctx);
@@ -58,17 +57,13 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
   }
 
   // Make sure that the object has all of the methods we want and add them
-  jmethodID getName = nullptr;
   const jsize numMethods = methods.getLength();
   for (jsize i = 0; i < numMethods; ++i) {
-    JniLocalRef<jsBridgeMethod> method = methods.getElement<jsBridgeMethod>(i);
-
-    if (getName == nullptr) {
-      getName = jniContext->getMethodID(methodClass, "getName", "()Ljava/lang/String;");
-    }
+    const JniLocalRef<jsBridgeMethod> method = methods.getElement<jsBridgeMethod>(i);
+    MethodInterface methodInterface = jniCache->methodInterface(method);
 
     // Sanity check that as of right now, the object we're proxying has a function with this name.
-    std::string strMethodName = JStringLocalRef(jniContext->callObjectMethod<jstring>(method, getName)).str();
+    std::string strMethodName = methodInterface.getName().c_str();
     if (!duk_get_prop_string(ctx, -1, strMethodName.c_str())) {
       duk_pop_2(ctx);
       throw std::runtime_error("JS global " + m_name + " has no method called " + strMethodName);
@@ -78,7 +73,7 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
     }
 
     try {
-      JniLocalRef<jobject> javaMethod = jniContext->callObjectMethod(method, getJavaMethod);
+      JniLocalRef<jobject> javaMethod = methodInterface.getJavaMethod();
       jmethodID methodId = jniContext->fromReflectedMethod(javaMethod);
 
       // Build a call wrapper that handles marshalling the arguments and return value.
@@ -105,14 +100,13 @@ JValue JavaScriptObject::call(const JniLocalRef<jobject> &javaMethod, const JObj
     return JValue();
   }
 
-  JniContext *jniContext = m_jsBridgeContext->jniContext();
+  const JniContext *jniContext = m_jsBridgeContext->jniContext();
+  const JniCache *jniCache = m_jsBridgeContext->getJniCache();
 
-  const JniRef<jclass> &methodClass = jniContext->getJsBridgeMethodClass();
   jmethodID methodId = jniContext->fromReflectedMethod(javaMethod);
 
   auto getMethodName = [&]() {
-    jmethodID getName = jniContext->getMethodID(jniContext->getObjectClass(javaMethod), "getName", "()Ljava/lang/String;");
-    return JStringLocalRef(jniContext->callObjectMethod<jstring>(javaMethod, getName)).str();
+    return jniCache->getJavaReflectedMethodName(javaMethod).c_str();
   };
 
   //alog("Invoking JS method %s.%s...", m_name.c_str(), getMethodName().c_str());
@@ -143,11 +137,9 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
  , m_jsBridgeContext(jsBridgeContext) {
 
   JSContext *ctx = jsBridgeContext->getCContext();
-  JniContext *jniContext = jsBridgeContext->jniContext();
-  QuickJsUtils *utils = jsBridgeContext->getUtils();
-
-  const JniRef<jclass> &methodClass = jniContext->getJsBridgeMethodClass();
-  jmethodID getJavaMethod = jniContext->getMethodID(methodClass, "getJavaMethod", "()Ljava/lang/reflect/Method;");  // TODO: cache it
+  const JniContext *jniContext = jsBridgeContext->jniContext();
+  const JniCache *jniCache = jsBridgeContext->getJniCache();
+  const QuickJsUtils *utils = jsBridgeContext->getUtils();
 
   if (!JS_IsObject(v)) {
     throw std::runtime_error("JavaScript object " + strName + " cannot be accessed (not an object)");
@@ -158,17 +150,13 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
   }
 
   // Make sure that the object has all of the methods we want and add them
-  jmethodID getName = nullptr;
   const jsize numMethods = methods.getLength();
   for (jsize i = 0; i < numMethods; ++i) {
     JniLocalRef<jsBridgeMethod > method = methods.getElement<jsBridgeMethod>(i);
-
-    if (getName == nullptr) {
-      getName = jniContext->getMethodID(methodClass, "getName", "()Ljava/lang/String;");
-    }
+    MethodInterface methodInterface = jniCache->methodInterface(method);
 
     // Sanity check that as of right now, the object we're proxying has a function with this name.
-    std::string strMethodName = JStringLocalRef(jniContext->callObjectMethod<jstring>(method, getName)).str();
+    std::string strMethodName = methodInterface.getName().c_str();
     JSValue methodValue = JS_GetPropertyStr(ctx, m_jsValue, strMethodName.c_str());
     if (JS_IsUndefined(methodValue)) {
       throw std::runtime_error("JS global " + m_name + " has no method called " + strMethodName);
@@ -179,7 +167,7 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
     JS_FreeValue(ctx, methodValue);
 
     try {
-      JniLocalRef<jobject> javaMethod = jniContext->callObjectMethod(method, getJavaMethod);
+      JniLocalRef<jobject> javaMethod = methodInterface.getJavaMethod();
       jmethodID methodId = jniContext->fromReflectedMethod(javaMethod);
 
       // Build a call wrapper that handles marshalling the arguments and return value.
@@ -195,15 +183,14 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
 
 JValue JavaScriptObject::call(const JniLocalRef<jobject> &javaMethod, const JObjectArrayLocalRef &args) const {
 
-  JniContext *jniContext = m_jsBridgeContext->jniContext();
   JSContext *ctx = m_jsBridgeContext->getCContext();
+  const JniContext *jniContext = m_jsBridgeContext->jniContext();
+  const JniCache *jniCache = m_jsBridgeContext->getJniCache();
 
-  const JniRef<jclass> &methodClass = jniContext->getJsBridgeMethodClass();
   jmethodID methodId = jniContext->fromReflectedMethod(javaMethod);
 
   auto getMethodName = [&]() {
-    jmethodID getName = jniContext->getMethodID(jniContext->getObjectClass(javaMethod), "getName", "()Ljava/lang/String;");
-    return JStringLocalRef(jniContext->callObjectMethod<jstring>(javaMethod, getName)).str();
+    return jniCache->getJavaReflectedMethodName(javaMethod).c_str();
   };
 
   //alog("Invoking JS method %s.%s...", m_name.c_str(), getMethodName().c_str());

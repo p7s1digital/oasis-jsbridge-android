@@ -17,6 +17,7 @@
  * limitations under the License.
  */
 #include "Primitive.h"
+#include "JniCache.h"
 #include "JsBridgeContext.h"
 #include "jni-helpers/JniContext.h"
 
@@ -28,7 +29,7 @@ Primitive::Primitive(const JsBridgeContext *jsBridgeContext, JavaTypeId primitiv
 }
 
 const JniRef<jclass> &Primitive::getBoxedJavaClass() const {
-  return m_jsBridgeContext->getJavaTypeProvider().getJavaClass(m_boxedId);
+  return m_jsBridgeContext->getJniCache()->getJavaClass(m_boxedId);
 }
 
 }  // namespace JavaTypes

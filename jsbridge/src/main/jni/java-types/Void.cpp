@@ -32,7 +32,7 @@ JValue Void::pop(bool) const {
   duk_pop(m_ctx);
 
   if (m_boxed) {
-    // Create and return a new Void or Unit instance
+    // Create and return a new Void or Unit instance (TODO: cache me!)
     const auto &javaClass = getJavaClass();
     jmethodID newInstance = getJniContext()->getMethodID(getJavaClass(), "<init>", "()V");
     auto instance = getJniContext()->newObject<jthrowable>(getJavaClass(), newInstance);

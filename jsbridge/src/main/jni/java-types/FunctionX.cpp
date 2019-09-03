@@ -15,6 +15,7 @@
  */
 #include "FunctionX.h"
 
+#include "JniCache.h"
 #include "JsBridgeContext.h"
 #include "JavaMethod.h"
 #include "JavaScriptLambda.h"
@@ -141,12 +142,11 @@ JValue FunctionX::pop(bool inScript) const {
   duk_pop(m_ctx);  // JS function
 
   // 4. Call native createJsLambdaProxy(id, javaMethod)
-  JniLocalRef<jobject> javaFunction = m_jniContext->callJsBridgeObjectMethod(
-      "createJsLambdaProxy", "(Ljava/lang/String;Lde/prosiebensat1digital/oasisjsbridge/Method;)Lkotlin/Function;",
-      JStringLocalRef(m_jniContext, jsFunctionGlobalName.c_str()), javaMethod);
-  if (m_jsBridgeContext->hasPendingJniException()) {
-    m_jsBridgeContext->rethrowJniException();
-  }
+  JniLocalRef<jobject> javaFunction = m_jniCache->jsBridgeInterface().createJsLambdaProxy(
+      JStringLocalRef(m_jniContext, jsFunctionGlobalName.c_str()),
+      javaMethod
+  );
+  m_jsBridgeContext->rethrowJniException();
 
   return JValue(javaFunction);
 }
@@ -227,11 +227,13 @@ JValue FunctionX::toJava(JSValueConst v, bool inScript) const {
   utils->createMappedCppPtrValue<JavaScriptLambda>(javaScriptLambda, JS_DupValue(m_ctx, v), jsFunctionGlobalName.c_str());
 
   // 4. Call native createJsLambdaProxy(id, javaMethod)
-  JniLocalRef<jobject> javaFunction = m_jniContext->callJsBridgeObjectMethod(
-      "createJsLambdaProxy", "(Ljava/lang/String;Lde/prosiebensat1digital/oasisjsbridge/Method;)Lkotlin/Function;",
-      JStringLocalRef(m_jniContext, jsFunctionGlobalName.c_str()), jniJavaMethod);
+  JniLocalRef<jobject> javaFunction = m_jniCache->jsBridgeInterface().createJsLambdaProxy(
+      JStringLocalRef(m_jniContext, jsFunctionGlobalName.c_str()),
+      jniJavaMethod
+  );
   if (m_jsBridgeContext->hasPendingJniException()) {
     m_jsBridgeContext->rethrowJniException();
+    return JValue();
   }
 
   return JValue(javaFunction);
@@ -284,11 +286,7 @@ const JniRef<jsBridgeMethod> &FunctionX::getJniJavaMethod() const {
     return m_lazyJniJavaMethod;
   }
 
-  const JniRef<jclass> &jsBridgeMethodClass = m_jniContext->getJsBridgeMethodClass();
-  const JniRef<jclass> &jsBridgeParameterClass = m_jniContext->getJsBridgeParameterClass();
-
-  jmethodID getInvokeMethod = m_jniContext->getMethodID(jsBridgeParameterClass, "getInvokeMethod", "()Lde/prosiebensat1digital/oasisjsbridge/Method;");
-  JniLocalRef<jsBridgeMethod> invokeMethod = m_jniContext->callObjectMethod<jsBridgeMethod>(m_parameter, getInvokeMethod);
+  JniLocalRef<jsBridgeMethod> invokeMethod = m_jniCache->parameterInterface(m_parameter).getInvokeMethod();
 
   m_lazyJniJavaMethod = JniGlobalRef<jsBridgeMethod>(invokeMethod);
   if (m_lazyJniJavaMethod.isNull()) {
@@ -303,15 +301,10 @@ const std::shared_ptr<JavaMethod> &FunctionX::getCppJavaMethod() const {
     return m_lazyCppJavaMethod;
   }
 
-  const JniRef<jclass> &jsBridgeParameterClass = m_jniContext->getJsBridgeParameterClass();
-
 #ifdef NDEBUG
   static const char *functionXName = "<FunctionX>";
 #else
-  jmethodID getName = m_jniContext->getMethodID(jsBridgeParameterClass, "getName", "()Ljava/lang/String;");
-  //jmethodID getMethodName = m_jniContext->getMethodID(jsBridgeParameterClass, "getMethodName", "()Ljava/lang/String;");
-  JStringLocalRef paramNameRef(m_jniContext->callObjectMethod<jstring>(m_parameter, getName));
-  //JStringLocalRef methodNameRef(m_jniContext->callObjectMethod<jstring>(m_parameter, getMethodName));
+  JStringLocalRef paramNameRef = m_jniCache->parameterInterface(m_parameter).getName();
   std::string methodName = "<method>";
   std::string paramName = paramNameRef.isNull() ? "_" : paramNameRef.str();
   std::string functionXName = "<FunctionX>/" + methodName + "::" + paramName;

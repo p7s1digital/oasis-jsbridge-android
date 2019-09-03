@@ -33,9 +33,10 @@
 # include "quickjs/quickjs.h"
 #endif
 
-class JsBridgeContext;
+class JniCache;
 class JniContext;
 class JValue;
+class JsBridgeContext;
 
 // Represents an instance of a Java class.  Handles getting/settings values of the represented type
 // to/from Duktape/QuickJS with appropriate conversions and boxing/unboxing.
@@ -71,6 +72,7 @@ protected:
 
   const JsBridgeContext * const m_jsBridgeContext;
   const JniContext * const m_jniContext;
+  const JniCache * const m_jniCache;
   JavaTypeId m_id;
 
 #if defined(DUKTAPE)

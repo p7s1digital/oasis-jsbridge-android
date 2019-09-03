@@ -10,7 +10,6 @@ on JsBridge.release()
 
 Performance:
 - Long-based JsValue (*)
-- cache JNI classes and method IDs
 
 
 (*) Long-based JsValue

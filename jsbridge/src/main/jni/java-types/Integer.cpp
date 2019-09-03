@@ -192,13 +192,13 @@ JValue Integer::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
 
 JValue Integer::box(const JValue &intValue) const {
   // From int to Integer
-  jmethodID boxId = m_jniContext->getStaticMethodID(getBoxedJavaClass(), "valueOf", "(I)Ljava/lang/Integer;");
+  static thread_local jmethodID boxId = m_jniContext->getStaticMethodID(getBoxedJavaClass(), "valueOf", "(I)Ljava/lang/Integer;");
   return JValue(m_jniContext->callStaticObjectMethod(getBoxedJavaClass(), boxId, intValue.getInt()));
 }
 
 JValue Integer::unbox(const JValue &boxedValue) const {
   // From Integer to int
-  jmethodID unboxId = m_jniContext->getMethodID(getBoxedJavaClass(), "intValue", "()I");
+  static thread_local jmethodID unboxId = m_jniContext->getMethodID(getBoxedJavaClass(), "intValue", "()I");
   return JValue(m_jniContext->callIntMethod(boxedValue.getLocalRef(), unboxId));
 }
 
