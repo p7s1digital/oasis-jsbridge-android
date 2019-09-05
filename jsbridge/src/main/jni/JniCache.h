@@ -44,9 +44,9 @@ public:
   const JniRef<jclass> &getJsBridgeParameterClass() const { return m_jsBridgeParameterClass; }
 
   // Access to JniInterface's
-  const JsBridgeInterface &jsBridgeInterface() const { return m_jsBridgeInterface; }
-  MethodInterface methodInterface(const JniRef<jsBridgeMethod> &method) const { return MethodInterface(this, method); }
-  ParameterInterface parameterInterface(const JniRef<jsBridgeParameter> &parameter) const { return ParameterInterface(this, parameter); }
+  const JsBridgeInterface &getJsBridgeInterface() const { return m_jsBridgeInterface; }
+  MethodInterface getMethodInterface(const JniRef<jsBridgeMethod> &method) const { return MethodInterface(this, method); }
+  ParameterInterface getParameterInterface(const JniRef<jsBridgeParameter> &parameter) const { return ParameterInterface(this, parameter); }
 
   // Exceptions
   const JniRef<jclass> &getIllegalArgumentExceptionClass() const { return m_illegalArgumentExceptionClass; }

@@ -148,7 +148,7 @@ JSValue Boolean::fromJavaArray(const JniLocalRef<jarray>& values, bool inScript)
     jboolean b = boolArray.getElement(i);
     try {
       JSValue elementValue = fromJava(JValue(b), inScript);
-      JS_SetPropertyUint32(m_ctx, jsArray, i, elementValue);
+      JS_SetPropertyUint32(m_ctx, jsArray, static_cast<uint32_t>(i), elementValue);
     } catch (std::invalid_argument &e) {
       JS_FreeValue(m_ctx, jsArray);
       throw e;

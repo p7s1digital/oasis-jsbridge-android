@@ -55,7 +55,7 @@ JValue JsValue::pop(bool inScript) const {
 
   // Create a new JS value with a new global name
   JStringLocalRef jsValueName(m_jniContext, jsValueGlobalName.c_str());
-  JniLocalRef<jobject> jsValue = m_jniCache->newJsValue(jsValueName);
+  JniLocalRef<jobject> jsValue = getJniCache()->newJsValue(jsValueName);
   jsValueName.release();
 
   // Set value
@@ -75,7 +75,7 @@ duk_ret_t JsValue::push(const JValue &value, bool inScript) const {
   }
 
   // Get JsValue JS name from Java
-  JStringLocalRef jsValueName = m_jniCache->getJsValueName(jValue);
+  JStringLocalRef jsValueName = getJniCache()->getJsValueName(jValue);
   m_jsBridgeContext->rethrowJniException();
 
   // Push the global JS value with that name
@@ -102,7 +102,7 @@ JValue JsValue::toJava(JSValueConst v, bool inScript) const {
 
   // Create a new JS value with a new global name
   JStringLocalRef jsValueName(m_jniContext, jsValueGlobalName.c_str());
-  JniLocalRef<jobject> jsValue = m_jniCache->newJsValue(jsValueName);
+  JniLocalRef<jobject> jsValue = getJniCache()->newJsValue(jsValueName);
   jsValueName.release();
 
   // Set value
@@ -120,7 +120,7 @@ JSValue JsValue::fromJava(const JValue &value, bool inScript) const {
   }
 
   // Get JsValue JS name from Java
-  JStringLocalRef jsValueName = m_jniCache->getJsValueName(jValue);
+  JStringLocalRef jsValueName = getJniCache()->getJsValueName(jValue);
   if (m_jsBridgeContext->hasPendingJniException()) {
     m_jsBridgeContext->rethrowJniException();
     return JS_EXCEPTION;

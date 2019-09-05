@@ -31,11 +31,10 @@ JavaScriptMethod::JavaScriptMethod(const JsBridgeContext *jsBridgeContext, const
  : m_methodName(std::move(methodName))
  , m_isLambda(isLambda) {
 
-  const JniContext *jniContext = jsBridgeContext->jniContext();
   const JniCache *jniCache = jsBridgeContext->getJniCache();
   const JavaTypeProvider &javaTypeProvider = jsBridgeContext->getJavaTypeProvider();
 
-  MethodInterface methodInterface = jniCache->methodInterface(method);
+  MethodInterface methodInterface = jniCache->getMethodInterface(method);
 
   {
     // Create return value loader
@@ -96,7 +95,7 @@ JavaScriptMethod &JavaScriptMethod::operator=(JavaScriptMethod &&other) noexcept
 #include "StackChecker.h"
 
 JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, void *jsHeapPtr, const JObjectArrayLocalRef &args, bool awaitJsPromise) const {
-  duk_context *ctx = jsBridgeContext->getCContext();
+  duk_context *ctx = jsBridgeContext->getDuktapeContext();
   CHECK_STACK(ctx);
 
   JValue result;
@@ -162,7 +161,7 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, void *js
 
 JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, JSValueConst jsMethod, JSValueConst jsThis, const JObjectArrayLocalRef &javaArgs, bool awaitJsPromise) const {
   JValue result;
-  JSContext *ctx = jsBridgeContext->getCContext();
+  JSContext *ctx = jsBridgeContext->getQuickJsContext();
 
   int numArguments = javaArgs.isNull() ? 0 : (int) javaArgs.getLength();
 

@@ -20,7 +20,7 @@
 
 JniCache::JniCache(const JsBridgeContext *jsBridgeContext, const JniLocalRef<jobject> &jsBridgeJavaObject)
  : m_jsBridgeContext(jsBridgeContext)
- , m_jniContext(m_jsBridgeContext->jniContext())
+ , m_jniContext(m_jsBridgeContext->getJniContext())
  , m_jsBridgeClass(JniGlobalRef<jclass>(m_jniContext->findClass(JSBRIDGE_PKG_PATH "/JsBridge")))
  , m_jsBridgeInterface(this, jsBridgeJavaObject)
  , m_objectClass(JniGlobalRef<jclass>(m_jniContext->findClass("java/lang/Object")))
@@ -38,7 +38,7 @@ const JniGlobalRef<jclass> &JniCache::getJavaClass(JavaTypeId id) const {
     return itFind->second;
   }
 
-  const JniContext *jniContext = m_jsBridgeContext->jniContext();
+  const JniContext *jniContext = m_jsBridgeContext->getJniContext();
   assert(jniContext != nullptr);
 
   const char *javaName = getJavaNameByJavaTypeId(id).c_str();

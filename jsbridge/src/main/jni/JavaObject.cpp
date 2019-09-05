@@ -47,7 +47,7 @@ namespace {
     JsBridgeContext *duktapeContext = JsBridgeContext::getInstance(ctx);
     assert(duktapeContext != nullptr);
 
-    JniContext *jniContext = duktapeContext->jniContext();
+    JniContext *jniContext = duktapeContext->getJniContext();
     JNIEnv *env = jniContext->getJNIEnv();
     assert(env != nullptr);
 
@@ -86,7 +86,7 @@ namespace {
     JsBridgeContext *duktapeContext = JsBridgeContext::getInstance(ctx);
     assert(duktapeContext != nullptr);
 
-    JniContext *jniContext = duktapeContext->jniContext();
+    JniContext *jniContext = duktapeContext->getJniContext();
 
     if (duk_get_prop_string(ctx, -1, JAVA_THIS_PROP_NAME)) {
       // Remove the global reference from the bound Java object
@@ -119,7 +119,7 @@ namespace {
     JsBridgeContext *duktapeContext = JsBridgeContext::getInstance(ctx);
     assert(duktapeContext != nullptr);
 
-    JniContext *jniContext = duktapeContext->jniContext();
+    JniContext *jniContext = duktapeContext->getJniContext();
     JNIEnv *env = jniContext->getJNIEnv();
     assert(env != nullptr);
 
@@ -148,7 +148,7 @@ namespace {
     JsBridgeContext *duktapeContext = JsBridgeContext::getInstance(ctx);
     assert(duktapeContext != nullptr);
 
-    JniContext *jniContext = duktapeContext->jniContext();
+    JniContext *jniContext = duktapeContext->getJniContext();
 
     if (duk_get_prop_string(ctx, -1, JAVA_THIS_PROP_NAME)) {
       JniGlobalRef<jobject>::deleteRawGlobalRef(jniContext, static_cast<jobject>(duk_require_pointer(ctx, -1)));
@@ -166,8 +166,8 @@ namespace {
 
 // static
 duk_ret_t JavaObject::push(const JsBridgeContext *jsBridgeContext, const std::string &strName, const JniLocalRef<jobject> &object, const JObjectArrayLocalRef &methods) {
-  duk_context *ctx = jsBridgeContext->getCContext();
-  const JniContext *jniContext = jsBridgeContext->jniContext();
+  duk_context *ctx = jsBridgeContext->getDuktapeContext();
+  const JniContext *jniContext = jsBridgeContext->getJniContext();
 
   CHECK_STACK_OFFSET(ctx, 1);
 
@@ -182,7 +182,7 @@ duk_ret_t JavaObject::push(const JsBridgeContext *jsBridgeContext, const std::st
 
   for (jsize i = 0; i < numMethods; ++i) {
     JniLocalRef<jsBridgeMethod> method = methods.getElement<jsBridgeMethod>(i);
-    MethodInterface methodInterface = jsBridgeContext->getJniCache()->methodInterface(method);
+    MethodInterface methodInterface = jsBridgeContext->getJniCache()->getMethodInterface(method);
 
     std::string strMethodName = methodInterface.getName().str();
     std::string qualifiedMethodName = qualifiedMethodPrefix + strMethodName;
@@ -221,12 +221,12 @@ duk_ret_t JavaObject::push(const JsBridgeContext *jsBridgeContext, const std::st
 
 // static
 duk_ret_t JavaObject::pushLambda(const JsBridgeContext *jsBridgeContext, const std::string &strName, const JniLocalRef<jobject> &object, const JniLocalRef<jsBridgeMethod> &method) {
-  duk_context *ctx = jsBridgeContext->getCContext();
-  const JniContext *jniContext = jsBridgeContext->jniContext();
+  duk_context *ctx = jsBridgeContext->getDuktapeContext();
+  const JniContext *jniContext = jsBridgeContext->getJniContext();
 
   CHECK_STACK_OFFSET(ctx, 1);
 
-  MethodInterface methodInterface = jsBridgeContext->getJniCache()->methodInterface(method);
+  MethodInterface methodInterface = jsBridgeContext->getJniCache()->getMethodInterface(method);
 
   std::string strMethodName = methodInterface.getName().str();
   std::string qualifiedMethodName = strName + "::" + strMethodName;
@@ -290,8 +290,8 @@ namespace {
 
 // static
 JSValue JavaObject::create(const JsBridgeContext *jsBridgeContext, const std::string &strName, const JniLocalRef<jobject> &object, const JObjectArrayLocalRef &methods) {
-  JSContext *ctx = jsBridgeContext->getCContext();
-  const JniContext *jniContext = jsBridgeContext->jniContext();
+  JSContext *ctx = jsBridgeContext->getQuickJsContext();
+  const JniContext *jniContext = jsBridgeContext->getJniContext();
   const QuickJsUtils *utils = jsBridgeContext->getUtils();
 
   JSValue javaObjectValue = JS_NewObject(ctx);
@@ -301,7 +301,7 @@ JSValue JavaObject::create(const JsBridgeContext *jsBridgeContext, const std::st
 
   for (jsize i = 0; i < numMethods; ++i) {
     JniLocalRef<jsBridgeMethod> method = methods.getElement<jsBridgeMethod>(i);
-    MethodInterface methodInterface = jsBridgeContext->getJniCache()->methodInterface(method);
+    MethodInterface methodInterface = jsBridgeContext->getJniCache()->getMethodInterface(method);
 
     std::string strMethodName = methodInterface.getName().str();
     std::string qualifiedMethodName = qualifiedMethodPrefix + strMethodName;
@@ -342,11 +342,11 @@ JSValue JavaObject::create(const JsBridgeContext *jsBridgeContext, const std::st
 
 // static
 JSValue JavaObject::createLambda(const JsBridgeContext *jsBridgeContext, const std::string &strName, const JniLocalRef<jobject> &object, const JniLocalRef<jsBridgeMethod> &method) {
-  JSContext *ctx = jsBridgeContext->getCContext();
-  const JniContext *jniContext = jsBridgeContext->jniContext();
+  JSContext *ctx = jsBridgeContext->getQuickJsContext();
+  const JniContext *jniContext = jsBridgeContext->getJniContext();
   const QuickJsUtils *utils = jsBridgeContext->getUtils();
 
-  MethodInterface methodInterface = jsBridgeContext->getJniCache()->methodInterface(method);
+  MethodInterface methodInterface = jsBridgeContext->getJniCache()->getMethodInterface(method);
 
   std::string strMethodName = methodInterface.getName().str();
   std::string qualifiedMethodName = strName + "::" + strMethodName;

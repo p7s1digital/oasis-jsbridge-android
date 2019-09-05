@@ -160,7 +160,7 @@ JSValue Float::fromJavaArray(const JniLocalRef<jarray> &values, bool inScript) c
    jfloat f = floatArray.getElement(i);
     try {
       JSValue elementValue = fromJava(JValue(f), inScript);
-      JS_SetPropertyUint32(m_ctx, jsArray, i, elementValue);
+      JS_SetPropertyUint32(m_ctx, jsArray, static_cast<uint32_t>(i), elementValue);
     } catch (std::invalid_argument &e) {
       JS_FreeValue(m_ctx, jsArray);
       throw e;

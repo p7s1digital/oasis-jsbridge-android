@@ -69,7 +69,7 @@ private:
     alog_error("StackChecker ERROR: expected: %d, actual: %d\n-> stack: %s", m_top + m_offset,
                actual, stack);
     JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(m_context);
-    backtraceToLogcat(jsBridgeContext->jniContext()->getJNIEnv());
+    backtraceToLogcat(jsBridgeContext->getJniContext()->getJNIEnv());
     exit(0);
   };
 

@@ -20,6 +20,7 @@
 #define _JSBRIDGE_JAVATYPE_H
 
 #include "JavaTypeId.h"
+#include "JsBridgeContext.h"
 #include "jni-helpers/JniGlobalRef.h"
 #include <jni-helpers/JniTypes.h>
 #include <jni-helpers/JValue.h>
@@ -62,24 +63,25 @@ public:
 
   virtual bool isDeferred() const { return false; }
 
-  const JsBridgeContext *getJsBridgeContext() const { return m_jsBridgeContext; }
-  const JniContext *getJniContext() const { return m_jniContext; }
-
 protected:
   explicit JavaType(const JsBridgeContext *, JavaTypeId);
 
   const JniRef<jclass> &getJavaClass() const;
+  const JniCache *getJniCache() const { return m_jsBridgeContext->getJniCache(); }
 
   const JsBridgeContext * const m_jsBridgeContext;
   const JniContext * const m_jniContext;
-  const JniCache * const m_jniCache;
-  JavaTypeId m_id;
 
 #if defined(DUKTAPE)
+  const DuktapeUtils *getUtils() const { return m_jsBridgeContext->getUtils(); }
   duk_context * const m_ctx;
 #elif defined(QUICKJS)
+  const QuickJsUtils *getUtils() const { return m_jsBridgeContext->getUtils(); }
   JSContext * const m_ctx;
 #endif
+
+private:
+  const JavaTypeId m_id;
 };
 
 #endif

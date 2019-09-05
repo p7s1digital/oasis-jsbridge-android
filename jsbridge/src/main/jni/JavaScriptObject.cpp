@@ -38,8 +38,8 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
  : m_name(std::move(strName))
  , m_jsBridgeContext(jsBridgeContext) {
 
-  duk_context *ctx = jsBridgeContext->getCContext();
-  const JniContext *jniContext = jsBridgeContext->jniContext();
+  duk_context *ctx = jsBridgeContext->getDuktapeContext();
+  const JniContext *jniContext = jsBridgeContext->getJniContext();
   const JniCache *jniCache = jsBridgeContext->getJniCache();
 
   CHECK_STACK(ctx);
@@ -60,7 +60,7 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
   const jsize numMethods = methods.getLength();
   for (jsize i = 0; i < numMethods; ++i) {
     const JniLocalRef<jsBridgeMethod> method = methods.getElement<jsBridgeMethod>(i);
-    MethodInterface methodInterface = jniCache->methodInterface(method);
+    MethodInterface methodInterface = jniCache->getMethodInterface(method);
 
     // Sanity check that as of right now, the object we're proxying has a function with this name.
     std::string strMethodName = methodInterface.getName().c_str();
@@ -100,7 +100,7 @@ JValue JavaScriptObject::call(const JniLocalRef<jobject> &javaMethod, const JObj
     return JValue();
   }
 
-  const JniContext *jniContext = m_jsBridgeContext->jniContext();
+  const JniContext *jniContext = m_jsBridgeContext->getJniContext();
   const JniCache *jniCache = m_jsBridgeContext->getJniCache();
 
   jmethodID methodId = jniContext->fromReflectedMethod(javaMethod);
@@ -136,8 +136,8 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
  , m_jsValue(v)
  , m_jsBridgeContext(jsBridgeContext) {
 
-  JSContext *ctx = jsBridgeContext->getCContext();
-  const JniContext *jniContext = jsBridgeContext->jniContext();
+  JSContext *ctx = jsBridgeContext->getQuickJsContext();
+  const JniContext *jniContext = jsBridgeContext->getJniContext();
   const JniCache *jniCache = jsBridgeContext->getJniCache();
   const QuickJsUtils *utils = jsBridgeContext->getUtils();
 
@@ -153,7 +153,7 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
   const jsize numMethods = methods.getLength();
   for (jsize i = 0; i < numMethods; ++i) {
     JniLocalRef<jsBridgeMethod > method = methods.getElement<jsBridgeMethod>(i);
-    MethodInterface methodInterface = jniCache->methodInterface(method);
+    MethodInterface methodInterface = jniCache->getMethodInterface(method);
 
     // Sanity check that as of right now, the object we're proxying has a function with this name.
     std::string strMethodName = methodInterface.getName().c_str();
@@ -183,8 +183,8 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
 
 JValue JavaScriptObject::call(const JniLocalRef<jobject> &javaMethod, const JObjectArrayLocalRef &args) const {
 
-  JSContext *ctx = m_jsBridgeContext->getCContext();
-  const JniContext *jniContext = m_jsBridgeContext->jniContext();
+  JSContext *ctx = m_jsBridgeContext->getQuickJsContext();
+  const JniContext *jniContext = m_jsBridgeContext->getJniContext();
   const JniCache *jniCache = m_jsBridgeContext->getJniCache();
 
   jmethodID methodId = jniContext->fromReflectedMethod(javaMethod);

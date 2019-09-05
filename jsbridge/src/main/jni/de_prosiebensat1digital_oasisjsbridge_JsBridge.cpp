@@ -40,14 +40,14 @@
       //alog("BEGINNING OF JNI SCOPE");
       m_jsBridgeContext = reinterpret_cast<JsBridgeContext *>(lctx);
 
-      m_jniContext = m_jsBridgeContext->jniContext();
+      m_jniContext = m_jsBridgeContext->getJniContext();
       assert(m_jniContext != nullptr);
       m_jniContext->m_jniEnv = env;
 
 #ifndef NDEBUG
       // In debug mode: check that we are in the correct thread
       // (everything else will lead to unexpected behavior...)
-      m_jsBridgeContext->getJniCache()->jsBridgeInterface().checkJsThread();
+      m_jsBridgeContext->getJniCache()->getJsBridgeInterface().checkJsThread();
 #endif
     }
 
@@ -136,7 +136,7 @@ JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jn
     return nullptr;
   }
 
-  JniContext *jniContext = jsBridgeContext->jniContext();
+  JniContext *jniContext = jsBridgeContext->getJniContext();
 
   std::string strCode = JStringLocalRef(jniContext, code, true).str();
 
@@ -168,7 +168,7 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniEv
     return;
   }
 
-  auto jniContext = jsBridgeContext->jniContext();
+  auto jniContext = jsBridgeContext->getJniContext();
   assert(jniContext != nullptr);
 
   std::string strCode = JStringLocalRef(jniContext, code, true).str();
@@ -194,7 +194,7 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
     return;
   }
 
-  auto jniContext = jsBridgeContext->jniContext();
+  auto jniContext = jsBridgeContext->getJniContext();
   assert(jniContext != nullptr);
 
   std::string strName = JStringLocalRef(jniContext, name, true).str();
@@ -220,7 +220,7 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
     return;
   }
 
-  auto jniContext = jsBridgeContext->jniContext();
+  auto jniContext = jsBridgeContext->getJniContext();
   assert(jniContext != nullptr);
 
   std::string strName = JStringLocalRef(jniContext, name, true).str();
@@ -246,7 +246,7 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
     return;
   }
 
-  auto jniContext = jsBridgeContext->jniContext();
+  auto jniContext = jsBridgeContext->getJniContext();
   assert(jniContext != nullptr);
 
     std::string strName = JStringLocalRef(jniContext, name, true).str();
@@ -271,7 +271,7 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
     return;
   }
 
-  auto jniContext = jsBridgeContext->jniContext();
+  auto jniContext = jsBridgeContext->getJniContext();
   assert(jniContext != nullptr);
 
   std::string strName = JStringLocalRef(jniContext, name, true).str();
@@ -296,7 +296,7 @@ JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jn
     return nullptr;
   }
 
-  auto jniContext = jsBridgeContext->jniContext();
+  auto jniContext = jsBridgeContext->getJniContext();
   assert(jniContext != nullptr);
 
   std::string strObjectName = JStringLocalRef(jniContext, objectName, true).str();
@@ -330,7 +330,7 @@ JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jn
     return nullptr;
   }
 
-  auto jniContext = jsBridgeContext->jniContext();
+  auto jniContext = jsBridgeContext->getJniContext();
   assert(jniContext != nullptr);
 
   std::string strObjectName = JStringLocalRef(jniContext, objectName, true).str();
@@ -364,7 +364,7 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniAs
     return;
   }
 
-  auto jniContext = jsBridgeContext->jniContext();
+  auto jniContext = jsBridgeContext->getJniContext();
   assert(jniContext != nullptr);
 
   std::string strGlobalName = JStringLocalRef(jniContext, globalName, true).str();
@@ -384,7 +384,7 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniNe
     return;
   }
 
-  auto jniContext = jsBridgeContext->jniContext();
+  auto jniContext = jsBridgeContext->getJniContext();
   assert(jniContext != nullptr);
 
   std::string strGlobalName = JStringLocalRef(jniContext, globalName, true).str();
@@ -405,7 +405,7 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCo
     return;
   }
 
-  auto jniContext = jsBridgeContext->jniContext();
+  auto jniContext = jsBridgeContext->getJniContext();
   assert(jniContext != nullptr);
 
   std::string strId = JStringLocalRef(jniContext, id, true).str();

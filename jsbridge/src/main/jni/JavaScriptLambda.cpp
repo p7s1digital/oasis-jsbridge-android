@@ -27,7 +27,7 @@
 
 JavaScriptLambda::JavaScriptLambda(const JsBridgeContext *jsBridgeContext, const JniRef<jsBridgeMethod> &method, std::string strName, duk_idx_t jsLambdaIndex)
  : m_method(nullptr) {
-  duk_context *ctx = jsBridgeContext->getCContext();
+  duk_context *ctx = jsBridgeContext->getDuktapeContext();
   CHECK_STACK(ctx);
 
   m_jsHeapPtr = duk_get_heapptr(ctx, jsLambdaIndex);
@@ -56,7 +56,7 @@ JavaScriptLambda::JavaScriptLambda(const JsBridgeContext *jsBridgeContext, const
  : m_method(nullptr)
  , m_jsValue(v) {
 
-  m_ctx = jsBridgeContext->getCContext();
+  m_ctx = jsBridgeContext->getQuickJsContext();
 
   if (!JS_IsFunction(m_ctx, v)) {
     throw std::runtime_error("JavaScript lambda " + strName + " cannot be accessed (not a function)");

@@ -42,7 +42,7 @@ namespace {
     JValue value = payload->componentType->toJava(promiseValue, true);
 
     // Complete the native Deferred
-    jsBridgeContext->getJniCache()->jsBridgeInterface().resolveDeferred(payload->javaDeferred, value);
+    jsBridgeContext->getJniCache()->getJsBridgeInterface().resolveDeferred(payload->javaDeferred, value);
     if (jsBridgeContext->hasPendingJniException()) {
       jsBridgeContext->rethrowJniException();
       return JS_EXCEPTION;
@@ -62,7 +62,7 @@ namespace {
     JValue value(jsBridgeContext->getJavaExceptionForJsError());
 
     // Reject the native Deferred
-    jsBridgeContext->getJniCache()->jsBridgeInterface().rejectDeferred(payload->javaDeferred, value);
+    jsBridgeContext->getJniCache()->getJsBridgeInterface().rejectDeferred(payload->javaDeferred, value);
     if (jsBridgeContext->hasPendingJniException()) {
       jsBridgeContext->rethrowJniException();
       return JS_EXCEPTION;
@@ -103,7 +103,7 @@ JValue Deferred::toJava(JSValueConst v, bool inScript) const {
   assert(utils != nullptr);
 
   // Create a native Deferred instance
-  JniLocalRef<jobject> javaDeferred = m_jniCache->jsBridgeInterface().createCompletableDeferred();
+  JniLocalRef<jobject> javaDeferred = getJniCache()->getJsBridgeInterface().createCompletableDeferred();
   if (m_jsBridgeContext->hasPendingJniException()) {
     m_jsBridgeContext->rethrowJniException();
     return JValue();
@@ -114,7 +114,7 @@ JValue Deferred::toJava(JSValueConst v, bool inScript) const {
     // Not a Promise => directly resolve the native Deferred with the value
     JValue value = m_componentType->toJava(v, inScript);
 
-    m_jniCache->jsBridgeInterface().resolveDeferred(javaDeferred, value);
+    getJniCache()->getJsBridgeInterface().resolveDeferred(javaDeferred, value);
     if (m_jsBridgeContext->hasPendingJniException()) {
       m_jsBridgeContext->rethrowJniException();
       return JValue();
@@ -151,7 +151,7 @@ JValue Deferred::toJava(JSValueConst v, bool inScript) const {
     alog("Error while calling JSPromise.then()");
 
     JniLocalRef<jthrowable> javaException = m_jsBridgeContext->getJavaExceptionForJsError();
-    m_jniCache->jsBridgeInterface().rejectDeferred(javaDeferred, JValue(javaException));
+    getJniCache()->getJsBridgeInterface().rejectDeferred(javaDeferred, JValue(javaException));
     if (m_jsBridgeContext->hasPendingJniException()) {
       m_jsBridgeContext->rethrowJniException();
       return JValue();
@@ -202,7 +202,7 @@ JSValue Deferred::fromJava(const JValue &value, bool inScript) const {
   JS_FreeValue(m_ctx, promiseCtor);
 
   // Call Java setUpJsPromise()
-  m_jniCache->jsBridgeInterface().setUpJsPromise(
+  getJniCache()->getJsBridgeInterface().setUpJsPromise(
       JStringLocalRef(m_jniContext, promiseObjectGlobalName.c_str()), jDeferred);
   if (m_jsBridgeContext->hasPendingJniException()) {
     m_jsBridgeContext->rethrowJniException();
@@ -213,7 +213,7 @@ JSValue Deferred::fromJava(const JValue &value, bool inScript) const {
 }
 
   void Deferred::completeJsPromise(const JsBridgeContext *jsBridgeContext, const std::string &strId, bool isFulfilled, const JniLocalRef<jobject> &value) {
-    JSContext *ctx = jsBridgeContext->getCContext();
+    JSContext *ctx = jsBridgeContext->getQuickJsContext();
     assert(ctx != nullptr);
 
     const QuickJsUtils *utils = jsBridgeContext->getUtils();

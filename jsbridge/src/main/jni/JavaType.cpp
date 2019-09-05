@@ -38,9 +38,12 @@ using namespace JavaTypes;
 
 JavaType::JavaType(const JsBridgeContext *jsBridgeContext, JavaTypeId id)
  : m_jsBridgeContext(jsBridgeContext)
- , m_jniContext(jsBridgeContext->jniContext())
- , m_jniCache(jsBridgeContext->getJniCache())
- , m_ctx(m_jsBridgeContext->getCContext())
+ , m_jniContext(jsBridgeContext->getJniContext())
+#if defined(DUKTAPE)
+ , m_ctx(m_jsBridgeContext->getDuktapeContext())
+#elif defined(QUICKJS)
+ , m_ctx(m_jsBridgeContext->getQuickJsContext())
+#endif
  , m_id(id) {
 }
 

@@ -143,10 +143,10 @@ std::unique_ptr<const JavaType> JavaTypeProvider::getDeferredType(const JniRef<j
 // ---
 
 JavaTypeId JavaTypeProvider::getJavaTypeId(const JniRef<jsBridgeParameter> &parameter) const {
-  const JniContext *jniContext = m_jsBridgeContext->jniContext();
+  const JniContext *jniContext = m_jsBridgeContext->getJniContext();
   assert(jniContext != nullptr);
 
-  auto strName = m_jsBridgeContext->getJniCache()->parameterInterface(parameter).getJavaName();
+  auto strName = m_jsBridgeContext->getJniCache()->getParameterInterface(parameter).getJavaName();
   if (strName.isNull()) {
     throw std::invalid_argument("Could not get Java name from Parameter!");
   }
@@ -160,12 +160,12 @@ JavaTypeId JavaTypeProvider::getJavaTypeId(const JniRef<jsBridgeParameter> &para
 }
 
 bool JavaTypeProvider::isParameterNullable(const JniRef<jsBridgeParameter> &parameter) const {
-  ParameterInterface parameterInterface = m_jsBridgeContext->getJniCache()->parameterInterface(parameter);
+  ParameterInterface parameterInterface = m_jsBridgeContext->getJniCache()->getParameterInterface(parameter);
   return parameterInterface.isNullable();
 }
 
 JniLocalRef<jsBridgeParameter> JavaTypeProvider::getGenericParameter(const JniRef<jsBridgeParameter> &parameter) const {
-  return m_jsBridgeContext->getJniCache()->parameterInterface(parameter).getGenericParameter();
+  return m_jsBridgeContext->getJniCache()->getParameterInterface(parameter).getGenericParameter();
 }
 
 std::unique_ptr<const JavaType> JavaTypeProvider::getGenericParameterType(const JniRef<jsBridgeParameter> &parameter) const {

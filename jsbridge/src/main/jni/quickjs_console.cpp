@@ -34,10 +34,10 @@ static JSValue js_print(JSContext *ctx, JSValueConst this_val, int argc, JSValue
   JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
   assert(jsBridgeContext != nullptr);
 
-  JniContext *jniContext = jsBridgeContext->jniContext();
+  JniContext *jniContext = jsBridgeContext->getJniContext();
   const JniCache *jniCache = jsBridgeContext->getJniCache();
 
-  jniCache->jsBridgeInterface().consoleLogHelper(JStringLocalRef(jniContext, logType), JStringLocalRef(jniContext, str));
+  jniCache->getJsBridgeInterface().consoleLogHelper(JStringLocalRef(jniContext, logType), JStringLocalRef(jniContext, str));
 
   return JS_UNDEFINED;
 }

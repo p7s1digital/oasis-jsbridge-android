@@ -142,7 +142,7 @@ JValue FunctionX::pop(bool inScript) const {
   duk_pop(m_ctx);  // JS function
 
   // 4. Call native createJsLambdaProxy(id, javaMethod)
-  JniLocalRef<jobject> javaFunction = m_jniCache->jsBridgeInterface().createJsLambdaProxy(
+  JniLocalRef<jobject> javaFunction = getJniCache()->getJsBridgeInterface().createJsLambdaProxy(
       JStringLocalRef(m_jniContext, jsFunctionGlobalName.c_str()),
       javaMethod
   );
@@ -227,7 +227,7 @@ JValue FunctionX::toJava(JSValueConst v, bool inScript) const {
   utils->createMappedCppPtrValue<JavaScriptLambda>(javaScriptLambda, JS_DupValue(m_ctx, v), jsFunctionGlobalName.c_str());
 
   // 4. Call native createJsLambdaProxy(id, javaMethod)
-  JniLocalRef<jobject> javaFunction = m_jniCache->jsBridgeInterface().createJsLambdaProxy(
+  JniLocalRef<jobject> javaFunction = getJniCache()->getJsBridgeInterface().createJsLambdaProxy(
       JStringLocalRef(m_jniContext, jsFunctionGlobalName.c_str()),
       jniJavaMethod
   );
@@ -286,7 +286,7 @@ const JniRef<jsBridgeMethod> &FunctionX::getJniJavaMethod() const {
     return m_lazyJniJavaMethod;
   }
 
-  JniLocalRef<jsBridgeMethod> invokeMethod = m_jniCache->parameterInterface(m_parameter).getInvokeMethod();
+  JniLocalRef<jsBridgeMethod> invokeMethod = getJniCache()->getParameterInterface(m_parameter).getInvokeMethod();
 
   m_lazyJniJavaMethod = JniGlobalRef<jsBridgeMethod>(invokeMethod);
   if (m_lazyJniJavaMethod.isNull()) {
@@ -304,7 +304,7 @@ const std::shared_ptr<JavaMethod> &FunctionX::getCppJavaMethod() const {
 #ifdef NDEBUG
   static const char *functionXName = "<FunctionX>";
 #else
-  JStringLocalRef paramNameRef = m_jniCache->parameterInterface(m_parameter).getName();
+  JStringLocalRef paramNameRef = getJniCache()->getParameterInterface(m_parameter).getName();
   std::string methodName = "<method>";
   std::string paramName = paramNameRef.isNull() ? "_" : paramNameRef.str();
   std::string functionXName = "<FunctionX>/" + methodName + "::" + paramName;

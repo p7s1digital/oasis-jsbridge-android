@@ -66,10 +66,10 @@ static duk_ret_t duk__console_log_helper(duk_context *ctx, const char *logType, 
     JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
     assert(jsBridgeContext != nullptr);
 
-    const JniContext *jniContext = jsBridgeContext->jniContext();
+    const JniContext *jniContext = jsBridgeContext->getJniContext();
     const JniCache *jniCache = jsBridgeContext->getJniCache();
 
-    jniCache->jsBridgeInterface().consoleLogHelper(JStringLocalRef(jniContext, logType), JStringLocalRef(jniContext, str));
+  jniCache->getJsBridgeInterface().consoleLogHelper(JStringLocalRef(jniContext, logType), JStringLocalRef(jniContext, str));
 
     free(str);
     return 0;

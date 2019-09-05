@@ -60,7 +60,7 @@ JValue JsonObjectWrapper::pop(bool inScript) const {
   JStringLocalRef str(m_jniContext, duk_require_string(m_ctx, -1));
   duk_pop(m_ctx);
 
-  JniLocalRef<jobject> localRef = m_jniCache->newJsonObjectWrapper(str);
+  JniLocalRef<jobject> localRef = getJniCache()->newJsonObjectWrapper(str);
 
   duk_pop(m_ctx);
   return JValue(localRef);
@@ -75,7 +75,7 @@ duk_ret_t JsonObjectWrapper::push(const JValue &value, bool inScript) const {
     return 1;
   }
 
-  JStringLocalRef str = m_jniCache->getJsonObjectWrapperString(jWrapper);
+  JStringLocalRef str = getJniCache()->getJsonObjectWrapperString(jWrapper);
 
   if (m_jsBridgeContext->hasPendingJniException()) {
     duk_push_undefined(m_ctx);
@@ -127,7 +127,7 @@ JValue JsonObjectWrapper::toJava(JSValueConst v, bool inScript) const {
   JS_FreeCString(m_ctx, jsonCStr);
   JS_FreeValue(m_ctx, jsonValue);
 
-  JniLocalRef<jobject> localRef = m_jniCache->newJsonObjectWrapper(str);
+  JniLocalRef<jobject> localRef = getJniCache()->newJsonObjectWrapper(str);
   return JValue(localRef);
 }
 
@@ -138,7 +138,7 @@ JSValue JsonObjectWrapper::fromJava(const JValue &value, bool inScript) const {
     return JS_NULL;
   }
 
-  JStringLocalRef str = m_jniCache->getJsonObjectWrapperString(jWrapper);
+  JStringLocalRef str = getJniCache()->getJsonObjectWrapperString(jWrapper);
 
   if (m_jsBridgeContext->hasPendingJniException()) {
     m_jsBridgeContext->rethrowJniException();

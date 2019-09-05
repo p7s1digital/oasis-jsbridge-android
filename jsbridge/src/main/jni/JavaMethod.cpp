@@ -33,8 +33,8 @@ JavaMethod::JavaMethod(const JsBridgeContext *jsBridgeContext, const JniLocalRef
  : m_methodName(std::move(methodName)),
    m_isLambda(isLambda) {
 
-  const JniContext *jniContext = jsBridgeContext->jniContext();
-  MethodInterface methodInterface = jsBridgeContext->getJniCache()->methodInterface(method);
+  const JniContext *jniContext = jsBridgeContext->getJniContext();
+  MethodInterface methodInterface = jsBridgeContext->getJniCache()->getMethodInterface(method);
 
   m_isVarArgs = methodInterface.isVarArgs();
   JObjectArrayLocalRef parameters = methodInterface.getParameters();
@@ -48,7 +48,7 @@ JavaMethod::JavaMethod(const JsBridgeContext *jsBridgeContext, const JniLocalRef
 
     if (m_isVarArgs && i == numParameters - 1) {
       // TODO: create the array component Parameter, maybe sth like Parameter.getArrayComponent()
-      //JniCache::Parameter parameterInterface = jsBridgeContext->getJniCache()->parameterInterface(parameter);
+      //Parameter parameterInterface = jsBridgeContext->getJniCache()->getParameterInterface(parameter);
       //jmethodID getVarArgParameter = jniContext->getMethodID(
       //    jsBridgeParameterClass, "getVarArgParameter", "()Lde/prosiebensat1digital/oasisjsbridge/Parameter;");
       //JniLocalRef<jsBridgeParameter> varArgParameter = jniContext->callObjectMethod<jsBridgeParameter>(javaClass, getVarArgParameter);
@@ -101,10 +101,10 @@ JavaMethod::JavaMethod(const JsBridgeContext *jsBridgeContext, const JniLocalRef
 #include "StackChecker.h"
 
 duk_ret_t JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRef<jobject> &javaThis) const {
-  duk_context *ctx = jsBridgeContext->getCContext();
+  duk_context *ctx = jsBridgeContext->getDuktapeContext();
   CHECK_STACK(ctx);
 
-  const JniContext *jniContext = jsBridgeContext->jniContext();
+  const JniContext *jniContext = jsBridgeContext->getJniContext();
 
   const auto argCount = duk_get_top(ctx);
   const auto minArgs = m_isVarArgs
@@ -144,8 +144,8 @@ duk_ret_t JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRe
 
 JSValue JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRef<jobject> &javaThis, int argc, JSValueConst *argv) const {
 
-  JSContext *ctx = jsBridgeContext->getCContext();
-  const JniContext *jniContext = jsBridgeContext->jniContext();
+  JSContext *ctx = jsBridgeContext->getQuickJsContext();
+  const JniContext *jniContext = jsBridgeContext->getJniContext();
 
   const int minArgs = m_isVarArgs
       ? m_argumentTypes.size() - 1
@@ -189,7 +189,7 @@ JSValue JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRef<
 
 // static
 JValue JavaMethod::callLambda(const JsBridgeContext *jsBridgeContext, const JniRef<jsBridgeMethod> &method, const JniRef<jobject> &javaThis, const std::vector<JValue> &args) {
-  const JniContext *jniContext = jsBridgeContext->jniContext();
+  const JniContext *jniContext = jsBridgeContext->getJniContext();
   assert(jniContext != nullptr);
 
   const JniCache *jniCache = jsBridgeContext->getJniCache();
@@ -201,7 +201,7 @@ JValue JavaMethod::callLambda(const JsBridgeContext *jsBridgeContext, const JniR
     argArray.setElement(i++, arg.isNull() ? JniLocalRef<jobject>() : arg.getLocalRef());
   }
 
-  JniLocalRef<jobject> ret = jniCache->methodInterface(method).callNativeLambda(javaThis, argArray);
+  JniLocalRef<jobject> ret = jniCache->getMethodInterface(method).callNativeLambda(javaThis, argArray);
 
   if (jsBridgeContext->hasPendingJniException()) {
     jsBridgeContext->rethrowJniException();
