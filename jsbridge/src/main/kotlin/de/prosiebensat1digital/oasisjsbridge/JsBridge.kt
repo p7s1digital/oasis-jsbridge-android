@@ -266,17 +266,17 @@ class JsBridge(context: Context): CoroutineScope {
     }
 
     @UseExperimental(ExperimentalStdlibApi::class)
-    inline fun <reified T: Any> evaluateAsync(js: String): Deferred<T> {
+    inline fun <reified T: Any?> evaluateAsync(js: String): Deferred<T> {
         return evaluateAsync(js, typeOf<T>())
     }
 
     @UseExperimental(ExperimentalStdlibApi::class)
-    suspend inline fun <reified T: Any> evaluate(js: String): T {
+    suspend inline fun <reified T: Any?> evaluate(js: String): T {
         return evaluate(js, typeOf<T>(), true)
     }
 
     @UseExperimental(ExperimentalStdlibApi::class)
-    inline fun <reified T: Any> evaluateBlocking(js: String, context: CoroutineContext = EmptyCoroutineContext): T {
+    inline fun <reified T: Any?> evaluateBlocking(js: String, context: CoroutineContext = EmptyCoroutineContext): T {
         return runBlocking(context) {
             if (isMainThread()) {
                 Timber.w("WARNING: evaluating JS code in the main thread! Consider using non-blocking API or evaluating JS code in another thread!")

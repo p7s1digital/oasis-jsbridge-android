@@ -217,7 +217,7 @@ internal constructor(
     }
 
     @UseExperimental(ExperimentalStdlibApi::class)
-    suspend inline fun <reified T: Any> evaluate(): T {
+    suspend inline fun <reified T: Any?> evaluate(): T {
         val jsBridge = jsBridge
                 ?: throw JsValueEvaluationError(associatedJsName, customMessage = "Cannot evaluate JS value because the JS interpreter has been destroyed")
 
@@ -225,7 +225,7 @@ internal constructor(
     }
 
     @UseExperimental(ExperimentalStdlibApi::class)
-    inline fun <reified T: Any> evaluateBlocking(context: CoroutineContext = EmptyCoroutineContext): T {
+    inline fun <reified T: Any?> evaluateBlocking(context: CoroutineContext = EmptyCoroutineContext): T {
         val jsBridge = jsBridge
                 ?: throw JsValueEvaluationError(associatedJsName, customMessage = "Cannot evaluate JS value because the JS interpreter has been destroyed")
 

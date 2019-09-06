@@ -50,6 +50,7 @@ public:
 private:
   const JsBridgeContext *m_jsBridgeContext;
   JavaTypeId getJavaTypeId(const JniRef<jsBridgeParameter> &) const;
+  bool isParameterNullable(const JniRef<jsBridgeParameter> &) const;
   JniLocalRef<jsBridgeParameter> getGenericParameter(const JniRef<jsBridgeParameter> &) const;
   std::unique_ptr<const JavaType> getGenericParameterType(const JniRef<jsBridgeParameter> &) const;
   mutable std::unique_ptr<const JavaType> m_objectType;
