@@ -396,7 +396,16 @@ class JsBridgeTest {
             assertEquals(error.jsonValue?.toPayload()?.stringValue(), "wrong")
             assertEquals(awaitError.jsonValue?.toPayload()?.stringValue(), "wrong")
         }
+        // THEN (null JsValue)
+        runBlocking {
+            // Non-nullable JsValue with JS var = "null"
+            val nonNullableJsValue: JsValue = subject.evaluate("null")
+            assertEquals(nonNullableJsValue.evaluate<Any?>(), null)
 
+            // Nullable JsValue with JS var = "null"
+            val nullableJsValue: JsValue? = subject.evaluate("null")
+            assertNull(nullableJsValue)
+        }
 
         assertTrue(errors.isEmpty())
     }

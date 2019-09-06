@@ -214,6 +214,11 @@ JStringLocalRef JniCache::ParameterInterface::getJavaName() const {
   return p->m_jniContext->callStringMethod(m_object, methodId);
 }
 
+jboolean JniCache::ParameterInterface::isNullable() const {
+  static thread_local jmethodID methodId = p->m_jniContext->getMethodID(m_class, "isNullable", "()Z");
+  return p->m_jniContext->callBooleanMethod(m_object, methodId);
+}
+
 JniLocalRef<jsBridgeParameter> JniCache::ParameterInterface::getGenericParameter() const {
   static thread_local jmethodID methodId = p->m_jniContext->getMethodID(m_class, "getGenericParameter", "()L" JSBRIDGE_PKG_PATH "/Parameter;");
   return p->m_jniContext->callObjectMethod<jsBridgeParameter>(m_object, methodId);
