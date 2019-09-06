@@ -27,8 +27,9 @@ namespace {
 
 namespace JavaTypes {
 
-JsValue::JsValue(const JsBridgeContext *jsBridgeContext)
- : JavaType(jsBridgeContext, JavaTypeId::JsValue) {
+JsValue::JsValue(const JsBridgeContext *jsBridgeContext, bool isNullable)
+ : JavaType(jsBridgeContext, JavaTypeId::JsValue)
+ , m_isNullable(isNullable) {
 }
 
 #if defined(DUKTAPE)
@@ -41,6 +42,13 @@ JValue JsValue::pop(bool inScript) const {
 
   JNIEnv *env = m_jniContext->getJNIEnv();
   assert(env != nullptr);
+
+  // If the Java JsValue instance is nullable and the JS value is null or undefined, return a null JsValue
+  // (but if the JsValue is not nullable, we still return a new JsValue instance)
+  if (m_isNullable && duk_is_null_or_undefined(m_ctx, -1)) {
+    duk_pop(m_ctx);
+    return JValue();
+  }
 
   static int jsValueCount = 0;
   std::string jsValueGlobalName = JSVALUE_GLOBAL_NAME_PREFIX + std::to_string(++jsValueCount);
@@ -80,6 +88,12 @@ duk_ret_t JsValue::push(const JValue &value, bool inScript) const {
 JValue JsValue::toJava(JSValueConst v, bool inScript) const {
   JNIEnv *env = m_jniContext->getJNIEnv();
   assert(env != nullptr);
+
+  // If the Java JsValue instance is nullable and the JS value is null or undefined, return a null JsValue
+  // (but if the JsValue is not nullable, we still return a new JsValue instance)
+  if (m_isNullable && (JS_IsNull(v) || JS_IsUndefined(v))) {
+    return JValue();
+  }
 
   static int jsValueCount = 0;
   std::string jsValueGlobalName = JSVALUE_GLOBAL_NAME_PREFIX + std::to_string(++jsValueCount);
