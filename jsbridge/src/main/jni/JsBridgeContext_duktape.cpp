@@ -178,17 +178,19 @@ void JsBridgeContext::evaluateFileContent(const std::string &strCode, const std:
 
   duk_push_string(m_ctx, strFileName.c_str());
 
-  if (duk_pcompile_string_filename(m_ctx, DUK_COMPILE_EVAL, strCode.c_str()) == DUK_EXEC_SUCCESS) {
-    if (duk_pcall(m_ctx, 0) != DUK_EXEC_SUCCESS) {
-      alog("Could not execute file %s", strFileName.c_str());
-      queueJavaExceptionForJsError();
-      return;
-    }
-    duk_pop(m_ctx);
-  } else {
+  if (duk_pcompile_string_filename(m_ctx, DUK_COMPILE_EVAL, strCode.c_str()) != DUK_EXEC_SUCCESS) {
     alog("Could not compile file %s", strFileName.c_str());
     queueJavaExceptionForJsError();
+    duk_pop(m_ctx);  // pcompile error
+    return;
   }
+
+  if (duk_pcall(m_ctx, 0) != DUK_EXEC_SUCCESS) {
+    alog("Could not execute file %s", strFileName.c_str());
+    queueJavaExceptionForJsError();
+  }
+
+  duk_pop(m_ctx);  // unsuded pcall result (or error)
 }
 
 void JsBridgeContext::registerJavaObject(const std::string &strName, const JniLocalRef<jobject> &object,
