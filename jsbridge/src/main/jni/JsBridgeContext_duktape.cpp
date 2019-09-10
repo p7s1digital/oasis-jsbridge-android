@@ -176,10 +176,9 @@ void JsBridgeContext::evaluateFileContent(const std::string &strCode, const std:
 
   CHECK_STACK(m_ctx);
 
-  duk_push_string(m_ctx, strCode.c_str());
   duk_push_string(m_ctx, strFileName.c_str());
 
-  if (duk_pcompile(m_ctx, DUK_COMPILE_EVAL) == DUK_EXEC_SUCCESS) {
+  if (duk_pcompile_string_filename(m_ctx, DUK_COMPILE_EVAL, strCode.c_str()) == DUK_EXEC_SUCCESS) {
     if (duk_pcall(m_ctx, 0) != DUK_EXEC_SUCCESS) {
       alog("Could not execute file %s", strFileName.c_str());
       queueJavaExceptionForJsError();
