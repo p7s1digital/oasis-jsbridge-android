@@ -105,13 +105,9 @@ private:
   const JavaType *m_objectType = nullptr;
 
 #if defined(DUKTAPE)
-  duk_idx_t pushJavaObject(const char *instanceName, const JniLocalRef<jobject> &object, const JObjectArrayLocalRef &methods) const;
-
   duk_context *m_context = nullptr;
   DuktapeUtils *m_utils = nullptr;
 #elif defined(QUICKJS)
-  JSValue createJavaObject(const char *instanceName, const JniLocalRef<jobject> &object, const JObjectArrayLocalRef &methods) const;
-
   JSRuntime *m_runtime = nullptr;
   JSContext *m_ctx = nullptr;
   QuickJsUtils *m_utils = nullptr;

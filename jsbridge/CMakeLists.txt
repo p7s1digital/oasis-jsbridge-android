@@ -18,6 +18,7 @@ add_library(
     src/main/jni/de_prosiebensat1digital_oasisjsbridge_JsBridge.cpp
     src/main/jni/ArgumentLoader.cpp
     src/main/jni/JavaMethod.cpp
+    src/main/jni/JavaObject.cpp
     src/main/jni/JavaScriptLambda.cpp
     src/main/jni/JavaScriptMethod.cpp
     src/main/jni/JavaScriptObject.cpp
