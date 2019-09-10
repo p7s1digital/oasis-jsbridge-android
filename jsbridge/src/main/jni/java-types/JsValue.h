@@ -23,14 +23,14 @@ namespace JavaTypes {
 class JsValue : public JavaType {
 
 public:
-  JsValue(const JsBridgeContext *, const JniGlobalRef <jclass> &classRef);
+  JsValue(const JsBridgeContext *);
 
 #if defined(DUKTAPE)
-  JValue pop(bool inScript, const AdditionalData *) const override;
-  duk_ret_t push(const JValue &, bool inScript, const AdditionalData *) const override;
+  JValue pop(bool inScript) const override;
+  duk_ret_t push(const JValue &, bool inScript) const override;
 #elif defined(QUICKJS)
-  JValue toJava(JSValueConst, bool inScript, const AdditionalData *) const override;
-  JSValue fromJava(const JValue &, bool inScript, const AdditionalData *) const override;
+  JValue toJava(JSValueConst, bool inScript) const override;
+  JSValue fromJava(const JValue &, bool inScript) const override;
 #endif
 };
 

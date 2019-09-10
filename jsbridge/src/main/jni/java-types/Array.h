@@ -26,27 +26,19 @@ namespace JavaTypes {
 class Array : public JavaType {
 
 public:
-  Array(const JsBridgeContext *, const JniGlobalRef<jclass>& classRef, const JavaType& componentType);
+  Array(const JsBridgeContext *, std::unique_ptr<const JavaType> &&componentType);
 
 #if defined(DUKTAPE)
-  JValue pop(bool inScript, const AdditionalData *) const override;
-  duk_ret_t push(const JValue &, bool inScript, const AdditionalData *) const override;
+  JValue pop(bool inScript) const override;
+  duk_ret_t push(const JValue &, bool inScript) const override;
 #elif defined(QUICKJS)
-  JValue toJava(JSValueConst, bool inScript, const AdditionalData *) const override;
-  JSValue fromJava(const JValue &, bool inScript, const AdditionalData *) const override;
+  JValue toJava(JSValueConst, bool inScript) const override;
+  JSValue fromJava(const JValue &, bool inScript) const override;
 #endif
 
-  bool isInteger() const override {
-    return m_componentType.isInteger();
-  }
-
-  AdditionalData *createAdditionalPushData(const JniRef<jsBridgeParameter> &) const override;
-  AdditionalData *createAdditionalPopData(const JniRef<jsBridgeParameter> &) const override;
-
 private:
-  class AdditionalArrayData;
-
-  const JavaType &m_componentType;
+  JniGlobalRef<jclass> m_javaClass;
+  std::unique_ptr<const JavaType> m_componentType;
 };
 
 }  // namespace JavaTypes

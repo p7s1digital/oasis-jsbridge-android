@@ -408,7 +408,7 @@ struct JSString {
     struct list_head link; /* string list */
 #endif
     union {
-        uint8_t str8[0]; /* 8 bit strings will get an extra null terminator */
+        uint8_t str8[0]; /* 8 bit strings will create an extra null terminator */
         uint16_t str16[0];
     } u;
 };
@@ -713,7 +713,7 @@ struct JSObject {
     uint8_t extensible : 1;
     uint8_t free_mark : 1; /* only used when freeing objects with cycles */
     uint8_t is_exotic : 1; /* TRUE if object has exotic property handlers */
-    uint8_t fast_array : 1; /* TRUE if u.array is used for get/put */
+    uint8_t fast_array : 1; /* TRUE if u.array is used for create/put */
     uint8_t is_constructor : 1; /* TRUE if object is a constructor function */
     uint8_t is_uncatchable_error : 1; /* if TRUE, error is not catchable */
     uint8_t is_class : 1; /* TRUE if object is a class constructor */
@@ -1495,7 +1495,7 @@ int JS_ExecutePendingJob(JSRuntime *rt, JSContext **pctx)
         return 0;
     }
 
-    /* get the first pending job and execute it */
+    /* create the first pending job and execute it */
     e = list_entry(rt->job_list.next, JSJobEntry, link);
     list_del(&e->link);
     ctx = e->ctx;
@@ -4545,7 +4545,7 @@ static int js_method_set_properties(JSContext *ctx, JSValueConst func_obj,
 
     name_str = js_get_function_name(ctx, name);
     if (flags & JS_PROP_HAS_GET) {
-        name_str = JS_ConcatString3(ctx, "get ", name_str, "");
+        name_str = JS_ConcatString3(ctx, "create ", name_str, "");
     } else if (flags & JS_PROP_HAS_SET) {
         name_str = JS_ConcatString3(ctx, "set ", name_str, "");
     }
@@ -6762,7 +6762,7 @@ static int JS_CheckBrand(JSContext *ctx, JSValueConst obj, JSValueConst func)
     JSProperty *pr;
     JSValueConst brand;
     
-    /* get the home object of 'func' */
+    /* create the home object of 'func' */
     if (unlikely(JS_VALUE_GET_TAG(func) != JS_TAG_OBJECT)) {
     not_obj:
         JS_ThrowTypeErrorNotAnObject(ctx);
@@ -6784,7 +6784,7 @@ static int JS_CheckBrand(JSContext *ctx, JSValueConst obj, JSValueConst func)
     if (unlikely(JS_VALUE_GET_TAG(brand) != JS_TAG_SYMBOL))
         goto not_obj;
     
-    /* get the brand array of 'obj' */
+    /* create the brand array of 'obj' */
     if (unlikely(JS_VALUE_GET_TAG(obj) != JS_TAG_OBJECT))
         goto not_obj;
     p = JS_VALUE_GET_OBJ(obj);
@@ -14827,7 +14827,7 @@ static JSValue JS_CallInternal(JSContext *ctx, JSValueConst func_obj,
     if (unlikely(JS_VALUE_GET_TAG(func_obj) != JS_TAG_OBJECT)) {
         if (flags & CALL_FLAG_GENERATOR) {
             JSAsyncFunctionState *s = JS_VALUE_GET_PTR(func_obj);
-            /* func_obj get contains a pointer to JSFuncAsyncState */
+            /* func_obj create contains a pointer to JSFuncAsyncState */
             /* the stack frame is already allocated */
             sf = &s->frame;
             p = JS_VALUE_GET_OBJ(sf->cur_func);
@@ -17695,7 +17695,7 @@ static JSValue js_generator_next(JSContext *ctx, JSValueConst this_val,
                 argv = iter_args;
                 goto redo;
             } else {
-                /* get the return the yield value at the top of the stack */
+                /* create the return the yield value at the top of the stack */
                 ret = sf->cur_sp[-1];
                 sf->cur_sp[-1] = JS_UNDEFINED;
                 *pdone = FALSE;
@@ -20675,7 +20675,7 @@ static int __exception js_parse_property_name(JSParseState *s,
     if (allow_method) {
         if (token_is_pseudo_keyword(s, JS_ATOM_get)
         ||  token_is_pseudo_keyword(s, JS_ATOM_set)) {
-            /* get x(), set x() */
+            /* create x(), set x() */
             name = JS_DupAtom(s->ctx, s->token.u.ident.atom);
             if (next_token(s))
                 goto fail1;
@@ -21854,7 +21854,7 @@ static __exception int get_lvalue(JSParseState *s, int *popcode, int *pscope,
     int opcode, scope, label, depth;
     JSAtom name;
 
-    /* we check the last opcode to get the lvalue type */
+    /* we check the last opcode to create the lvalue type */
     fd = s->cur_func;
     scope = 0;
     name = JS_ATOM_NULL;
@@ -21904,7 +21904,7 @@ static __exception int get_lvalue(JSParseState *s, int *popcode, int *pscope,
     fd->last_opcode_pos = -1;
 
     if (keep) {
-        /* get the value but keep the object/fields on the stack */
+        /* create the value but keep the object/fields on the stack */
         switch(opcode) {
         case OP_scope_get_var:
             label = new_label(s);
@@ -22281,7 +22281,7 @@ static int js_parse_destructing_element(JSParseState *s, int tok, int is_arg,
                             emit_op(s, OP_define_array_el); /* TOS: src excludeList prop */
                             emit_op(s, OP_perm3); /* TOS: excludeList src prop */
                         }
-                        /* get the computed property from the source object */
+                        /* create the computed property from the source object */
                         emit_op(s, OP_get_array_el2);
                     } else {
                         /* named property */
@@ -22293,7 +22293,7 @@ static int js_parse_destructing_element(JSParseState *s, int tok, int is_arg,
                             emit_atom(s, prop_name);
                             emit_op(s, OP_swap); /* TOS: excludeList src */
                         }
-                        /* get the named property from the source object */
+                        /* create the named property from the source object */
                         emit_op(s, OP_get_field2);
                         emit_u32(s, prop_name);
                     }
@@ -22468,7 +22468,7 @@ static int js_parse_destructing_element(JSParseState *s, int tok, int is_arg,
         emit_op(s, OP_for_of_start);
         has_spread = FALSE;
         while (s->token.val != ']') {
-            /* get the next value */
+            /* create the next value */
             if (s->token.val == TOK_ELLIPSIS) {
                 if (next_token(s))
                     return -1;
@@ -24368,7 +24368,7 @@ static __exception int js_parse_for_in_of(JSParseState *s, int label_name,
         if (is_async) {
             /* call the next method */
             emit_op(s, OP_for_await_of_next);
-            /* get the result of the promise */
+            /* create the result of the promise */
             emit_op(s, OP_await);
             /* unwrap the value and done values */
             emit_op(s, OP_iterator_get_value_done);
@@ -27399,7 +27399,7 @@ static int optimize_scope_make_ref(JSContext *ctx, JSFunctionDef *s,
        for operations that can potentially change `a`:
        OP_scope_make_ref(a), function calls, jumps and gosub.
      */
-    /* replace the reference get/put with normal variable
+    /* replace the reference create/put with normal variable
        accesses */
     if (bc_buf[pos_next] == OP_get_ref_value) {
         dbuf_putc(bc, get_op);
@@ -27439,7 +27439,7 @@ static int optimize_scope_make_global_ref(JSContext *ctx, JSFunctionDef *s,
     BOOL is_strict;
     is_strict = ((s->js_mode & JS_MODE_STRICT) != 0);
 
-    /* replace the reference get/put with normal variable
+    /* replace the reference create/put with normal variable
        accesses */
     if (is_strict) {
         /* need to check if the variable exists before evaluating the right
@@ -29366,7 +29366,7 @@ static __exception int resolve_labels(JSContext *ctx, JSFunctionDef *s)
 
         case OP_line_num:
             /* line number info (for debug). We put it in a separate
-               compressed table to reduce memory usage and get better
+               compressed table to reduce memory usage and create better
                performance */
             line_num = get_u32(bc_buf + pos + 1);
             break;
@@ -33238,7 +33238,7 @@ static int JS_InstantiateFunctionListItem(JSContext *ctx, JSObject *p,
 
             getter = JS_UNDEFINED;
             if (e->u.getset.get.generic) {
-                snprintf(buf, sizeof(buf), "get %s", e->name);
+                snprintf(buf, sizeof(buf), "create %s", e->name);
                 getter = JS_NewCFunction2(ctx, e->u.getset.get.generic,
                                           buf, 0, e->def_type == JS_DEF_CGETSET_MAGIC ? JS_CFUNC_getter_magic : JS_CFUNC_getter,
                                           e->magic);
@@ -41878,7 +41878,7 @@ static const JSCFunctionListEntry js_reflect_funcs[] = {
     JS_CFUNC_DEF("construct", 2, js_reflect_construct ),
     JS_CFUNC_MAGIC_DEF("defineProperty", 3, js_object_defineProperty, 1 ),
     JS_CFUNC_DEF("deleteProperty", 2, js_reflect_deleteProperty ),
-    JS_CFUNC_DEF("get", 2, js_reflect_get ),
+    JS_CFUNC_DEF("create", 2, js_reflect_get ),
     JS_CFUNC_MAGIC_DEF("getOwnPropertyDescriptor", 2, js_object_getOwnPropertyDescriptor, 1 ),
     JS_CFUNC_MAGIC_DEF("getPrototypeOf", 1, js_object_getPrototypeOf, 1 ),
     JS_CFUNC_DEF("has", 2, js_reflect_has ),
@@ -42175,7 +42175,7 @@ static JSValue js_proxy_get(JSContext *ctx, JSValueConst obj, JSAtom atom,
             fail:
                 js_free_desc(ctx, &desc);
                 JS_FreeValue(ctx, ret);
-                return JS_ThrowTypeError(ctx, "proxy: inconsistent get");
+                return JS_ThrowTypeError(ctx, "proxy: inconsistent create");
             }
         }
         js_free_desc(ctx, &desc);
@@ -43615,7 +43615,7 @@ static JSValue js_map_iterator_next(JSContext *ctx, JSValueConst this_val,
         mr = list_entry(el, JSMapRecord, link);
         if (!mr->empty)
             break;
-        /* get the next record */
+        /* create the next record */
         el = mr->link.next;
     }
 
@@ -43647,7 +43647,7 @@ static const JSCFunctionListEntry js_map_funcs[] = {
 
 static const JSCFunctionListEntry js_map_proto_funcs[] = {
     JS_CFUNC_MAGIC_DEF("set", 2, js_map_set, 0 ),
-    JS_CFUNC_MAGIC_DEF("get", 1, js_map_get, 0 ),
+    JS_CFUNC_MAGIC_DEF("create", 1, js_map_get, 0 ),
     JS_CFUNC_MAGIC_DEF("has", 1, js_map_has, 0 ),
     JS_CFUNC_MAGIC_DEF("delete", 1, js_map_delete, 0 ),
     JS_CFUNC_MAGIC_DEF("clear", 0, js_map_clear, 0 ),
@@ -43686,7 +43686,7 @@ static const JSCFunctionListEntry js_set_iterator_proto_funcs[] = {
 
 static const JSCFunctionListEntry js_weak_map_proto_funcs[] = {
     JS_CFUNC_MAGIC_DEF("set", 2, js_map_set, MAGIC_WEAK ),
-    JS_CFUNC_MAGIC_DEF("get", 1, js_map_get, MAGIC_WEAK ),
+    JS_CFUNC_MAGIC_DEF("create", 1, js_map_get, MAGIC_WEAK ),
     JS_CFUNC_MAGIC_DEF("has", 1, js_map_has, MAGIC_WEAK ),
     JS_CFUNC_MAGIC_DEF("delete", 1, js_map_delete, MAGIC_WEAK ),
     JS_PROP_STRING_DEF("[Symbol.toStringTag]", "WeakMap", JS_PROP_CONFIGURABLE ),
@@ -47033,7 +47033,7 @@ void JS_AddIntrinsicBaseObjects(JSContext *ctx)
     ctx->throw_type_error = JS_NewCFunction(ctx, js_throw_type_error, NULL, 0);
 
     /* add caller and arguments properties to throw a TypeError */
-    obj1 = JS_NewCFunction(ctx, js_function_proto_caller, "get caller", 0);
+    obj1 = JS_NewCFunction(ctx, js_function_proto_caller, "create caller", 0);
     JS_DefineProperty(ctx, ctx->function_proto, JS_ATOM_caller, JS_UNDEFINED,
                       obj1, ctx->throw_type_error,
                       JS_PROP_HAS_GET | JS_PROP_HAS_SET |
@@ -47437,7 +47437,7 @@ void JS_DetachArrayBuffer(JSContext *ctx, JSValueConst obj)
     }
 }
 
-/* get an ArrayBuffer or SharedArrayBuffer */
+/* create an ArrayBuffer or SharedArrayBuffer */
 static JSArrayBuffer *js_get_array_buffer(JSContext *ctx, JSValueConst obj)
 {
     JSObject *p;

@@ -19,6 +19,7 @@
 #include "JavaObject.h"
 
 #include "JavaMethod.h"
+#include "JavaType.h"
 #include "JsBridgeContext.h"
 
 #if defined(DUKTAPE)

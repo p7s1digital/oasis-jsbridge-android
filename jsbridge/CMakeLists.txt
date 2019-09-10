@@ -16,23 +16,27 @@ add_library(
 
     src/main/jni/custom_stringify.cpp
     src/main/jni/de_prosiebensat1digital_oasisjsbridge_JsBridge.cpp
-    src/main/jni/ArgumentLoader.cpp
+    src/main/jni/log.cpp
     src/main/jni/JavaMethod.cpp
     src/main/jni/JavaObject.cpp
     src/main/jni/JavaScriptLambda.cpp
     src/main/jni/JavaScriptMethod.cpp
     src/main/jni/JavaScriptObject.cpp
-    src/main/jni/JavaTypeMap.cpp
-    src/main/jni/log.cpp
+    src/main/jni/JavaType.cpp
+    src/main/jni/JavaTypeProvider.cpp
+    src/main/jni/JavaTypeId.cpp
     src/main/jni/java-types/Array.cpp
     src/main/jni/java-types/Boolean.cpp
     src/main/jni/java-types/BoxedPrimitive.cpp
     src/main/jni/java-types/Double.cpp
     src/main/jni/java-types/Float.cpp
+    src/main/jni/java-types/FunctionX.cpp
     src/main/jni/java-types/Integer.cpp
+    src/main/jni/java-types/JsonObjectWrapper.cpp
     src/main/jni/java-types/JsValue.cpp
     src/main/jni/java-types/Long.cpp
     src/main/jni/java-types/Object.cpp
+    src/main/jni/java-types/Primitive.cpp
     src/main/jni/java-types/String.cpp
     src/main/jni/java-types/Void.cpp
     src/main/jni/jni-helpers/JniContext.cpp
@@ -46,15 +50,12 @@ if (FLAVOR STREQUAL "DUKTAPE")
     include_directories(src/duktape/jni)
 
     target_sources(${JNI_LIB_NAME} PUBLIC
+        src/main/jni/DuktapeUtils.cpp
+        src/main/jni/JsBridgeContext_duktape.cpp
         src/main/jni/duk_console.cpp
         src/main/jni/duktape/duk_trans_socket_unix.c
         src/main/jni/duktape/duktape.cpp
-        src/main/jni/DuktapeUtils.cpp
-        src/main/jni/JavaType_duktape.cpp
-        src/main/jni/JsBridgeContext_duktape.cpp
         src/main/jni/java-types/Deferred_duktape.cpp
-        src/main/jni/java-types/FunctionX_duktape.cpp
-        src/main/jni/java-types/JsonObjectWrapper_duktape.cpp
     )
 elseif (FLAVOR STREQUAL "QUICKJS")
     file (STRINGS "src/main/jni/quickjs/VERSION" QUICKJS_VERSION)
@@ -63,17 +64,14 @@ elseif (FLAVOR STREQUAL "QUICKJS")
     include_directories(src/quickjs/jni)
 
     target_sources(${JNI_LIB_NAME} PUBLIC
+        src/main/jni/JsBridgeContext_quickjs.cpp
+        src/main/jni/QuickJsUtils.cpp
         src/main/jni/quickjs_console.cpp
         src/main/jni/quickjs/cutils.c
         src/main/jni/quickjs/libregexp.c
         src/main/jni/quickjs/libunicode.c
         src/main/jni/quickjs/quickjs.c
-        src/main/jni/JavaType_quickjs.cpp
-        src/main/jni/JsBridgeContext_quickjs.cpp
-        src/main/jni/QuickJsUtils.cpp
         src/main/jni/java-types/Deferred_quickjs.cpp
-        src/main/jni/java-types/FunctionX_quickjs.cpp
-        src/main/jni/java-types/JsonObjectWrapper_quickjs.cpp
     )
 endif (FLAVOR STREQUAL "DUKTAPE")
 

@@ -26,6 +26,7 @@ class JsException(val jsonValue: String? = null, detailedMessage: String, jsStac
 
     init {
         Timber.v("JsException() - detailedMessage = $detailedMessage")
+        Timber.v("JsException() - jsStackTrace = $jsStackTrace")
 
         // Parses `StackTraceElement`s from `jsStackTrace` and prepend them to the Java stack trace
         stackTrace = jsStackTrace.orEmpty().split('\n')
@@ -39,9 +40,18 @@ class JsException(val jsonValue: String? = null, detailedMessage: String, jsStac
         // - QuickJS stack trace strings have multiple lines of the format "    at func (file.ext)".
         // "func" is optional, but we'll omit frames without a function, since it means the frame is in
         // native code.
-        private val STACK_TRACE_PATTERN = Pattern.compile("\\s*at ([^\\s^\\[]+) \\(([^\\s:]+):?(\\d+)?\\).*$")
+        private val STACK_TRACE_PATTERN: Pattern
         /** Java StackTraceElements require a class name.  We don't have one in JS, so use this.  */
         private const val STACK_TRACE_CLASS_NAME = "JavaScript"
+
+        init {
+            STACK_TRACE_PATTERN = if (BuildConfig.FLAVOR == "duktape")
+                Pattern.compile("\\s*at ([^\\s^\\[]+ ) ?\\(?([^\\s:]+):?(\\d+)?\\).*$")
+            else if (BuildConfig.FLAVOR == "quickjs")
+                Pattern.compile("\\s*at ([^\\s^\\[]+) \\(([^\\s]+):(\\d+)\\).*$");
+            else
+                throw JsBridgeError.InternalError(customMessage = "Unsupported flavor: ${BuildConfig.FLAVOR}")
+        }
 
         private fun toStackTraceElement(s: String): StackTraceElement? {
             val m = STACK_TRACE_PATTERN.matcher(s)
@@ -53,7 +63,7 @@ class JsException(val jsonValue: String? = null, detailedMessage: String, jsStac
 
             val m3 = if (m.groupCount() >= 3) m.group(3) else null
             return StackTraceElement(
-                STACK_TRACE_CLASS_NAME, m.group(1), m.group(2),
+                STACK_TRACE_CLASS_NAME, m.group(1) ?: "<unknown func>", m.group(2),
                 m3?.toInt() ?: 0
             )
         }

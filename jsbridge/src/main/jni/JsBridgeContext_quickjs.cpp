@@ -15,15 +15,17 @@
  */
 #include "JsBridgeContext.h"
 
-#include "ArgumentLoader.h"
 #include "JavaObject.h"
 #include "JavaScriptLambda.h"
 #include "JavaScriptObject.h"
 #include "JavaType.h"
+#include "JavaTypeProvider.h"
 #include "QuickJsUtils.h"
-#include "quickjs_console.h"
-#include "log.h"
+#include "java-types/Deferred.h"
+#include "java-types/Object.h"
 #include "custom_stringify.h"
+#include "log.h"
+#include "quickjs_console.h"
 #include <functional>
 
 
@@ -45,7 +47,7 @@ namespace {
 // ---
 
 JsBridgeContext::JsBridgeContext()
- : m_javaTypes() {
+ : m_javaTypeProvider(this) {
 }
 
 JsBridgeContext::~JsBridgeContext() {
@@ -72,8 +74,6 @@ void JsBridgeContext::init(JniContext *jniContext) {
   // No JS_FreeValue(m_ctx, cppWrapperObj) after JS_SetPropertyStr()
   JS_FreeValue(m_ctx, globalObj);
 
-  m_objectType = m_javaTypes.getObjectType(this);
-
   // Set global + window (TODO)
   // See also https://wiki.duktape.org/howtoglobalobjectreference
   static const char *str1 = "var global = this; var window = this; window.open = function() {};\n";
@@ -93,7 +93,6 @@ void JsBridgeContext::cancelDebug() {
 
 JValue JsBridgeContext::evaluateString(const std::string &strCode, const JniLocalRef<jsBridgeParameter> &returnParameter,
                                       bool awaitJsPromise) const {
-
   JSValue v = JS_Eval(m_ctx, strCode.c_str(), strCode.size(), "JsBridgeContext/evaluateString", 0);
 
   if (JS_IsException(v)) {
@@ -108,13 +107,13 @@ JValue JsBridgeContext::evaluateString(const std::string &strCode, const JniLoca
     // No return type given: try to guess it out of the JS value
     if (JS_IsBool(v) || JS_IsNumber(v) || JS_IsString(v)) {
       // The result is a supported scalar type - return it.
-      JValue ret = m_objectType->toJava(v, false, nullptr);
+      JValue ret = m_javaTypeProvider.getObjectType()->toJava(v, false);
       JS_FreeValue(m_ctx, v);
       return ret;
     }
 
     if (JS_IsArray(m_ctx, v)) {
-      JValue ret = m_objectType->toJavaArray(v, false, nullptr);
+      JValue ret = m_javaTypeProvider.getObjectType()->toJavaArray(v, false);
       JS_FreeValue(m_ctx, v);
       return ret;
     }
@@ -124,20 +123,13 @@ JValue JsBridgeContext::evaluateString(const std::string &strCode, const JniLoca
     return JValue();
   }
 
-  const JniRef<jclass> &jsBridgeParameterClass = jniContext()->getJsBridgeParameterClass();
-  jmethodID getParameterClass = jniContext()->getMethodID(jsBridgeParameterClass, "getJava", "()Ljava/lang/Class;");
-  JniLocalRef<jclass> returnClass = jniContext()->callObjectMethod<jclass>(returnParameter, getParameterClass);
-
-  const JavaType *returnType = m_javaTypes.get(this, returnClass, true /*boxed*/);
-
-  ArgumentLoader argumentLoader(returnType, returnParameter, false);
+  auto returnType = m_javaTypeProvider.makeUniqueType(returnParameter, true /*boxed*/);
 
   JValue value;
-
   if (isDeferred && !returnType->isDeferred()) {
-    value = argumentLoader.toJavaDeferred(v, &m_javaTypes);
+    value = m_javaTypeProvider.getDeferredType(returnParameter)->toJava(v, false /*inScript*/);
   } else {
-    value = argumentLoader.toJava(v);
+    value = returnType->toJava(v, false);
   }
 
   JS_FreeValue(m_ctx, v);
@@ -154,7 +146,7 @@ void JsBridgeContext::evaluateFileContent(const std::string &strCode, const std:
 }
 
 void JsBridgeContext::registerJavaObject(const std::string &strName, const JniLocalRef<jobject> &object,
-                                        const JObjectArrayLocalRef &methods) {
+                                         const JObjectArrayLocalRef &methods) {
 
   JSValue globalObj = JS_GetGlobalObject(m_ctx);
   if (m_utils->hasPropertyStr(globalObj, strName.c_str())) {
@@ -331,37 +323,6 @@ void JsBridgeContext::newJsFunction(const std::string &strGlobalName, const JObj
   JS_FreeValue(m_ctx, globalObj);
 }
 
-void JsBridgeContext::completeJsPromise(const std::string &strId, bool isFulfilled, const JniLocalRef<jobject> &value, const JniLocalRef<jclass> &valueClass) {
-  // Get the global PromiseObject
-  JSValue globalObj = JS_GetGlobalObject(m_ctx);
-  JSValue promiseObj = JS_GetPropertyStr(m_ctx, globalObj, strId.c_str());
-  JS_FreeValue(m_ctx, globalObj);
-  if (!JS_IsObject(promiseObj)) {
-    alog("Could not find PromiseObject with id %s", strId.c_str());
-    return;
-  }
-
-  // Get the resolve/reject function
-  const char *resolveOrRejectStr = isFulfilled ? "resolve" : "reject";
-  JSValue resolveOrReject = JS_GetPropertyStr(m_ctx, promiseObj, resolveOrRejectStr);
-  if (JS_IsFunction(m_ctx, resolveOrReject)) {
-    // Call it with the Promise value
-    JSValue promiseParam = m_javaTypes.get(this, valueClass)->fromJava(JValue(value), false /*inScript*/, nullptr);
-    JSValue ret = JS_Call(m_ctx, resolveOrReject, promiseObj, 1, &promiseParam);
-    if (JS_IsException(ret)) {
-      alog("Could not complete Promise with id %s", strId.c_str());
-    }
-
-    JS_FreeValue(m_ctx, ret);
-    JS_FreeValue(m_ctx, promiseParam);
-  } else {
-    alog("Could not complete Promise with id %s: cannot find %s", strId.c_str(), resolveOrRejectStr);
-  }
-
-  JS_FreeValue(m_ctx, resolveOrReject);
-  JS_FreeValue(m_ctx, promiseObj);
-}
-
 void JsBridgeContext::processPromiseQueue() {
   JSContext *ctx1;
   int err;
@@ -375,6 +336,14 @@ void JsBridgeContext::processPromiseQueue() {
       }
       break;
     }
+  }
+}
+
+void JsBridgeContext::throwTypeException(const std::string &message, bool inScript) const {
+  if (inScript) {
+    JS_ThrowTypeError(m_ctx, "%s", message.c_str());
+  } else {
+    throw std::invalid_argument(message);
   }
 }
 

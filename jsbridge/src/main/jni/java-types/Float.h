@@ -26,36 +26,30 @@ namespace JavaTypes {
 class Float : public Primitive {
 
 public:
-  Float(const JsBridgeContext *, const JniGlobalRef<jclass>& classRef, const JniGlobalRef<jclass>& boxedClassRef);
+  Float(const JsBridgeContext *);
 
 #if defined(DUKTAPE)
-  JValue pop(bool inScript, const AdditionalData *) const override;
-  JValue popArray(uint32_t count, bool expanded, bool inScript, const AdditionalData *) const override;
+  JValue pop(bool inScript) const override;
+  JValue popArray(uint32_t count, bool expanded, bool inScript) const override;
 
-  duk_ret_t push(const JValue &, bool inScript, const AdditionalData *) const override;
-  duk_ret_t pushArray(const JniLocalRef<jarray> &values, bool expand, bool inScript, const AdditionalData *) const override;
+  duk_ret_t push(const JValue &, bool inScript) const override;
+  duk_ret_t pushArray(const JniLocalRef<jarray> &values, bool expand, bool inScript) const override;
 #elif defined(QUICKJS)
-  JValue toJava(JSValueConst, bool inScript, const AdditionalData *) const override;
-  JValue toJavaArray(JSValueConst, bool inScript, const AdditionalData *) const override;
+  JValue toJava(JSValueConst, bool inScript) const override;
+  JValue toJavaArray(JSValueConst, bool inScript) const override;
 
-  JSValue fromJava(const JValue &, bool inScript, const AdditionalData *) const override;
-  JSValue fromJavaArray(const JniLocalRef<jarray> &values, bool inScript, const AdditionalData *) const override;
+  JSValue fromJava(const JValue &, bool inScript) const override;
+  JSValue fromJavaArray(const JniLocalRef<jarray> &values, bool inScript) const override;
 #endif
 
   JValue callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
                     const std::vector<JValue> &args) const override;
 
-  JniLocalRef<jclass> getArrayClass() const override;
+  JavaTypeId arrayId() const override { return JavaTypeId::FloatArray; }
 
-  const char* getUnboxSignature() const override {
-    return "()F";
-  }
-  const char* getUnboxMethodName() const override {
-    return "floatValue";
-  }
-  const char* getBoxSignature() const override {
-    return "(F)Ljava/lang/Float;";
-  }
+private:
+  JValue box(const JValue &) const override;
+  JValue unbox(const JValue &) const override;
 };
 
 }  // namespace JavaTypes

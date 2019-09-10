@@ -17,7 +17,7 @@
  * limitations under the License.
  */
 #include "String.h"
-#include "../JsBridgeContext.h"
+#include "JsBridgeContext.h"
 
 #if defined(DUKTAPE)
 # include "StackChecker.h"
@@ -27,21 +27,14 @@
 
 namespace JavaTypes {
 
-String::String(const JsBridgeContext *jsBridgeContext, const JniGlobalRef<jclass>& classRef)
- : JavaType(jsBridgeContext, classRef) {
+String::String(const JsBridgeContext *jsBridgeContext)
+ : JavaType(jsBridgeContext, JavaTypeId::String) {
 }
 
 #if defined(DUKTAPE)
 
-JValue String::pop(bool inScript, const AdditionalData *) const {
+JValue String::pop(bool inScript) const {
   CHECK_STACK_OFFSET(m_ctx, -1);
-
-  if (!inScript && !duk_is_string(m_ctx, -1) && !duk_is_null(m_ctx, -1)) {
-    const auto message =
-        std::string("Cannot convert popped JS value ") + duk_safe_to_string(m_ctx, -1) + " to String";
-    duk_pop(m_ctx);
-    throw std::invalid_argument(message);
-  }
 
   // Check if the caller passed in a null string.
   if (duk_is_null_or_undefined(m_ctx, -1)) {
@@ -49,12 +42,12 @@ JValue String::pop(bool inScript, const AdditionalData *) const {
     return JValue();
   }
 
-  JStringLocalRef stringLocalRef(m_jniContext, duk_require_string(m_ctx, -1));
+  JStringLocalRef stringLocalRef(m_jniContext, duk_safe_to_string(m_ctx, -1));
   duk_pop(m_ctx);
   return JValue(stringLocalRef);
 }
 
-duk_ret_t String::push(const JValue &value, bool inScript, const AdditionalData *) const {
+duk_ret_t String::push(const JValue &value, bool inScript) const {
   CHECK_STACK_OFFSET(m_ctx, 1);
 
   if (value.isNull()) {
@@ -74,12 +67,7 @@ duk_ret_t String::push(const JValue &value, bool inScript, const AdditionalData 
 
 #elif defined(QUICKJS)
 
-JValue String::toJava(JSValueConst v, bool inScript, const AdditionalData *) const {
-  if (!inScript && !JS_IsString(v) && !JS_IsNull(v)) {
-    const auto message = "Cannot convert JS value to String";
-    throw std::invalid_argument(message);
-  }
-
+JValue String::toJava(JSValueConst v, bool inScript) const {
   // Check if the caller passed in a null string.
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
     return JValue();
@@ -89,7 +77,7 @@ JValue String::toJava(JSValueConst v, bool inScript, const AdditionalData *) con
   return JValue(stringLocalRef);
 }
 
-JSValue String::fromJava(const JValue &value, bool inScript, const AdditionalData *) const {
+JSValue String::fromJava(const JValue &value, bool inScript) const {
   if (value.isNull()) {
     return JS_NULL;
   }

@@ -23,14 +23,14 @@ namespace JavaTypes {
 class JsonObjectWrapper : public JavaType {
 
 public:
-  explicit JsonObjectWrapper(const JsBridgeContext *, const JniGlobalRef <jclass> &classRef);
+  explicit JsonObjectWrapper(const JsBridgeContext *);
 
 #if defined(DUKTAPE)
-  JValue pop(bool inScript, const AdditionalData *) const override;
-  duk_ret_t push(const JValue &value, bool inScript, const AdditionalData *) const override;
+    JValue pop(bool inScript) const override;
+    duk_ret_t push(const JValue &value, bool inScript) const override;
 #elif defined(QUICKJS)
-  JValue toJava(JSValueConst, bool inScript, const AdditionalData *) const override;
-  JSValue fromJava(const JValue &value, bool inScript, const AdditionalData *) const override;
+    JValue toJava(JSValueConst, bool inScript) const override;
+    JSValue fromJava(const JValue &value, bool inScript) const override;
 #endif
 };
 

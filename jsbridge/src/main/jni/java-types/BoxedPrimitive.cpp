@@ -29,16 +29,14 @@
 
 namespace JavaTypes {
 
-BoxedPrimitive::BoxedPrimitive(const JsBridgeContext *jsBridgeContext, const Primitive &primitive)
-  : JavaType(jsBridgeContext, primitive.boxedClass())
-  , m_primitive(primitive)
-  , m_unbox(m_jniContext->getMethodID(primitive.boxedClass(), primitive.getUnboxMethodName(), primitive.getUnboxSignature()))
-  , m_box(m_jniContext->getStaticMethodID(primitive.boxedClass(), primitive.getBoxMethodName(), primitive.getBoxSignature())) {
+BoxedPrimitive::BoxedPrimitive(const JsBridgeContext *jsBridgeContext, std::unique_ptr<Primitive> primitive)
+ : JavaType(jsBridgeContext, primitive->boxedId())
+ , m_primitive(std::move(primitive)) {
 }
 
 #if defined(DUKTAPE)
 
-JValue BoxedPrimitive::pop(bool inScript, const AdditionalData *) const {
+JValue BoxedPrimitive::pop(bool inScript) const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
   if (duk_is_null_or_undefined(m_ctx, -1)) {
@@ -46,14 +44,11 @@ JValue BoxedPrimitive::pop(bool inScript, const AdditionalData *) const {
     return JValue();
   }
 
-  JValue primitiveValue = m_primitive.pop(inScript, nullptr);
-  JniLocalRef<jobject> localRef = m_jniContext->callStaticObjectMethodA(
-      m_primitive.boxedClass(), m_box, std::vector<JValue> { primitiveValue });
-  m_jsBridgeContext->checkRethrowJsError();
-  return JValue(localRef);
+  JValue primitiveValue = m_primitive->pop(inScript);
+  return m_primitive->box(primitiveValue);
 }
 
-duk_ret_t BoxedPrimitive::push(const JValue &value, bool inScript, const AdditionalData *) const {
+duk_ret_t BoxedPrimitive::push(const JValue &value, bool inScript) const {
   CHECK_STACK_OFFSET(m_ctx, 1);
 
   const JniLocalRef<jobject> &jObject = value.getLocalRef();
@@ -62,41 +57,31 @@ duk_ret_t BoxedPrimitive::push(const JValue &value, bool inScript, const Additio
     return 1;
   }
 
-  JValue unboxedValue = m_primitive.callMethod(m_unbox, jObject, std::vector<JValue>());  // TODO: check it!
-  m_jsBridgeContext->checkRethrowJsError();
-  return m_primitive.push(unboxedValue, inScript, nullptr /*TODO?*/);
+  return m_primitive->push(m_primitive->unbox(value), inScript);
 }
 
 #elif defined(QUICKJS)
 
-JValue BoxedPrimitive::toJava(JSValueConst v, bool inScript, const AdditionalData *) const {
+JValue BoxedPrimitive::toJava(JSValueConst v, bool inScript) const {
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
     return JValue();
   }
 
-  JValue primitiveValue = m_primitive.toJava(v, inScript, nullptr);
-  JniLocalRef<jobject> localRef = m_jniContext->callStaticObjectMethodA(
-      m_primitive.boxedClass(), m_box, std::vector<JValue> { primitiveValue });
-  m_jsBridgeContext->checkRethrowJsError();
-  return JValue(localRef);
+  JValue primitiveValue = m_primitive->toJava(v, inScript);
+  return JValue(m_primitive->box(primitiveValue));
 }
 
-JSValue BoxedPrimitive::fromJava(const JValue &value, bool inScript, const AdditionalData *) const {
+JSValue BoxedPrimitive::fromJava(const JValue &value, bool inScript) const {
   const JniLocalRef<jobject> &jObject = value.getLocalRef();
   if (jObject.isNull()) {
     return JS_NULL;
   }
 
-  JValue unboxedValue = m_primitive.callMethod(m_unbox, jObject, std::vector<JValue>());  // TODO: check it!
-  m_jsBridgeContext->checkRethrowJsError();
-  return m_primitive.fromJava(unboxedValue, inScript, nullptr /*TODO?*/);
+  JValue unboxedValue = m_primitive->unbox(value);
+  return m_primitive->fromJava(unboxedValue, inScript);
 }
 
 #endif
-
-bool BoxedPrimitive::isInteger() const {
-  return m_primitive.isInteger();
-}
 
 }  // namespace JavaTypes
 

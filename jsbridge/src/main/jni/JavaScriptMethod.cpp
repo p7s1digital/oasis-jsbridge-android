@@ -17,7 +17,6 @@
  * limitations under the License.
  */
 #include "JavaScriptMethod.h"
-#include "ArgumentLoader.h"
 #include "JsBridgeContext.h"
 #include "JavaType.h"
 #include "jni-helpers/JniContext.h"
@@ -31,20 +30,17 @@ JavaScriptMethod::JavaScriptMethod(const JsBridgeContext *jsBridgeContext, const
  , m_isLambda(isLambda) {
 
   JniContext *jniContext = jsBridgeContext->jniContext();
-  const JavaTypeMap &javaTypes = jsBridgeContext->getJavaTypes();
+  const JavaTypeProvider &javaTypeProvider = jsBridgeContext->getJavaTypeProvider();
 
   const JniRef<jclass> &jsBridgeMethodClass = jniContext->getJsBridgeMethodClass();
   const JniRef<jclass> &jsBridgeParameterClass = jniContext->getJsBridgeParameterClass();
-
-  jmethodID getParameterClass = jniContext->getMethodID(jsBridgeParameterClass, "getJava", "()Ljava/lang/Class;");
 
   {
     // Create return value loader
     jmethodID getReturnParameter = jniContext->getMethodID(jsBridgeMethodClass, "getReturnParameter", "()Lde/prosiebensat1digital/oasisjsbridge/Parameter;");
     JniLocalRef<jsBridgeParameter> returnParameter = jniContext->callObjectMethod<jsBridgeParameter>(method, getReturnParameter);
-    JniLocalRef<jclass> returnClass = jniContext->callObjectMethod<jclass>(returnParameter, getParameterClass);
-    const JavaType *returnType = jsBridgeContext->getJavaTypes().get(jsBridgeContext, returnClass, true /*boxed*/);
-    m_returnValueLoader = new ArgumentLoader(returnType, returnParameter, false);
+    m_returnValueType = std::move(javaTypeProvider.makeUniqueType(returnParameter, true /*boxed*/));
+    m_returnValueParameter = JniGlobalRef<jsBridgeParameter>(returnParameter);
   }
 
   jmethodID isVarArgsMethod = jniContext->getMethodID(jsBridgeMethodClass, "isVarArgs", "()Z");
@@ -57,56 +53,43 @@ JavaScriptMethod::JavaScriptMethod(const JsBridgeContext *jsBridgeContext, const
   // Release any local objects allocated in this frame when we leave this scope.
   //const JniLocalFrame localFrame(jniContext, numArgs);
 
-  m_argumentLoaders.resize(numParameters);
+  m_argumentTypes.resize(numParameters);
 
   // Create ArgumentLoader instances
   for (jsize i = 0; i < numParameters; ++i) {
     JniLocalRef<jsBridgeParameter> parameter = parameters.getElement<jsBridgeParameter >(i);
-    JniLocalRef<jclass> javaClass = jniContext->callObjectMethod<jclass>(parameter, getParameterClass);
 
     if (m_isVarArgs && i == numParameters - 1) {
-        const JavaType *javaType = javaTypes.get(jsBridgeContext, javaClass);
-        m_argumentLoaders[i] = new ArgumentLoader(javaType, parameter, false);
+        auto javaType = javaTypeProvider.makeUniqueType(parameter, false /*boxed*/);
+        m_argumentTypes[i] = std::move(javaType);
         break;
     }
 
     // Always load the boxed type instead of the primitive type (e.g. Integer vs int)
     // because we are going to a Proxy object
-    const JavaType *javaType = javaTypes.get(jsBridgeContext, javaClass, true /*boxed*/);
-
-    m_argumentLoaders[i] = new ArgumentLoader(javaType, parameter, false);
+    auto javaType = javaTypeProvider.makeUniqueType(parameter, true /*boxed*/);
+    m_argumentTypes[i] = std::move(javaType);
   }
 }
 
 JavaScriptMethod::JavaScriptMethod(JavaScriptMethod &&other) noexcept
  : m_methodName(std::move(other.m_methodName))
- , m_returnValueLoader(other.m_returnValueLoader)
- , m_argumentLoaders(std::move(other.m_argumentLoaders))
+ , m_returnValueType(std::move(other.m_returnValueType))
+ , m_returnValueParameter(std::move(other.m_returnValueParameter))
+ , m_argumentTypes(std::move(other.m_argumentTypes))
  , m_isVarArgs(other.m_isVarArgs)
  , m_isLambda(other.m_isLambda) {
-
-  other.m_returnValueLoader = nullptr;
-  other.m_argumentLoaders = std::vector<ArgumentLoader *>();
 }
 
 JavaScriptMethod &JavaScriptMethod::operator=(JavaScriptMethod &&other) noexcept {
   m_methodName = std::move(other.m_methodName);
-  m_returnValueLoader = other.m_returnValueLoader;
-  other.m_returnValueLoader = nullptr;
-  m_argumentLoaders = std::move(other.m_argumentLoaders);
-  other.m_argumentLoaders = std::vector<ArgumentLoader *>();
+  m_returnValueType = std::move(other.m_returnValueType);
+  m_returnValueParameter = std::move(other.m_returnValueParameter);
+  m_argumentTypes = std::move(other.m_argumentTypes);
   m_isVarArgs = other.m_isVarArgs;
   m_isLambda = other.m_isLambda;
 
   return *this;
-}
-
-JavaScriptMethod::~JavaScriptMethod() {
-  for (auto argumentLoader : m_argumentLoaders) {
-    delete argumentLoader;
-  }
-
-  delete m_returnValueLoader;
 }
 
 #if defined(DUKTAPE)
@@ -134,13 +117,13 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, void *js
 
   for (jsize i = 0; i < numArguments; ++i) {
     JValue arg(args.getElement(i));
-    const ArgumentLoader *argumentLoader = m_argumentLoaders[i];
+    const auto &argumentType = m_argumentTypes[i];
     try {
       if (m_isVarArgs && i == numArguments - 1) {
-        numArguments = i + argumentLoader->pushArray(arg.getLocalRef().staticCast<jarray>(), true);
+        numArguments = i + argumentType->pushArray(arg.getLocalRef().staticCast<jarray>(), true /*expand*/, false /*inScript*/);
         break;
       }
-      argumentLoader->push(arg);
+      argumentType->push(arg, false /*inScript*/);
     } catch (const std::invalid_argument &e) {
       duk_pop_n(ctx, (m_isLambda ? 1 : 2) + i);  // lambda: func + args, method: obj + methodName + args
       throw e;
@@ -157,11 +140,10 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, void *js
   if (ret == DUK_EXEC_SUCCESS) {
     try {
       bool isDeferred = awaitJsPromise && duk_is_object(ctx, -1) && duk_has_prop_string(ctx, -1, "then");
-      if (isDeferred && !m_returnValueLoader->getJavaType()->isDeferred()) {
-        const JavaTypeMap &javaTypeMap = jsBridgeContext->getJavaTypes();
-        result = m_returnValueLoader->popDeferred(&javaTypeMap);
+      if (isDeferred && !m_returnValueType->isDeferred()) {
+        result = jsBridgeContext->getJavaTypeProvider().getDeferredType(m_returnValueParameter)->pop(false /*inScript*/);
       } else {
-        result = m_returnValueLoader->pop();
+        result = m_returnValueType->pop(false /*inScript*/);
       }
     } catch (const std::invalid_argument &e) {
       throw e;
@@ -188,13 +170,14 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, JSValueC
   JSValue jsArgs[numArguments];
   for (jsize i = 0; i < numArguments; ++i) {
     JValue javaArg(javaArgs.getElement(i));
-    const ArgumentLoader *argumentLoader = m_argumentLoaders[i];
+    const auto &argumentType = m_argumentTypes[i];
     try {
       if (m_isVarArgs && i == numArguments - 1) {
-        //TODO: numArguments = i + argumentLoader->pushArray(arg.getLocalRef().staticCast<jarray>(), true);
+        // TODO: QuickJS varargs
+        //numArguments = i + argumentLoader->pushArray(arg.getLocalRef().staticCast<jarray>(), true);
         break;
       }
-      jsArgs[i] = argumentLoader->fromJava(javaArg);
+      jsArgs[i] = argumentType->fromJava(javaArg, false /*inScript*/);
     } catch (const std::invalid_argument &e) {
       // Free all the JSValue instances which had been added until now
       for (int j = 0; j < i; ++j) {
@@ -214,11 +197,10 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, JSValueC
 
   try {
     bool isDeferred = awaitJsPromise && JS_IsObject(ret) && jsBridgeContext->getUtils()->hasPropertyStr(ret, "then");
-    if (isDeferred && !m_returnValueLoader->getJavaType()->isDeferred()) {
-      const JavaTypeMap &javaTypeMap = jsBridgeContext->getJavaTypes();
-      result = m_returnValueLoader->toJavaDeferred(ret, &javaTypeMap);
+    if (isDeferred && !m_returnValueType->isDeferred()) {
+      result = jsBridgeContext->getJavaTypeProvider().getDeferredType(m_returnValueParameter)->toJava(ret, false /*inScript*/);
     } else {
-      result = m_returnValueLoader->toJava(ret);
+      result = m_returnValueType->toJava(ret, false /*inScript*/);
     }
     JS_FreeValue(ctx, ret);
   } catch (std::runtime_error& e) {

@@ -361,7 +361,7 @@ int cr_op(CharRange *cr, const uint32_t *a_pt, int a_len,
     a_idx = 0;
     b_idx = 0;
     for(;;) {
-        /* get one more point from a or b in increasing order */
+        /* create one more point from a or b in increasing order */
         if (a_idx < a_len && b_idx < b_len) {
             if (a_pt[a_idx] < b_pt[b_idx]) {
                 goto a_add;

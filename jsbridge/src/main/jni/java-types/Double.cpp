@@ -17,8 +17,7 @@
  * limitations under the License.
  */
 #include "Double.h"
-
-#include "../JsBridgeContext.h"
+#include "JsBridgeContext.h"
 #include "jni-helpers/JArrayLocalRef.h"
 
 #ifdef DUKTAPE
@@ -29,20 +28,20 @@
 
 namespace JavaTypes {
 
-Double::Double(const JsBridgeContext *jsBridgeContext, const JniGlobalRef<jclass>& classRef, const JniGlobalRef<jclass>& boxedClassRef)
- : Primitive(jsBridgeContext, classRef, boxedClassRef) {
+Double::Double(const JsBridgeContext *jsBridgeContext)
+ : Primitive(jsBridgeContext, JavaTypeId::Double, JavaTypeId::BoxedDouble) {
 }
 
 #if defined(DUKTAPE)
 
-JValue Double::pop(bool inScript, const AdditionalData *) const {
+JValue Double::pop(bool inScript) const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
-  if (!inScript && !duk_is_number(m_ctx, -1)) {
-    const auto message =
-        std::string("Cannot convert return value ") + duk_safe_to_string(m_ctx, -1) + " to double";
+  if (!duk_is_number(m_ctx, -1)) {
+    const auto message = std::string("Cannot convert JS value ") + duk_safe_to_string(m_ctx, -1) + " to double";
     duk_pop(m_ctx);
-    throw std::invalid_argument(message);
+    CHECK_STACK_NOW();
+    m_jsBridgeContext->throwTypeException(message, inScript);
   }
 
   double d = duk_require_number(m_ctx, -1);
@@ -50,11 +49,18 @@ JValue Double::pop(bool inScript, const AdditionalData *) const {
   return JValue(d);
 }
 
-JValue Double::popArray(uint32_t count, bool expanded, bool inScript, const AdditionalData *additionalData) const {
+JValue Double::popArray(uint32_t count, bool expanded, bool inScript) const {
   // If we're not expanded, pop the array off the stack no matter what.
   const StackUnwinder _(m_ctx, expanded ? 0 : 1);
 
-  count = expanded ? count : static_cast<uint32_t>(duk_get_length(m_ctx, -1));
+  if (!expanded) {
+    count = static_cast<uint32_t>(duk_get_length(m_ctx, -1));
+    if (!duk_is_array(m_ctx, -1)) {
+      const auto message = std::string("Cannot convert JS value ") + duk_safe_to_string(m_ctx, -1) + " to Array<Double>";
+      m_jsBridgeContext->throwTypeException(message, inScript);
+    }
+  }
+
   JArrayLocalRef<jdouble> doubleArray(m_jniContext, count);
   m_jsBridgeContext->checkRethrowJsError();
 
@@ -62,19 +68,19 @@ JValue Double::popArray(uint32_t count, bool expanded, bool inScript, const Addi
     if (!expanded) {
       duk_get_prop_index(m_ctx, -1, i);
     }
-    JValue value = pop(inScript, additionalData);
+    JValue value = pop(inScript);
     doubleArray.setElement(i, value.getDouble());
   }
 
   return JValue(doubleArray);
 }
 
-duk_ret_t Double::push(const JValue &value, bool inScript, const AdditionalData *) const {
+duk_ret_t Double::push(const JValue &value, bool inScript) const {
   duk_push_number(m_ctx, value.getDouble());
   return 1;
 }
 
-duk_ret_t Double::pushArray(const JniLocalRef<jarray> &values, bool expand, bool inScript, const AdditionalData *) const {
+duk_ret_t Double::pushArray(const JniLocalRef<jarray> &values, bool expand, bool inScript) const {
   JArrayLocalRef<jdouble> doubleArray(values);
   const auto count = doubleArray.getLength();
 
@@ -95,10 +101,11 @@ duk_ret_t Double::pushArray(const JniLocalRef<jarray> &values, bool expand, bool
 
 #elif defined(QUICKJS)
 
-JValue Double::toJava(JSValueConst v, bool inScript, const AdditionalData *) const {
-  if (!inScript && !JS_IsNumber(v)) {
+JValue Double::toJava(JSValueConst v, bool inScript) const {
+  if (!JS_IsNumber(v)) {
     const auto message = "Cannot convert return value to double";
-    throw std::invalid_argument(message);
+    m_jsBridgeContext->throwTypeException(message, inScript);
+    return JValue();
   }
 
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
@@ -114,8 +121,13 @@ JValue Double::toJava(JSValueConst v, bool inScript, const AdditionalData *) con
   return JValue(d);
 }
 
-JValue Double::toJavaArray(JSValueConst v, bool inScript, const AdditionalData *additionalData) const {
+JValue Double::toJavaArray(JSValueConst v, bool inScript) const {
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
+    return JValue();
+  }
+
+  if (!JS_IsArray(m_ctx, v)) {
+    m_jsBridgeContext->throwTypeException("Cannot convert JS value to Java array", inScript);
     return JValue();
   }
 
@@ -126,9 +138,8 @@ JValue Double::toJavaArray(JSValueConst v, bool inScript, const AdditionalData *
 
   JArrayLocalRef<jdouble> doubleArray(m_jniContext, count);
 
-  assert(JS_IsArray(m_ctx, v));
   for (uint32_t i = 0; i < count; ++i) {
-    JValue elementValue = toJava(JS_GetPropertyUint32(m_ctx, v, i), inScript, additionalData);
+    JValue elementValue = toJava(JS_GetPropertyUint32(m_ctx, v, i), inScript);
     doubleArray.setElement(i, elementValue.getDouble());
     m_jsBridgeContext->checkRethrowJsError();
   }
@@ -136,11 +147,11 @@ JValue Double::toJavaArray(JSValueConst v, bool inScript, const AdditionalData *
   return JValue(doubleArray);
 }
 
-JSValue Double::fromJava(const JValue &value, bool inScript, const AdditionalData *) const {
+JSValue Double::fromJava(const JValue &value, bool inScript) const {
   return JS_NewFloat64(m_ctx, value.getDouble());
 }
 
-JSValue Double::fromJavaArray(const JniLocalRef<jarray> &values, bool inScript, const AdditionalData *additionalData) const {
+JSValue Double::fromJavaArray(const JniLocalRef<jarray> &values, bool inScript) const {
   JArrayLocalRef<jdouble> doubleArray(values);
   const auto count = doubleArray.getLength();
 
@@ -149,7 +160,7 @@ JSValue Double::fromJavaArray(const JniLocalRef<jarray> &values, bool inScript, 
   for (jsize i = 0; i < count; ++i) {
    jdouble d = doubleArray.getElement(i);
     try {
-      JSValue elementValue = fromJava(JValue(d), inScript, additionalData);
+      JSValue elementValue = fromJava(JValue(d), inScript);
       JS_SetPropertyUint32(m_ctx, jsArray, i, elementValue);
     } catch (std::invalid_argument &e) {
       JS_FreeValue(m_ctx, jsArray);
@@ -174,8 +185,16 @@ JValue Double::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
   return JValue(d);
 }
 
-JniLocalRef<jclass> Double::getArrayClass() const {
-  return m_jniContext->getObjectClass(JArrayLocalRef<jdouble>(m_jniContext, 0));
+JValue Double::box(const JValue &doubleValue) const {
+  // From double to Double
+  jmethodID boxId = m_jniContext->getStaticMethodID(getBoxedJavaClass(), "valueOf", "(D)Ljava/lang/Double;");
+  return JValue(m_jniContext->callStaticObjectMethod(getBoxedJavaClass(), boxId, doubleValue.getDouble()));
+}
+
+JValue Double::unbox(const JValue &boxedValue) const {
+  // From Double to double
+  jmethodID unboxId = m_jniContext->getMethodID(getBoxedJavaClass(), "doubleValue", "()D");
+  return JValue(m_jniContext->callDoubleMethod(boxedValue.getLocalRef(), unboxId));
 }
 
 }  // namespace JavaTypes

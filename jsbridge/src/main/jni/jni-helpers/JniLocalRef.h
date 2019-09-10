@@ -41,14 +41,11 @@ public:
   }
 
   JniLocalRef(const JniContext *jniContext, jobject o, bool fromJniParam = false)
-    : m_refCounter(o == nullptr ? nullptr : new RefCounter())
+    : m_refCounter(o == nullptr ? nullptr : new RefCounter(1))
     , m_jniContext(jniContext)
     , m_object(static_cast<T>(o))
     , m_fromJniParam(fromJniParam) {
 
-    if (m_refCounter != nullptr) {
-      m_refCounter->increment();
-    }
     if (!m_fromJniParam && m_object != nullptr) {
       assert(m_jniContext != nullptr);
       JniRefHelper::getLocalRefStats(m_jniContext)->add();
@@ -61,7 +58,7 @@ public:
     , m_object(other.m_object)
     , m_fromJniParam(other.m_fromJniParam) {
 
-    other.m_refCounter = nullptr;
+    other.m_refCounter = nullptr;  // make sure that the old instance does not trigger delete
   }
 
   JniLocalRef(const JniLocalRef &other)
@@ -166,7 +163,12 @@ public:
   }
 
   void detach() {
-    m_fromJniParam = true;
+    if (m_refCounter) {
+      m_refCounter->disable();  // make sure that other instance with same counter don't get destroyed
+    }
+
+    delete m_refCounter;
+    m_refCounter = nullptr;
   }
 
   // JniLocalRef<T2> staticCast() const  WHEN T2 == T

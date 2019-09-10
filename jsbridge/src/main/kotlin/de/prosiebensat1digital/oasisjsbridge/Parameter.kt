@@ -17,8 +17,6 @@ package de.prosiebensat1digital.oasisjsbridge
 
 import kotlin.reflect.*
 import kotlin.reflect.full.memberFunctions
-import kotlin.reflect.jvm.javaType
-import kotlin.reflect.jvm.jvmErasure
 
 // Represents a (reflected) function parameter (or return value) with its (optional) name based on:
 // - (ideally) Kotlin KParameter or KType which has the (full) reflection info
@@ -26,24 +24,27 @@ import kotlin.reflect.jvm.jvmErasure
 internal open class Parameter private constructor(
     internal val kotlinType: KType?,
     private val javaClass: Class<*>?,
-    val name: String?,
-    val methodName: String?
+    val name: String?
 ) {
-    constructor(kotlinType: KType, methodName: String?)
-        : this(kotlinType, findJavaClass(kotlinType), null, methodName)
+    constructor(kotlinType: KType)
+        : this(kotlinType, findJavaClass(kotlinType), null)
 
-    constructor(kotlinParameter: KParameter, methodName: String?) : this(
+    constructor(kotlinParameter: KParameter) : this(
         kotlinParameter.type,
         findJavaClass(kotlinParameter.type),
-        kotlinParameter.name,
-        methodName
+        kotlinParameter.name
     )
 
-    constructor(javaClass: Class<*>, methodName: String?) : this(null, javaClass, javaClass.name, methodName)
+    constructor(javaClass: Class<*>) : this(null, javaClass, javaClass.name)
 
     @Suppress("UNUSED")  // Called from JNI
     fun getJava(): Class<*>? {
         return javaClass
+    }
+
+    @Suppress("UNUSED")  // Called from JNI
+    fun getJavaName(): String? {
+        return javaClass?.name
     }
 
 
@@ -73,7 +74,7 @@ internal open class Parameter private constructor(
             return@lazy Method(javaMethod)
         }
 
-        // Add the FunctionX generic arguments to get type info for function parameters
+        // Add the FunctionX generic arguments to create type info for function parameters
         Method(javaMethod, kotlinType.arguments, true)
     }
 
@@ -89,11 +90,11 @@ internal open class Parameter private constructor(
     fun getGenericParameter(): Parameter? {
         return if (kotlinType == null) {
             // No type information => using generic Object type
-            Parameter(Any::class.java, null)
+            Parameter(Any::class.java)
         } else {
-            // Use KType instance to get the (only) generic type
+            // Use KType instance to create the (only) generic type
             kotlinType.arguments.firstOrNull()?.type?.let { genericParameterType ->
-                Parameter(genericParameterType, null)
+                Parameter(genericParameterType)
             }
         }
     }

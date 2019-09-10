@@ -320,7 +320,7 @@ class JsBridge(context: Context): CoroutineScope {
     @PublishedApi
     internal suspend fun <T: Any?> evaluate(js: String, type: KType?, awaitJsPromise: Boolean): T {
         //val initialStackTrace = Thread.currentThread().stackTrace
-        val parameter = type?.let { Parameter(type, null) }
+        val parameter = type?.let { Parameter(type) }
 
         val doAwaitJsPromise = awaitJsPromise && type?.classifier != Deferred::class
 
@@ -425,7 +425,7 @@ class JsBridge(context: Context): CoroutineScope {
     // the lambda via callJsLambda()
     @PublishedApi
     internal fun registerJsLambda(jsValue: JsValue, types: List<KType>, isVarArgs: Boolean): JsValue {
-        val parameters = types.map { Parameter(it, null) }
+        val parameters = types.map { Parameter(it) }
         val inputParameters = parameters.take(types.count() - 1)
         val outputParameter = parameters.last()
         val method = Method(inputParameters.toTypedArray(), outputParameter, isVarArgs)
@@ -824,7 +824,7 @@ class JsBridge(context: Context): CoroutineScope {
     }
 
     @Suppress("UNUSED")  // Called from JNI
-    private fun setUpJsPromise(id: String, deferred: Deferred<Any>, type: Class<*>) {
+    private fun setUpJsPromise(id: String, deferred: Deferred<Any>) {
         launch {
             val jniJsContext = jniJsContextOrThrow()
 
@@ -833,7 +833,7 @@ class JsBridge(context: Context): CoroutineScope {
 
                 // Resolve promise
                 try {
-                    jniCompleteJsPromise(jniJsContext, id, true, result, type)
+                    jniCompleteJsPromise(jniJsContext, id, true, result)
                     processPromiseQueue()
                 } catch (t: Throwable) {
                     Timber.e("Error while fulfilling JS promise: $t")
@@ -841,7 +841,7 @@ class JsBridge(context: Context): CoroutineScope {
                 }
             } catch (t: Throwable) {
                 try {
-                    jniCompleteJsPromise(jniJsContext, id, false, t.message ?: "Deferred error", t.message!!.javaClass)
+                    jniCompleteJsPromise(jniJsContext, id, false, t.message ?: "Deferred error")
                     processPromiseQueue()
                 } catch (t: Throwable) {
                     Timber.e("Error while rejecting JS promise: $t")
@@ -913,7 +913,7 @@ class JsBridge(context: Context): CoroutineScope {
     private external fun jniCallJsLambda(context: Long, objectName: String, args: Array<Any?>, awaitJsPromise: Boolean): Any?
     private external fun jniAssignJsValue(context: Long, globalName: String, jsCode: String)
     private external fun jniNewJsFunction(context: Long, globalName: String, functionArgs: Array<String>, jsCode: String)
-    private external fun jniCompleteJsPromise(context: Long, id: String, isFulfilled: Boolean, value: Any, valueType: Class<*>)
+    private external fun jniCompleteJsPromise(context: Long, id: String, isFulfilled: Boolean, value: Any)
     private external fun jniProcessPromiseQueue(context: Long)
 
     @Suppress("UNUSED_PARAMETER")
@@ -931,17 +931,20 @@ class JsBridge(context: Context): CoroutineScope {
     ) : java.lang.reflect.InvocationHandler {
 
         override fun invoke(proxy: Any, method: JavaMethod, args: Array<Any?>?): Any? {
-            // If the method is a method from Object then defer to normal invocation
-            if (method.declaringClass == Object::class.java) {
-                return method.invoke(this, args)
-            }
+            return when {
+                method.name == "hashCode" -> jsValue.hashCode()
+                method.name == "equals" -> jsValue.toString() == args?.firstOrNull()?.toString()
+                method.name == "toString" -> jsValue.toString()
 
-            return when (method.returnType) {
-                null, Unit::class, Void::class, Void::class.javaPrimitiveType -> {
+                method.returnType == Unit::class ||
+                method.returnType == Void::class ||
+                method.returnType == Void::class.javaPrimitiveType -> {
                     callJsMethodWithoutRetVal(method, args)
                     CompletableDeferred(Unit)
                 }
-                Deferred::class -> callJsMethodAsync(method, args)
+
+                method.returnType.isAssignableFrom(Deferred::class.java) -> callJsMethodAsync(method, args)
+
                 else -> callJsMethodBlocking(method, args)
             }
         }

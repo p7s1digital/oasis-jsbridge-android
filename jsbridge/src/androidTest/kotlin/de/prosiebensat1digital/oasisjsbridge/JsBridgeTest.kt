@@ -19,12 +19,9 @@ import androidx.test.platform.app.InstrumentationRegistry
 import de.prosiebensat1digital.oasisjsbridge.JsBridgeError.*
 import io.mockk.*
 import kotlin.test.*
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 import kotlinx.coroutines.*
 import okhttp3.*
-import org.junit.Assert.*
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.fail
 import org.junit.After
 import org.junit.BeforeClass
@@ -210,8 +207,6 @@ class JsBridgeTest {
             assertEquals(subject.evaluate("1.5+1"), 2.5)  // Double
             assertEquals(subject.evaluate("1.5+1"), 2.5f)  // Float
 
-            subject.evaluateNoRetVal("console.log(JSON.stringify(3))")
-
             // Exception
             val exceptionFromString: JsStringEvaluationError = assertFailsWith { subject.evaluate("""throw "Error string";""") }
             val exceptionFromError: JsStringEvaluationError = assertFailsWith { subject.evaluate("""throw new Error("Error message");""") }
@@ -252,22 +247,32 @@ class JsBridgeTest {
             assertEquals(jsPromiseErrorPayload?.getString("message"), "JS test error")
 
             // Array
-            assertArrayEquals(subject.evaluate("""["a", "b", "c"]"""), arrayOf("a", "b", "c"))  // Array<String>
+            assertArrayEquals(subject.evaluate<Array<String>>("""["a", "b", "c"]"""), arrayOf("a", "b", "c"))  // Array<String>
             assertArrayEquals(subject.evaluate("""[true, false, true]"""), booleanArrayOf(true, false, true))  // BooleanArray
-            assertArrayEquals(subject.evaluate("""[true, false, true]"""), arrayOf(true, false, true))  // Array<Boolean>
+            assertArrayEquals(subject.evaluate<Array<Boolean>>("""[true, false, true]"""), arrayOf(true, false, true))  // Array<Boolean>
             assertArrayEquals(subject.evaluate("""[1.0, 2.2, 3.8]"""), intArrayOf(1, 2, 3))  // IntArray
             assertArrayEquals(subject.evaluate<Array<Int>>("""[1.0, 2.2, 3.8]"""), arrayOf(1, 2, 3))  // Array<Int>
+            assertArrayEquals(subject.evaluate("""[1.0, 2.2, 3.8]"""), longArrayOf(1L, 2L, 3L))  // LongArray
+            assertArrayEquals(subject.evaluate<Array<Long>>("""[1.0, 2.2, 3.8]"""), arrayOf(1L, 2L, 3L))  // Array<Long>
             assertTrue(subject.evaluate<DoubleArray>("""[1.0, 2.2, 3.8]""").contentEquals(doubleArrayOf(1.0, 2.2, 3.8)))  // DoubleArray
-            assertArrayEquals(subject.evaluate("""[1.0, 2.2, 3.8]"""), arrayOf(1.0, 2.2, 3.8))  // Array<Double>
+            assertArrayEquals(subject.evaluate<Array<Double>>("""[1.0, 2.2, 3.8]"""), arrayOf(1.0, 2.2, 3.8))  // Array<Double>
             assertTrue(subject.evaluate<FloatArray>("""[1.0, 2.2, 3.8]""").contentEquals(floatArrayOf(1.0f, 2.2f, 3.8f)))  // FloatArray
             assertArrayEquals(subject.evaluate<Array<Float>>("""[1.0, 2.2, 3.8]"""), arrayOf(1.0f, 2.2f, 3.8f))  // Array<Float>
 
+            // 2D-Arrays
+            assertArrayEquals(subject.evaluate<Array<Array<Int>>>("""[[1, 2], [3, 4]]"""), arrayOf(arrayOf(1, 2), arrayOf(3, 4)))  // Array<Array<Int>>
+            assertArrayEquals(subject.evaluate<Array<Array<Int?>>>("""[[1, 2], [null, 4]]"""), arrayOf(arrayOf(1, 2), arrayOf(null, 4)))  // Array<Array<Int?>>
+            assertArrayEquals(subject.evaluate<Array<IntArray>>("""[[1, 2], [3, 4]]"""), arrayOf(intArrayOf(1, 2), intArrayOf(3, 4)))  // Array<IntArray>>
+
             // Array with optionals
-            assertArrayEquals(subject.evaluate("""["a", null, "c"]"""), arrayOf("a", null, "c"))  // Array<String?>
-            assertArrayEquals(subject.evaluate("""[false, null, true]"""), arrayOf(false, null, true))  // Array<Boolean?>
+            assertArrayEquals(subject.evaluate<Array<String?>>("""["a", null, "c"]"""), arrayOf("a", null, "c"))  // Array<String?>
+            assertArrayEquals(subject.evaluate<Array<Boolean?>>("""[false, null, true]"""), arrayOf(false, null, true))  // Array<Boolean?>
             assertArrayEquals(subject.evaluate<Array<Int?>>("""[1.0, null, 3.8]"""), arrayOf(1, null, 3))  // Array<Int?>
-            assertArrayEquals(subject.evaluate("""[1.0, null, 3.8]"""), arrayOf(1.0, null, 3.8))  // Array<Double?>
+            assertArrayEquals(subject.evaluate<Array<Double?>>("""[1.0, null, 3.8]"""), arrayOf(1.0, null, 3.8))  // Array<Double?>
             assertArrayEquals(subject.evaluate<Array<Float?>>("""[1.0, null, 3.8]"""), arrayOf(1.0f, null, 3.8f))  // Array<Float?>
+
+            // Array of (any) objects
+            assertArrayEquals(subject.evaluate<Array<Any>>("""[1.0, "hello", null]"""), arrayOf(1.0, "hello", null))  // Array<Any?>
 
             // JSON
             assertEquals(
@@ -542,7 +547,7 @@ class JsBridgeTest {
             Timber.i("-> result is $result")
             assertEquals(result, expectedResult)
 
-            // Make sure that the JS value does not get garbage-collected as calcMagicMixed3Func()
+            // Make sure that the JS value does not create garbage-collected as calcMagicMixed3Func()
             // access the value by its name!
             updateMagicNativeFuncJsValue.hold()
         }
