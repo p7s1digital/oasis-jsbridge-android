@@ -58,7 +58,7 @@ class PromisePolyfillExtension(private val jsBridge: JsBridge) {
         onUnhandledPromiseRejectedJsValue = null
     }
 
-    fun processQueue(jniJsContext: Long) {
+    fun processQueue() {
         if (!isReady) {
             return
         }
@@ -66,8 +66,8 @@ class PromisePolyfillExtension(private val jsBridge: JsBridge) {
         try {
             jsBridge.callJsLambdaUnsafe(processQueueJsValue, arrayOf(), false)
         } catch (t: Throwable) {
-            Timber.e("Error while processing promise queue: $t")
-            jsBridge.notifyErrorListeners(JsBridgeError.JsPromiseError(t))
+            val errorMessage = "Error while processing promise queue: ${t.message}"
+            jsBridge.notifyErrorListeners(JsBridgeError.UnhandledJsPromiseError(errorMessage, t))
         }
     }
 }
