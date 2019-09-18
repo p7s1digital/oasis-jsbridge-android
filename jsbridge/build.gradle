@@ -119,6 +119,7 @@ dependencies {
     implementation 'com.squareup.okhttp3:okhttp:3.11.0'  // Note: support for Android 4 removed in okhttp 3.13!
 
     testImplementation 'junit:junit:4.12'
+    testImplementation 'org.json:json:20180813'
     androidTestImplementation 'junit:junit:4.12'
 
     testImplementation "org.jetbrains.kotlin:kotlin-test:$versions.kotlin.kotlin"
