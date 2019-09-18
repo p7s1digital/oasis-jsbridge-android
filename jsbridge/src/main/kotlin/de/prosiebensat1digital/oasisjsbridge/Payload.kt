@@ -99,10 +99,10 @@ internal fun getIntFromAny(value: Any?): Int? {
 }
 
 internal fun getDoubleFromAny(value: Any?): Double? {
-    // Number -> Int
+    // Number -> Double
     (value as? Number?)?.toDouble()?.let { return it }
 
-    // String -> Int
+    // String -> Double
     return (value as? String)?.toDoubleOrNull()
 }
 
