@@ -52,17 +52,28 @@ sealed class JsBridgeError(message: String? = null, cause: Throwable?): Exceptio
     class JsToNativeRegistrationError(val type: KClass<*>, cause: Throwable? = null, customMessage: String? = null)
         : JsBridgeError(customMessage ?: "Error while registering native interface ($type)", cause)
 
-    class NativeToJsRegistrationError(val type: KClass<*>, cause: Throwable? = null, customMessage: String? = null)
-        : JsBridgeError(customMessage ?: "Error while registering JS interface ($type)", cause)
-
-    class NativeToJsCallError(val jsCall: String, cause: Throwable? = null, customMessage: String? = null)
-        : JsBridgeError("Error while calling JS method $jsCall", cause)
+    class JsToNativeFunctionRegistrationError(val jsFunction: String, cause: Throwable? = null, customMessage: String? = null)
+        : JsBridgeError(customMessage ?: "Error while registering native function ($jsFunction)", cause)
 
     class JsToNativeCallError(val nativeCall: String, cause: Throwable? = null, customMessage: String? = null)
         : JsBridgeError(customMessage ?: "Error while calling native method $nativeCall", cause)
 
+    class JsToNativeFunctionCallError(val nativeCall: String, cause: Throwable? = null, customMessage: String? = null)
+        : JsBridgeError(customMessage ?: "Error while calling native function $nativeCall", cause)
+
+    class NativeToJsRegistrationError(val type: KClass<*>, cause: Throwable? = null, customMessage: String? = null)
+        : JsBridgeError(customMessage ?: "Error while registering JS interface ($type)", cause)
+
+    class NativeToJsFunctionRegistrationError(val jsFunction: String, cause: Throwable? = null, customMessage: String? = null)
+        : JsBridgeError(customMessage ?: "Error while registering JS function ($jsFunction)", cause)
+
+    class NativeToJsCallError(val jsCall: String, cause: Throwable? = null, customMessage: String? = null)
+        : JsBridgeError(customMessage ?: "Error while calling JS method $jsCall", cause)
+
+    class NativeToJsFunctionCallError(val jsCall: String, cause: Throwable? = null, customMessage: String? = null)
+        : JsBridgeError(customMessage ?: "Error while calling JS method $jsCall", cause)
+
     class JsCallbackError(cause: Throwable? = null): JsBridgeError(cause = cause)
-    class JsPromiseError(cause: Throwable? = null): JsBridgeError(cause = cause)
     class UnhandledJsPromiseError(val reason: String, cause: Throwable? = null): JsBridgeError("Unhandled promise error: $reason", cause = cause)
     class XhrError(val query: String, cause: Throwable? = null): JsBridgeError(cause = cause)
 

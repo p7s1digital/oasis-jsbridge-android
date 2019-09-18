@@ -149,9 +149,9 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, void *js
       throw e;
     }
   } else {
-    std::string strError = duk_safe_to_string(ctx, -1);
-    duk_pop(ctx);  // ret (pcall error)
-    throw std::runtime_error(std::string("Error while calling JS ") + (m_isLambda ? "lambda" : "method") + ": " + strError);
+    jsBridgeContext->queueJavaExceptionForJsError();
+    duk_pop(ctx);
+    return JValue();
   }
 
   return result;
@@ -192,7 +192,8 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, JSValueC
 
   if (JS_IsException(ret)) {
     JS_FreeValue(ctx, ret);
-    throw std::runtime_error("Error while calling JS lambda");
+    jsBridgeContext->queueJavaExceptionForJsError();
+    return JValue();
   }
 
   try {

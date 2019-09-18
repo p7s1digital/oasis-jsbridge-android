@@ -331,11 +331,8 @@ class JsBridge(context: Context): CoroutineScope {
             //val shortJs = if (js.length <= 500) js else js.take(500) + "..."
             //Timber.v("evaluate(\"$shortJs\")")
 
-            var ret = try {
-                jniEvaluateString(jniJsContext, js, parameter, doAwaitJsPromise)
-            } catch (t: Throwable) {
-                throw t as? JsStringEvaluationError ?: JsStringEvaluationError(js, t)
-            }
+            // Exceptions must be directly caught by the caller
+            var ret = jniEvaluateString(jniJsContext, js, parameter, doAwaitJsPromise)
 
             if (doAwaitJsPromise && ret is Deferred<*>) {
                 processPromiseQueue()
@@ -445,7 +442,7 @@ class JsBridge(context: Context): CoroutineScope {
                 lambdaJsValue.hold()
             } catch (t: Throwable) {
                 throw t as? JsStringEvaluationError
-                        ?: NativeToJsCallError(jsValue.associatedJsName, t)
+                        ?: NativeToJsFunctionRegistrationError(jsValue.associatedJsName, t)
             }
         }
 
@@ -459,13 +456,10 @@ class JsBridge(context: Context): CoroutineScope {
         return withContext(coroutineContext) {
             val jniJsContext = jniJsContextOrThrow()
 
-            var ret = try {
-                lambdaJsValue.codeEvaluationDeferred?.await()
-                jniCallJsLambda(jniJsContext, lambdaJsValue.associatedJsName, args, awaitJsPromise)
-            } catch (t: Throwable) {
-                val error = t as? JsStringEvaluationError ?: NativeToJsCallError(lambdaJsValue.associatedJsName, t)
-                throw error
-            }
+            lambdaJsValue.codeEvaluationDeferred?.await()
+
+            // Exceptions must be directly caught by the caller
+            var ret = jniCallJsLambda(jniJsContext, lambdaJsValue.associatedJsName, args, awaitJsPromise)
 
             if (awaitJsPromise && ret is Deferred<*>) {
                 processPromiseQueue()
@@ -532,7 +526,7 @@ class JsBridge(context: Context): CoroutineScope {
         val jniJsContext = jniJsContext ?: return
 
         promisePolyfillExtension?.let { promisePolyfillExtension ->
-            promisePolyfillExtension.processQueue(jniJsContext)
+            promisePolyfillExtension.processQueue()
             return
         }
 
@@ -783,7 +777,7 @@ class JsBridge(context: Context): CoroutineScope {
 
         val returnClass = method.returnParameter.getJava()
         if (returnClass != Unit::class.java) {
-             throw JsToNativeCallError("JS lambda ($globalObjectName)", customMessage = "Unsupported return ($returnClass). JS lambdas should not return any value!")
+             throw JsToNativeFunctionRegistrationError("JS lambda ($globalObjectName)", customMessage = "Unsupported return ($returnClass). JS lambdas should not return any value!")
         }
 
         // Wrap the JS object within a JsValue which will be deleted when no longer needed
@@ -797,7 +791,7 @@ class JsBridge(context: Context): CoroutineScope {
                     val jniJsContext = jniJsContextOrThrow()
                     jniCallJsLambda(jniJsContext, jsFunctionObject.associatedJsName, args, false)
                 } catch (t: Throwable) {
-                    JsToNativeCallError("JS lambda($globalObjectName)", t )
+                    JsToNativeFunctionCallError("JS lambda($globalObjectName)", t )
                         .also(::notifyErrorListeners)
                 }
             }
@@ -832,22 +826,13 @@ class JsBridge(context: Context): CoroutineScope {
                 val result = deferred.await()
 
                 // Resolve promise
-                try {
-                    jniCompleteJsPromise(jniJsContext, id, true, result)
-                    processPromiseQueue()
-                } catch (t: Throwable) {
-                    Timber.e("Error while fulfilling JS promise: $t")
-                    throw JsPromiseError(t)
-                }
+                jniCompleteJsPromise(jniJsContext, id, true, result)
             } catch (t: Throwable) {
-                try {
-                    jniCompleteJsPromise(jniJsContext, id, false, t.message ?: "Deferred error")
-                    processPromiseQueue()
-                } catch (t: Throwable) {
-                    Timber.e("Error while rejecting JS promise: $t")
-                    throw JsPromiseError(t)
-                }
+                // Reject promise
+                jniCompleteJsPromise(jniJsContext, id, false, t.message ?: "Deferred error")
             }
+
+            processPromiseQueue()
         }
     }
 
@@ -965,25 +950,24 @@ class JsBridge(context: Context): CoroutineScope {
             val deferred = CompletableDeferred<Any?>()
 
             launch {
-                try {
+                val retVal = try {
                     Timber.v("Calling (deferred) JS method ${type.canonicalName}/$jsValue.${method.name}...")
-                    val retVal = callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf())
-
-                    if (retVal is Deferred<*>) {
-                        try {
-                            deferred.complete(retVal.await())
-                        } catch (t: Throwable) {
-                            // For deferred, don't apply the generic JsBridge exception handling
-                            // but directly add the exception into the returned Deferred
-                            deferred.completeExceptionally(t)
-                        }
-                    } else {
-                        deferred.complete(retVal)
-                    }
+                    callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf())
                 } catch (t: Throwable) {
-                    val error = NativeToJsCallError("${type.canonicalName}/$jsValue.${method.name}", t)
-                        .also(::notifyErrorListeners)
-                    deferred.completeExceptionally(error)
+                    // Reject the deferred with the JS exception (which must be directly caught by the caller)
+                    deferred.completeExceptionally(t)
+                }
+
+                if (retVal is Deferred<*>) {
+                    try {
+                        deferred.complete(retVal.await())
+                    } catch (t: Throwable) {
+                        // For deferred, don't apply the generic JsBridge exception handling
+                        // but directly add the exception into the returned Deferred
+                        deferred.completeExceptionally(t)
+                    }
+                } else {
+                    deferred.complete(retVal)
                 }
             }
 
@@ -991,19 +975,15 @@ class JsBridge(context: Context): CoroutineScope {
         }
 
         private fun callJsMethodBlocking(method: JavaMethod, args: Array<Any?>?): Any? {
+            if (isMainThread()) {
+                Timber.w("WARNING: executing JS method ${type.canonicalName}/$jsValue.${method.name} in the main thread! Consider using a Deferred or calling the method in another thread!")
+            } else {
+                Timber.v("Calling (blocking) JS method ${type.canonicalName}/$jsValue.${method.name}...")
+            }
+
             return runBlocking(coroutineContext) {
-                try {
-                    Timber.v("Calling (blocking) JS method ${type.canonicalName}/$jsValue.${method.name}...")
-                    if (isMainThread()) {
-                        Timber.w("WARNING: executing JS method ${type.canonicalName}/$jsValue.${method.name} in the main thread! Consider using a Deferred or calling the method in another thread!")
-                    } else {
-                        Timber.v("Calling (blocking) JS method ${type.canonicalName}/$jsValue.${method.name}...")
-                    }
-                    callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf())
-                } catch (t: Throwable) {
-                    throw NativeToJsCallError("${type.canonicalName}/$jsValue.${method.name}", t)
-                        .also(::notifyErrorListeners)
-                }
+                // Exceptions must be directly caught by the caller
+                callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf())
             }
         }
     }

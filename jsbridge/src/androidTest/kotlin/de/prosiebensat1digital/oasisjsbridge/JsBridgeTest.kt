@@ -28,6 +28,7 @@ import org.junit.BeforeClass
 import org.junit.Ignore
 import org.junit.Test
 import timber.log.Timber
+import java.lang.IllegalArgumentException
 
 interface TestNativeApiInterface : JsToNativeInterface {
     fun nativeMethodReturningTrue(): Boolean
@@ -92,17 +93,6 @@ class JsBridgeTest {
             jsBridge?.release()
             jsBridge?.waitForDone()
         }
-    }
-
-    interface QuickJsToNativeInterface : JsToNativeInterface {
-        fun hello(): String
-        fun helloPromise(): Deferred<String>
-        fun withCallback(s: String, cb: (String) -> Unit)
-    }
-
-    interface NativeToQuickJSInterface : NativeToJsInterface {
-        fun helloPromise(): Deferred<String>
-        fun withCallback(s: String, cb: (String) -> Unit)
     }
 
     @Test
@@ -176,18 +166,18 @@ class JsBridgeTest {
 
         // WHEN
         val js = "invalid.javaScript.instruction"
-        val stringEvaluationError1: JsStringEvaluationError = assertFailsWith {
+        val jsException1: JsException = assertFailsWith {
             subject.evaluateBlocking<Unit>(js)
         }
-        val stringEvaluationError2 = runBlocking {
-            assertFailsWith<JsStringEvaluationError> {
+        val jsException2 = runBlocking {
+            assertFailsWith<JsException> {
                 subject.evaluate(js)
             }
         }
 
         // THEN
-        assertEquals(stringEvaluationError1.js, js)
-        assertEquals(stringEvaluationError2.js, js)
+        assertEquals(jsException1.message?.contains("invalid"), true)
+        assertEquals(jsException1.message, jsException2.message)
         assertTrue(errors.isEmpty())
     }
 
@@ -207,24 +197,19 @@ class JsBridgeTest {
             assertEquals(subject.evaluate("1.5+1"), 2.5)  // Double
             assertEquals(subject.evaluate("1.5+1"), 2.5f)  // Float
 
-            // Exception
-            val exceptionFromString: JsStringEvaluationError = assertFailsWith { subject.evaluate("""throw "Error string";""") }
-            val exceptionFromError: JsStringEvaluationError = assertFailsWith { subject.evaluate("""throw new Error("Error message");""") }
-            val exceptionFromObject: JsStringEvaluationError = assertFailsWith { subject.evaluate("""throw {message: "Error object", hint: "Just a test"};""") }
-            exceptionFromString.jsException.also { jse ->
-                assertNotNull(jse)
-                assertEquals(jse.message, "Error string")
-                assertEquals(jse.jsonValue, "\"Error string\"")
-            }
-            exceptionFromError.jsException.also { jse ->
-                assertNotNull(jse)
-                assert(jse.message?.contains("Error message") == true)
-                assertEquals(jse.jsonValue?.toPayload(), """{message: "Error message"}""".toPayload())
-            }
-            exceptionFromObject.jsException.also { jse ->
-                assertNotNull(jse)
-                assertEquals(jse.jsonValue?.toPayload(), """{message: "Error object", hint: "Just a test"}""".toPayload())
-            }
+            // Throwing string from JS
+            val exceptionFromString: JsException = assertFailsWith { subject.evaluate("""throw "Error string";""") }
+            assertEquals(exceptionFromString.message, "Error string")
+            assertEquals(exceptionFromString.jsonValue, "\"Error string\"")
+
+            // Throwing Error from JS
+            val exceptionFromError: JsException = assertFailsWith { subject.evaluate("""throw new Error("Error message");""") }
+            assertEquals(exceptionFromError.message?.contains("Error message"), true)
+            assertEquals(exceptionFromError.jsonValue?.toPayload(), """{message: "Error message"}""".toPayload())
+
+            // Throwing Object from JS
+            val exceptionFromObject: JsException = assertFailsWith { subject.evaluate("""throw {message: "Error object", hint: "Just a test"};""") }
+            assertEquals(exceptionFromObject.jsonValue?.toPayload(), """{message: "Error object", hint: "Just a test"}""".toPayload())
 
             // Pending promise
             val resolveFuncJsValue = JsValue(subject)
@@ -683,11 +668,16 @@ class JsBridgeTest {
         val calcSumBlocking: (Int, Int) -> Int = calcSumJsValue.mapToNativeBlockingFunction2()
         val calcSumWrongSignature: (Int, String) -> Int = calcSumJsValue.mapToNativeBlockingFunction2()
 
+        val invalidFunction: suspend () -> Unit = JsValue.newFunction(subject, "invalid").mapToNativeFunction0()
+
         val createJsObject: suspend (Int, String) -> JsonObjectWrapper =
             JsValue.newFunction(subject, "a", "b", "return {key1: a, key2: b};")
                 .mapToNativeFunction2()
 
         val createCalcSumFunc: suspend () -> JsValue = JsValue.newFunction(subject, "return $calcSumJsValue;")
+            .mapToNativeFunction0()
+
+        val throwException: suspend () -> Unit = JsValue.newFunction(subject, "", "throw 'JS exception from function';")
             .mapToNativeFunction0()
 
         val getPromiseJsValue = JsValue.newFunction(subject, "name", """
@@ -719,9 +709,15 @@ class JsBridgeTest {
             assertEquals(sumFromAnonymousFunction, 7)
 
             // Call JS function calcSumWrongSignature(3, "four")
-            assertFailsWith<NativeToJsCallError> {
+            assertFailsWith<IllegalArgumentException> {
                 calcSumWrongSignature(3, "four")
             }
+
+            // Call JS function invalidFunction()
+            val invalidFunctionException: JsException = assertFailsWith {
+                invalidFunction()
+            }
+            assertEquals(invalidFunctionException.message?.contains("invalid"), true)
 
             // Call JS function createJsObject(69, "sixty-nine")
             val jsObject = createJsObject(69, "sixty-nine")
@@ -731,6 +727,12 @@ class JsBridgeTest {
             val calcSum2: suspend (Int, Int) -> Int = createCalcSumFunc().mapToNativeFunction2()
             val sum2 = calcSum2(2, 2)
             assertEquals(sum2, 4)
+
+            // Call JS function throwException()
+            val jsException: JsException = assertFailsWith {
+                throwException()
+            }
+            assertEquals(jsException.message, "JS exception from function")
 
             // Call JS function getPromise("testPromise")
             val promiseResult = getPromise("testPromise")
