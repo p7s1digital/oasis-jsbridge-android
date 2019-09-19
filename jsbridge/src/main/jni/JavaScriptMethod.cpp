@@ -190,6 +190,10 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, JSValueC
 
   JSValue ret = JS_Call(ctx, jsMethod, jsThis, numArguments, jsArgs);
 
+  for (jsize i = 0; i < numArguments; ++i) {
+    JS_FreeValue(ctx, jsArgs[i]);
+  }
+
   if (JS_IsException(ret)) {
     JS_FreeValue(ctx, ret);
     jsBridgeContext->queueJavaExceptionForJsError();
