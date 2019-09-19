@@ -441,7 +441,7 @@ class JsBridge(context: Context): CoroutineScope {
                 Timber.v("Registered JS lambda ${lambdaJsValue.associatedJsName}")
                 lambdaJsValue.hold()
             } catch (t: Throwable) {
-                throw t as? JsStringEvaluationError
+                throw t as? JsException
                         ?: NativeToJsFunctionRegistrationError(jsValue.associatedJsName, t)
             }
         }
@@ -710,9 +710,8 @@ class JsBridge(context: Context): CoroutineScope {
         launch {
             val jniJsContext = jniJsContextOrThrow()
 
-            jsValue.codeEvaluationDeferred?.await()
-
             try {
+                jsValue.codeEvaluationDeferred?.await()
                 jniRegisterJsObject( jniJsContext, jsValue.associatedJsName, methods.toTypedArray())
             } catch (t: Throwable) {
                 throw NativeToJsRegistrationError(type, cause = t)
