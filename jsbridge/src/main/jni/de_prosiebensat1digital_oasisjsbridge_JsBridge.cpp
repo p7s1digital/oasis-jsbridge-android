@@ -27,48 +27,28 @@
 #include "jni-helpers/JStringLocalRef.h"
 #include <new>
 
-#define SET_UP_JNI_CONTEXT(env, lctx) auto internalScopedContext = InternalScopedContext(env, lctx)
-#define GET_DUKTAPE_CONTEXT() internalScopedContext.getJsBridgeContext()
-#define DELETE_JNI_CONTEXT() internalScopedContext.deleteJniContext()
+namespace {
+  // This should be instanciated in each JNI entry function to make sure that the JNI context is
+  // properly set up with the current JNIEnv
+  JsBridgeContext *getJsBridgeContext(JNIEnv *env, jlong lctx) {
+    assert(lctx != 0L);
+    auto jsBridgeContext = reinterpret_cast<JsBridgeContext *>(lctx);
 
-//namespace {
-  // Handle context within its scope. This should be instanciated in each JNI entry
-  // function to make sure that the whole JNI context is properly set up
-  class InternalScopedContext {
-  public:
-    explicit InternalScopedContext(JNIEnv *env, jlong lctx) {
-      //alog("BEGINNING OF JNI SCOPE");
-      m_jsBridgeContext = reinterpret_cast<JsBridgeContext *>(lctx);
-
-      m_jniContext = m_jsBridgeContext->getJniContext();
-      assert(m_jniContext != nullptr);
-      m_jniContext->m_jniEnv = env;
+    // Set the current JNIEnv instance of the JniContext
+    JniContext *jniContext = jsBridgeContext->getJniContext();
+    assert(jniContext != nullptr);
+    assert(jniContext->getJNIEnv() == env);
+    jniContext->setCurrentJNIEnv(env);
 
 #ifndef NDEBUG
-      // In debug mode: check that we are in the correct thread
-      // (everything else will lead to unexpected behavior...)
-      m_jsBridgeContext->getJniCache()->getJsBridgeInterface().checkJsThread();
+    // In debug mode: check that we are in the correct thread
+    // (everything else will lead to unexpected behavior...)
+    jsBridgeContext->getJniCache()->getJsBridgeInterface().checkJsThread();
 #endif
-    }
 
-    ~InternalScopedContext() {
-      if (m_jniContext == nullptr) {
-        return;
-      }
-    }
-
-    JsBridgeContext *getJsBridgeContext() const { return m_jsBridgeContext; }
-
-    void deleteJniContext() {
-      delete m_jniContext;
-      m_jniContext = nullptr;
-    }
-
-  private:
-    JsBridgeContext *m_jsBridgeContext = nullptr;
-    JniContext *m_jniContext = nullptr;
-  };
-//}
+    return jsBridgeContext;
+  }
+}
 
 extern "C" {
 
@@ -91,22 +71,13 @@ JNIEXPORT jlong JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniC
     return 0L;
   }
 
-  auto lctx = reinterpret_cast<jlong>(jsBridgeContext);
-
-  SET_UP_JNI_CONTEXT(env, lctx);
-
-  return lctx;
+  return reinterpret_cast<jlong>(jsBridgeContext);
 }
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCancelDebug
     (JNIEnv *env, jobject, jlong lctx) {
 
-  SET_UP_JNI_CONTEXT(env, lctx);
-  auto jsBridgeContext = GET_DUKTAPE_CONTEXT();
-  if (jsBridgeContext == nullptr) {
-    return;
-  }
-
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
   jsBridgeContext->cancelDebug();
 }
 
@@ -115,14 +86,11 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniDe
 
   alog("jniDeleteContext()");
 
-  SET_UP_JNI_CONTEXT(env, lctx);
-  auto jsBridgeContext = GET_DUKTAPE_CONTEXT();
-  if (jsBridgeContext == nullptr) {
-    return;
-  }
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
+  auto jniContext = jsBridgeContext->getJniContext();
 
   delete jsBridgeContext;
-  DELETE_JNI_CONTEXT();
+  delete jniContext;
 }
 
 JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniEvaluateString
@@ -130,13 +98,8 @@ JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jn
 
   //alog("jniEvaluateString()");
 
-  SET_UP_JNI_CONTEXT(env, lctx);
-  auto jsBridgeContext = GET_DUKTAPE_CONTEXT();
-  if (jsBridgeContext == nullptr) {
-    return nullptr;
-  }
-
-  JniContext *jniContext = jsBridgeContext->getJniContext();
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
+  auto jniContext = jsBridgeContext->getJniContext();
 
   std::string strCode = JStringLocalRef(jniContext, code, true).str();
 
@@ -162,14 +125,8 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniEv
 
   //alog("jniEvaluateFileContent()");
 
-  SET_UP_JNI_CONTEXT(env, lctx);
-  auto jsBridgeContext = GET_DUKTAPE_CONTEXT();
-  if (jsBridgeContext == nullptr) {
-    return;
-  }
-
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
   auto jniContext = jsBridgeContext->getJniContext();
-  assert(jniContext != nullptr);
 
   std::string strCode = JStringLocalRef(jniContext, code, true).str();
   std::string strFilename = JStringLocalRef(jniContext, filename, true).str();
@@ -188,14 +145,8 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
 
   //alog("jniRegisterJavaObject()");
 
-  SET_UP_JNI_CONTEXT(env, lctx);
-  auto jsBridgeContext = GET_DUKTAPE_CONTEXT();
-  if (jsBridgeContext == nullptr) {
-    return;
-  }
-
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
   auto jniContext = jsBridgeContext->getJniContext();
-  assert(jniContext != nullptr);
 
   std::string strName = JStringLocalRef(jniContext, name, true).str();
 
@@ -214,14 +165,8 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
 
   //alog("jniRegisterJavaLambda()");
 
-  SET_UP_JNI_CONTEXT(env, lctx);
-  auto jsBridgeContext = GET_DUKTAPE_CONTEXT();
-  if (jsBridgeContext == nullptr) {
-    return;
-  }
-
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
   auto jniContext = jsBridgeContext->getJniContext();
-  assert(jniContext != nullptr);
 
   std::string strName = JStringLocalRef(jniContext, name, true).str();
 
@@ -240,14 +185,8 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
 
   //alog("jniRegisterJsObject()");
 
-  SET_UP_JNI_CONTEXT(env, lctx);
-  auto jsBridgeContext = GET_DUKTAPE_CONTEXT();
-  if (jsBridgeContext == nullptr) {
-    return;
-  }
-
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
   auto jniContext = jsBridgeContext->getJniContext();
-  assert(jniContext != nullptr);
 
     std::string strName = JStringLocalRef(jniContext, name, true).str();
 
@@ -265,14 +204,8 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
 
   //alog("jniRegisterJsLambda()");
 
-  SET_UP_JNI_CONTEXT(env, lctx);
-  auto jsBridgeContext = GET_DUKTAPE_CONTEXT();
-  if (jsBridgeContext == nullptr) {
-    return;
-  }
-
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
   auto jniContext = jsBridgeContext->getJniContext();
-  assert(jniContext != nullptr);
 
   std::string strName = JStringLocalRef(jniContext, name, true).str();
 
@@ -290,14 +223,8 @@ JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jn
 
   //alog("jniCallJsMethod()");
 
-  SET_UP_JNI_CONTEXT(env, lctx);
-  auto jsBridgeContext = GET_DUKTAPE_CONTEXT();
-  if (jsBridgeContext == nullptr) {
-    return nullptr;
-  }
-
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
   auto jniContext = jsBridgeContext->getJniContext();
-  assert(jniContext != nullptr);
 
   std::string strObjectName = JStringLocalRef(jniContext, objectName, true).str();
 
@@ -324,14 +251,8 @@ JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jn
 
   //alog("jniCallJsLambda()");
 
-  SET_UP_JNI_CONTEXT(env, lctx);
-  auto jsBridgeContext = GET_DUKTAPE_CONTEXT();
-  if (jsBridgeContext == nullptr) {
-    return nullptr;
-  }
-
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
   auto jniContext = jsBridgeContext->getJniContext();
-  assert(jniContext != nullptr);
 
   std::string strObjectName = JStringLocalRef(jniContext, objectName, true).str();
 
@@ -358,14 +279,8 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniAs
 
   //alog("jniInitJsValue()");
 
-  SET_UP_JNI_CONTEXT(env, lctx);
-  auto jsBridgeContext = GET_DUKTAPE_CONTEXT();
-  if (jsBridgeContext == nullptr) {
-    return;
-  }
-
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
   auto jniContext = jsBridgeContext->getJniContext();
-  assert(jniContext != nullptr);
 
   std::string strGlobalName = JStringLocalRef(jniContext, globalName, true).str();
   std::string strJsCode = JStringLocalRef(jniContext, jsCode, true).str();
@@ -378,14 +293,8 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniNe
 
   //alog("jniNewJsFunction()");
 
-  SET_UP_JNI_CONTEXT(env, lctx);
-  auto jsBridgeContext = GET_DUKTAPE_CONTEXT();
-  if (jsBridgeContext == nullptr) {
-    return;
-  }
-
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
   auto jniContext = jsBridgeContext->getJniContext();
-  assert(jniContext != nullptr);
 
   std::string strGlobalName = JStringLocalRef(jniContext, globalName, true).str();
   JObjectArrayLocalRef objectArgs(jniContext, args, true);
@@ -399,14 +308,8 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCo
 
   //alog("jniCompleteJsPromise()");
 
-  SET_UP_JNI_CONTEXT(env, lctx);
-  auto jsBridgeContext = GET_DUKTAPE_CONTEXT();
-  if (jsBridgeContext == nullptr) {
-    return;
-  }
-
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
   auto jniContext = jsBridgeContext->getJniContext();
-  assert(jniContext != nullptr);
 
   std::string strId = JStringLocalRef(jniContext, id, true).str();
   JniLocalRef<jobject> valueRef(jniContext, value, true);
@@ -425,12 +328,7 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniPr
 
   //alog("jniProcessPromiseQueue()");
 
-  SET_UP_JNI_CONTEXT(env, lctx);
-  auto jsBridgeContext = GET_DUKTAPE_CONTEXT();
-  if (jsBridgeContext == nullptr) {
-    return;
-  }
-
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
   jsBridgeContext->processPromiseQueue();
 }
 

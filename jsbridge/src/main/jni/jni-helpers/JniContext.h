@@ -33,6 +33,7 @@ public:
   ~JniContext();
 
   JNIEnv *getJNIEnv() const { return m_jniEnv; }
+  void setCurrentJNIEnv(JNIEnv *env) { m_jniEnv = env; }
 
   jmethodID getMethodID(const JniRef<jclass> &, const char *name, const char *sig) const;
   jmethodID getStaticMethodID(const JniRef<jclass> &, const char *name, const char *sig) const;
@@ -228,8 +229,6 @@ public:
   }
 
 private:
-  friend class InternalScopedContext;
-
   JNIEnv *m_jniEnv;
 };
 
