@@ -34,6 +34,7 @@
 
 class DuktapeUtils;
 class JavaType;
+class JniCache;
 class JObjectArrayLocalRef;
 class QuickJsUtils;
 
@@ -48,7 +49,7 @@ public:
   ~JsBridgeContext();
 
   // Must be called immediately after the constructor
-  void init(JniContext *jniContext);
+  void init(JniContext *jniContext, const JniLocalRef<jobject> &jsBridgeObject);
 
   void initDebugger();
   void cancelDebug();
@@ -82,7 +83,10 @@ public:
   void rethrowJniException() const;
   void queueJavaExceptionForJsError() const;
 
-  JniContext *jniContext() const { return m_currentJniContext; }
+  JniContext *getJniContext() { return m_jniContext; }
+  const JniContext *getJniContext() const { return m_jniContext; }
+  const JniCache *getJniCache() const { return m_jniCache; }
+
   const JavaTypeProvider &getJavaTypeProvider() const { return m_javaTypeProvider; }
   JniLocalRef<jthrowable> getJavaExceptionForJsError() const;
 
@@ -90,17 +94,18 @@ public:
   static JsBridgeContext *getInstance(duk_context *);
 
   DuktapeUtils *getUtils() const { return m_utils; }
-  duk_context *getCContext() const { return m_ctx; };
+  duk_context *getDuktapeContext() const { return m_ctx; };
 #elif defined(QUICKJS)
   static JsBridgeContext *getInstance(JSContext *);
 
   QuickJsUtils *getUtils() const { return m_utils; }
-  JSContext *getCContext() const { return m_ctx; };
+  JSContext *getQuickJsContext() const { return m_ctx; };
 #endif
 
 private:
   // Updated on each Java -> Native call (and reset to nullptr afterwards)
-  JniContext *m_currentJniContext = nullptr;
+  JniContext *m_jniContext = nullptr;
+  JniCache *m_jniCache = nullptr;
 
   const JavaTypeProvider m_javaTypeProvider;
 

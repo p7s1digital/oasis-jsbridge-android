@@ -22,6 +22,7 @@
 #include "JavaObject.h"
 #include "JavaScriptLambda.h"
 #include "JavaScriptObject.h"
+#include "JniCache.h"
 #include "StackChecker.h"
 #include "custom_stringify.h"
 #include "log.h"
@@ -72,9 +73,9 @@ JsBridgeContext::~JsBridgeContext() {
   duk_destroy_heap(m_ctx);
 }
 
-void JsBridgeContext::init(JniContext *jniContext) {
+void JsBridgeContext::init(JniContext *jniContext, const JniLocalRef<jobject> &jsBridgeObject) {
 
-  m_currentJniContext = jniContext;
+  m_jniContext = jniContext;
 
   m_ctx = duk_create_heap(nullptr, nullptr, nullptr, nullptr, fatalErrorHandler);
 
@@ -82,6 +83,7 @@ void JsBridgeContext::init(JniContext *jniContext) {
     throw std::bad_alloc();
   }
 
+  m_jniCache = new JniCache(this, jsBridgeObject);
   m_utils = new DuktapeUtils(jniContext, m_ctx);
 
   // Stash the JsBridgeContext instance in the context, so we can find our way back from a Duktape C callback.
@@ -102,7 +104,7 @@ void JsBridgeContext::init(JniContext *jniContext) {
 void JsBridgeContext::initDebugger() {
 
   // Call Java onDebuggerPending()
-  jniContext()->callJsBridgeVoidMethod("onDebuggerPending", "()V");
+  m_jniCache->getJsBridgeInterface().onDebuggerPending();
 
   alog_info("Debugger enabled, create socket and wait for connection\n");
   duk_trans_socket_init();
@@ -110,7 +112,7 @@ void JsBridgeContext::initDebugger() {
   alog_info("Debugger connected, call duk_debugger_attach() and then execute requested file(s)/eval\n");
 
   // Call Java onDebuggerReady()
-  jniContext()->callJsBridgeVoidMethod("onDebuggerReady", "()V");
+  m_jniCache->getJsBridgeInterface().onDebuggerReady();
 
   duk_debugger_attach(
       m_ctx,
@@ -133,9 +135,6 @@ void JsBridgeContext::cancelDebug() {
 JValue JsBridgeContext::evaluateString(const std::string &strCode, const JniLocalRef<jsBridgeParameter> &returnParameter,
                                       bool awaitJsPromise) const {
   CHECK_STACK(m_ctx);
-
-  JNIEnv *env = jniContext()->getJNIEnv();
-  assert(env != nullptr);
 
   if (duk_peval_string(m_ctx, strCode.c_str()) != DUK_EXEC_SUCCESS) {
     alog("Could not evaluate string:\n%s", strCode.c_str());
@@ -394,48 +393,39 @@ void JsBridgeContext::throwTypeException(const std::string &message, bool inScri
 }
 
 void JsBridgeContext::queueIllegalArgumentException(const std::string &message) const {
-  JniLocalRef<jclass> illegalArgumentException = jniContext()->findClass("java/lang/IllegalArgumentException");
-  jniContext()->throwNew(illegalArgumentException, message.c_str());
+  m_jniContext->throwNew(m_jniCache->getIllegalArgumentExceptionClass(), message.c_str());
 }
 
 void JsBridgeContext::queueJsException(const std::string &message) const {
-  JniLocalRef<jclass> exceptionClass = jniContext()->findClass("de/prosiebensat1digital/oasisjsbridge/JsException");
-
-  jmethodID newException = jniContext()->getMethodID(
-      exceptionClass, "<init>", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)V");
-
-  auto exception = jniContext()->newObject<jthrowable>(
-      exceptionClass,
-      newException,
+  auto exception = m_jniCache->newJsException(
       JStringLocalRef(),  // jsonValue
-      JStringLocalRef(jniContext(), message.c_str()),  // detailedMessage
+      JStringLocalRef(m_jniContext, message.c_str()),  // detailedMessage
       JStringLocalRef(),  // jsStackTrace
       JniLocalRef<jthrowable>()  // cause
   );
-  jniContext()->throw_(exception);
+  m_jniContext->throw_(exception);
 }
 
 //void JsBridgeContext::queueNullPointerException(const std::string &message) const {
-//  JniLocalRef<jclass> exceptionClass = findClass("java/lang/NullPointerException");
-//  m_jniEnv->ThrowNew(exceptionClass.create(), message.c_str());
+//  m_jniEnv->ThrowNew(nullPointerExceptionClass, message.c_str());
 //}
 
 bool JsBridgeContext::hasPendingJniException() const {
-  return jniContext()->exceptionCheck();
+  return m_jniContext->exceptionCheck();
 }
 
 void JsBridgeContext::rethrowJniException() const {
-  if (!jniContext()->exceptionCheck()) {
+  if (!m_jniContext->exceptionCheck()) {
     return;
   }
 
   // Get (and clear) the Java exception and read its message
-  auto exception = JniLocalRef<jthrowable>(jniContext(), jniContext()->exceptionOccurred(), true);
-  jniContext()->exceptionClear();
+  auto exception = JniLocalRef<jthrowable>(m_jniContext, m_jniContext->exceptionOccurred(), true);
+  m_jniContext->exceptionClear();
   
-  auto exceptionClass = jniContext()->getObjectClass(exception);
-  jmethodID getMessage = jniContext()->getMethodID(exceptionClass, "getMessage","()Ljava/lang/String;");
-  JStringLocalRef message(jniContext()->callObjectMethod<jstring>(exception, getMessage));
+  auto exceptionClass = m_jniContext->getObjectClass(exception);
+  jmethodID getMessage = m_jniContext->getMethodID(exceptionClass, "getMessage", "()Ljava/lang/String;");
+  JStringLocalRef message = m_jniContext->callStringMethod(exception, getMessage);
 
   // Propagate Java exception to JavaScript (and store pointer to Java exception)
   duk_push_error_object(m_ctx, DUK_ERR_ERROR, message.c_str());
@@ -449,23 +439,18 @@ void JsBridgeContext::rethrowJniException() const {
 // Duktape stack. The exception will be thrown to the Java caller when the current JNI call returns.
 //
 void JsBridgeContext::queueJavaExceptionForJsError() const {
-  jniContext()->throw_(getJavaExceptionForJsError());
+  m_jniContext->throw_(getJavaExceptionForJsError());
 }
 
 JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
   CHECK_STACK(m_ctx);
-
-  JniLocalRef<jclass> exceptionClass = jniContext()->findClass("de/prosiebensat1digital/oasisjsbridge/JsException");
-
-  jmethodID newException = jniContext()->getMethodID(
-      exceptionClass, "<init>", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)V");
 
   // Create the JSON string
   const char *jsonStringRaw = nullptr;
   if (custom_stringify(m_ctx, -1) == DUK_EXEC_SUCCESS) {
     jsonStringRaw = duk_require_string(m_ctx, -1);
   }
-  JStringLocalRef jsonString(jniContext(), jsonStringRaw);
+  JStringLocalRef jsonString(m_jniContext, jsonStringRaw);
   duk_pop(m_ctx);  // stringified string
 
   duk_dup(m_ctx, -1);  // JS error
@@ -480,16 +465,14 @@ JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
   JniLocalRef<jthrowable> cause;
   if (duk_is_object(m_ctx, -1) && !duk_is_null(m_ctx, -1) && duk_has_prop_string(m_ctx, -1, JAVA_EXCEPTION_PROP_NAME)) {
     duk_get_prop_string(m_ctx, -1, JAVA_EXCEPTION_PROP_NAME);
-    cause = JniLocalRef<jthrowable>(jniContext(), static_cast<jthrowable>(duk_get_pointer(m_ctx, -1)));
+    cause = JniLocalRef<jthrowable>(m_jniContext, static_cast<jthrowable>(duk_get_pointer(m_ctx, -1)));
     duk_pop(m_ctx);  // Java exception
   }
 
-  return jniContext()->newObject<jthrowable>(
-      exceptionClass,
-      newException,
+  return m_jniCache->newJsException(
       jsonString,  // jsonValue
-      JStringLocalRef(jniContext(), strFirstLine.c_str()),  // detailedMessage
-      JStringLocalRef(jniContext(), strJsStacktrace.c_str()),  // jsStackTrace
+      JStringLocalRef(m_jniContext, strFirstLine.c_str()),  // detailedMessage
+      JStringLocalRef(m_jniContext, strJsStacktrace.c_str()),  // jsStackTrace
       cause
   );
 }

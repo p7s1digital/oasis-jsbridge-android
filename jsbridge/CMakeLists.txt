@@ -25,6 +25,8 @@ add_library(
     src/main/jni/JavaType.cpp
     src/main/jni/JavaTypeProvider.cpp
     src/main/jni/JavaTypeId.cpp
+    src/main/jni/JniCache.cpp
+    src/main/jni/JniInterfaces.cpp
     src/main/jni/java-types/Array.cpp
     src/main/jni/java-types/Boolean.cpp
     src/main/jni/java-types/BoxedPrimitive.cpp

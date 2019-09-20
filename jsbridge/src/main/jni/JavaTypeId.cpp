@@ -77,14 +77,6 @@ static std::unordered_map<JavaTypeId, std::string> createInversedMap() {
 
 static std::unordered_map<JavaTypeId, std::string> sIdToJavaName = createInversedMap();
 
-static std::string dropLandSemicolon(const std::string& s) {
-  if (s.empty() || s[0] != 'L') {
-    return s;
-  }
-  return s.substr(1, s.length() - 2);
-}
-
-
 JavaTypeId getJavaTypeIdByJavaName(const std::string &javaName) {
   auto itFind = sJavaNameToID.find(javaName);
   if (itFind != sJavaNameToID.end()) {

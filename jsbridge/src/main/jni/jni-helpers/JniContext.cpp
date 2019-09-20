@@ -16,16 +16,8 @@
 #include "JniContext.h"
 #include "JStringLocalRef.h"
 
-#define JSBRIDGE_PKG_PATH "de/prosiebensat1digital/oasisjsbridge"
-
-JniContext::JniContext(JNIEnv *env, jobject jsBridgeJavaObject)
- : m_jniEnv(env)
- , m_jsBridgeJavaClass(JniGlobalRef<jclass>(findClass(JSBRIDGE_PKG_PATH "/JsBridge")))
- , m_jsBridgeJavaObject(JniGlobalRef<jobject>(JniLocalRef<jobject>(this, jsBridgeJavaObject, true))) {
-
-  m_objectClass = JniGlobalRef<jclass>(findClass("java/lang/Object"));
-  m_jsBridgeMethodClass = JniGlobalRef<jclass>(findClass(JSBRIDGE_PKG_PATH "/Method"));
-  m_jsBridgeParameterClass = JniGlobalRef<jclass>(findClass(JSBRIDGE_PKG_PATH "/Parameter"));
+JniContext::JniContext(JNIEnv *env)
+ : m_jniEnv(env) {
 }
 
 JniContext::~JniContext() {
@@ -50,12 +42,12 @@ JniLocalRef<jclass> JniContext::findClass(const char *name) const {
   return JniLocalRef<jclass>(this, m_jniEnv->FindClass(name));
 }
 
-void JniContext::throw_(const JniRef<jthrowable> &throwable) {
+void JniContext::throw_(const JniRef<jthrowable> &throwable) const {
   assert(m_jniEnv);
   m_jniEnv->Throw(throwable.get());
 }
 
-void JniContext::throwNew(const JniRef<jclass> &clazz, const char *s) {
+void JniContext::throwNew(const JniRef<jclass> &clazz, const char *s) const {
   assert(m_jniEnv);
   m_jniEnv->ThrowNew(clazz.get(), s);
 }
@@ -70,7 +62,7 @@ jthrowable JniContext::exceptionOccurred() const {
   return m_jniEnv->ExceptionOccurred();
 }
 
-void JniContext::exceptionClear() {
+void JniContext::exceptionClear() const {
   assert(m_jniEnv);
   m_jniEnv->ExceptionClear();
 }

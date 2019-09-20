@@ -17,6 +17,8 @@
  * limitations under the License.
  */
 #include "JavaScriptMethod.h"
+
+#include "JniCache.h"
 #include "JsBridgeContext.h"
 #include "JavaType.h"
 #include "jni-helpers/JniContext.h"
@@ -29,25 +31,21 @@ JavaScriptMethod::JavaScriptMethod(const JsBridgeContext *jsBridgeContext, const
  : m_methodName(std::move(methodName))
  , m_isLambda(isLambda) {
 
-  JniContext *jniContext = jsBridgeContext->jniContext();
+  const JniCache *jniCache = jsBridgeContext->getJniCache();
   const JavaTypeProvider &javaTypeProvider = jsBridgeContext->getJavaTypeProvider();
 
-  const JniRef<jclass> &jsBridgeMethodClass = jniContext->getJsBridgeMethodClass();
-  const JniRef<jclass> &jsBridgeParameterClass = jniContext->getJsBridgeParameterClass();
+  MethodInterface methodInterface = jniCache->getMethodInterface(method);
 
   {
     // Create return value loader
-    jmethodID getReturnParameter = jniContext->getMethodID(jsBridgeMethodClass, "getReturnParameter", "()Lde/prosiebensat1digital/oasisjsbridge/Parameter;");
-    JniLocalRef<jsBridgeParameter> returnParameter = jniContext->callObjectMethod<jsBridgeParameter>(method, getReturnParameter);
+    JniLocalRef<jsBridgeParameter> returnParameter = methodInterface.getReturnParameter();
     m_returnValueType = std::move(javaTypeProvider.makeUniqueType(returnParameter, true /*boxed*/));
     m_returnValueParameter = JniGlobalRef<jsBridgeParameter>(returnParameter);
   }
 
-  jmethodID isVarArgsMethod = jniContext->getMethodID(jsBridgeMethodClass, "isVarArgs", "()Z");
-  m_isVarArgs = (bool) jniContext->callBooleanMethod(method, isVarArgsMethod);
+  m_isVarArgs = (bool) methodInterface.isVarArgs();
 
-  jmethodID getParameters = jniContext->getMethodID(jsBridgeMethodClass, "getParameters", "()[Lde/prosiebensat1digital/oasisjsbridge/Parameter;");
-  JObjectArrayLocalRef parameters(jniContext->callObjectMethod<jobjectArray>(method, getParameters));
+  JObjectArrayLocalRef parameters = methodInterface.getParameters();
   const auto numParameters = (size_t) parameters.getLength();
 
   // Release any local objects allocated in this frame when we leave this scope.
@@ -97,7 +95,7 @@ JavaScriptMethod &JavaScriptMethod::operator=(JavaScriptMethod &&other) noexcept
 #include "StackChecker.h"
 
 JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, void *jsHeapPtr, const JObjectArrayLocalRef &args, bool awaitJsPromise) const {
-  duk_context *ctx = jsBridgeContext->getCContext();
+  duk_context *ctx = jsBridgeContext->getDuktapeContext();
   CHECK_STACK(ctx);
 
   JValue result;
@@ -163,7 +161,7 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, void *js
 
 JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, JSValueConst jsMethod, JSValueConst jsThis, const JObjectArrayLocalRef &javaArgs, bool awaitJsPromise) const {
   JValue result;
-  JSContext *ctx = jsBridgeContext->getCContext();
+  JSContext *ctx = jsBridgeContext->getQuickJsContext();
 
   int numArguments = javaArgs.isNull() ? 0 : (int) javaArgs.getLength();
 

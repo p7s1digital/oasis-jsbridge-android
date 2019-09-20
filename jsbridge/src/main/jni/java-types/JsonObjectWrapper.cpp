@@ -15,6 +15,7 @@
  */
 #include "JsonObjectWrapper.h"
 
+#include "JniCache.h"
 #include "JsBridgeContext.h"
 #include "custom_stringify.h"
 #include "log.h"
@@ -41,18 +42,13 @@ namespace {
 JValue JsonObjectWrapper::pop(bool inScript) const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
-  alog("BW - JOW::pop1");
-  alog("BW - JOW::pop2");
-
   // Check if the caller passed in a null string.
   if (duk_is_null_or_undefined(m_ctx, -1)) {
     duk_pop(m_ctx);
     return JValue();
   }
 
-  alog("BW - JOW::pop3");
   duk_require_object_coercible(m_ctx, -1);
-  alog("BW - JOW::pop4");
 
   if (custom_stringify(m_ctx, -1) != DUK_EXEC_SUCCESS) {
     alog_warn("Could not stringify object!");
@@ -61,19 +57,10 @@ JValue JsonObjectWrapper::pop(bool inScript) const {
     return JValue();
   }
 
-  alog("BW - JOW::pop5");
-
   JStringLocalRef str(m_jniContext, duk_require_string(m_ctx, -1));
   duk_pop(m_ctx);
 
-  alog("BW - JOW::pop6");
-
-  JniLocalRef<jclass> javaClass = getJavaClass();
-  jmethodID method = m_jniContext->getMethodID(javaClass, "<init>", "(Ljava/lang/String;)V");
-  JniLocalRef<jobject> localRef = m_jniContext->newObject<jobject>(javaClass, method, str);
-  javaClass.release();
-
-  alog("BW - JOW::pop7");
+  JniLocalRef<jobject> localRef = getJniCache()->newJsonObjectWrapper(str);
 
   duk_pop(m_ctx);
   return JValue(localRef);
@@ -88,8 +75,7 @@ duk_ret_t JsonObjectWrapper::push(const JValue &value, bool inScript) const {
     return 1;
   }
 
-  jmethodID method = m_jniContext->getMethodID(getJavaClass(), "getJsonString", "()Ljava/lang/String;");
-  JStringLocalRef str(m_jniContext->callObjectMethod<jstring>(jWrapper, method));
+  JStringLocalRef str = getJniCache()->getJsonObjectWrapperString(jWrapper);
 
   if (m_jsBridgeContext->hasPendingJniException()) {
     duk_push_undefined(m_ctx);
@@ -141,11 +127,7 @@ JValue JsonObjectWrapper::toJava(JSValueConst v, bool inScript) const {
   JS_FreeCString(m_ctx, jsonCStr);
   JS_FreeValue(m_ctx, jsonValue);
 
-  JniLocalRef<jclass> javaClass = getJavaClass();
-  jmethodID method = m_jniContext->getMethodID(javaClass, "<init>", "(Ljava/lang/String;)V");
-  JniLocalRef<jobject> localRef = m_jniContext->newObject<jobject>(javaClass, method, str);
-  javaClass.release();
-
+  JniLocalRef<jobject> localRef = getJniCache()->newJsonObjectWrapper(str);
   return JValue(localRef);
 }
 
@@ -156,8 +138,7 @@ JSValue JsonObjectWrapper::fromJava(const JValue &value, bool inScript) const {
     return JS_NULL;
   }
 
-  jmethodID method = m_jniContext->getMethodID(getJavaClass(), "getJsonString", "()Ljava/lang/String;");
-  JStringLocalRef str(m_jniContext->callObjectMethod<jstring>(jWrapper, method));
+  JStringLocalRef str = getJniCache()->getJsonObjectWrapperString(jWrapper);
 
   if (m_jsBridgeContext->hasPendingJniException()) {
     m_jsBridgeContext->rethrowJniException();

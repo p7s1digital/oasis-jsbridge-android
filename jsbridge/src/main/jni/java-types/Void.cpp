@@ -32,10 +32,10 @@ JValue Void::pop(bool) const {
   duk_pop(m_ctx);
 
   if (m_boxed) {
-    // Create and return a new Void or Unit instance
+    // Create and return a new Void or Unit instance (TODO: cache me!)
     const auto &javaClass = getJavaClass();
-    jmethodID newInstance = getJniContext()->getMethodID(getJavaClass(), "<init>", "()V");
-    auto instance = getJniContext()->newObject<jthrowable>(getJavaClass(), newInstance);
+    jmethodID newInstance = m_jniContext->getMethodID(getJavaClass(), "<init>", "()V");
+    auto instance = m_jniContext->newObject<jthrowable>(getJavaClass(), newInstance);
     return JValue(instance);
   }
 
@@ -76,8 +76,8 @@ JValue Void::toJava(JSValueConst, bool) const {
   if (m_boxed) {
     // Create and return a new Void or Unit instance
     const auto &javaClass = getJavaClass();
-    jmethodID newInstance = getJniContext()->getMethodID(getJavaClass(), "<init>", "()V");
-    auto instance = getJniContext()->newObject<jthrowable>(getJavaClass(), newInstance);
+    jmethodID newInstance = m_jniContext->getMethodID(getJavaClass(), "<init>", "()V");
+    auto instance = m_jniContext->newObject<jthrowable>(getJavaClass(), newInstance);
     return JValue(instance);
   }
 

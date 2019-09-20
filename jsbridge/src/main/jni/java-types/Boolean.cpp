@@ -148,7 +148,7 @@ JSValue Boolean::fromJavaArray(const JniLocalRef<jarray>& values, bool inScript)
     jboolean b = boolArray.getElement(i);
     try {
       JSValue elementValue = fromJava(JValue(b), inScript);
-      JS_SetPropertyUint32(m_ctx, jsArray, i, elementValue);
+      JS_SetPropertyUint32(m_ctx, jsArray, static_cast<uint32_t>(i), elementValue);
     } catch (std::invalid_argument &e) {
       JS_FreeValue(m_ctx, jsArray);
       throw e;
@@ -178,13 +178,13 @@ JValue Boolean::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
 
 JValue Boolean::box(const JValue &booleanValue) const {
   // From boolean to Boolean
-  jmethodID boxId = m_jniContext->getStaticMethodID(getBoxedJavaClass(), "valueOf", "(Z)Ljava/lang/Boolean;");
+  static thread_local jmethodID boxId = m_jniContext->getStaticMethodID(getBoxedJavaClass(), "valueOf", "(Z)Ljava/lang/Boolean;");
   return JValue(m_jniContext->callStaticObjectMethod(getBoxedJavaClass(), boxId, booleanValue.getBool()));
 }
 
 JValue Boolean::unbox(const JValue &boxedValue) const {
   // From Boolean to boolean
-  jmethodID unboxId = m_jniContext->getMethodID(getBoxedJavaClass(), "booleanValue", "()Z");
+  static thread_local jmethodID unboxId = m_jniContext->getMethodID(getBoxedJavaClass(), "booleanValue", "()Z");
   return JValue(m_jniContext->callBooleanMethod(boxedValue.getLocalRef(), unboxId));
 }
 

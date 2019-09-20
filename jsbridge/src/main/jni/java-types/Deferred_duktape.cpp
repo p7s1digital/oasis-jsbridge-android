@@ -15,10 +15,10 @@
  */
 #include "java-types/Deferred.h"
 
+#include "JniCache.h"
 #include "JsBridgeContext.h"
 #include "StackChecker.h"
 #include "jni-helpers/JniContext.h"
-#include "../../../main/jni/JsBridgeContext.h"
 
 namespace {
   const char *PAYLOAD_PROP_NAME = "\xff\xffpayload";
@@ -38,8 +38,6 @@ namespace {
 
       JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
       assert(jsBridgeContext != nullptr);
-
-      JniContext *jniContext = jsBridgeContext->jniContext();
 
       // Get the bound native Deferred instance and the generic argument loader
       duk_push_current_function(ctx);
@@ -61,9 +59,8 @@ namespace {
       }
 
       // Complete the native Deferred
-      jniContext->callJsBridgeVoidMethod("resolveDeferred",
-                                         "(Lkotlinx/coroutines/CompletableDeferred;Ljava/lang/Object;)V",
-                                         payload->javaDeferred, value);
+      jsBridgeContext->getJniCache()->getJsBridgeInterface().resolveDeferred(payload->javaDeferred, value);
+
       return 0;
     }
 
@@ -74,8 +71,6 @@ namespace {
 
       JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
       assert(jsBridgeContext != nullptr);
-
-      JniContext *jniContext = jsBridgeContext->jniContext();
 
       // Get the bound native Deferred instance and the generic argument loader
       duk_push_current_function(ctx);
@@ -95,10 +90,8 @@ namespace {
       duk_pop_n(ctx, argCount);  // function args
 
       // Reject the native Deferred
-      jniContext->callJsBridgeVoidMethod("rejectDeferred", "(Lkotlinx/coroutines/CompletableDeferred;Lde/prosiebensat1digital/oasisjsbridge/JsException;)V", payload->javaDeferred, value);
-      if (jsBridgeContext->hasPendingJniException()) {
-        jsBridgeContext->rethrowJniException();
-      }
+      jsBridgeContext->getJniCache()->getJsBridgeInterface().rejectDeferred(payload->javaDeferred, value);
+      jsBridgeContext->rethrowJniException();
 
       return 0;
     }
@@ -176,7 +169,7 @@ JValue Deferred::pop(bool inScript) const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
   // Create a native Deferred instance
-  JniLocalRef<jobject> javaDeferred = m_jniContext->callJsBridgeObjectMethod("createCompletableDeferred", "()Lkotlinx/coroutines/CompletableDeferred;");
+  JniLocalRef<jobject> javaDeferred = getJniCache()->getJsBridgeInterface().createCompletableDeferred();
   if (m_jsBridgeContext->hasPendingJniException()) {
     duk_pop(m_ctx);
     m_jsBridgeContext->rethrowJniException();
@@ -186,12 +179,8 @@ JValue Deferred::pop(bool inScript) const {
     // Not a Promise => directly resolve the native Deferred with the value
     JValue value = m_componentType->pop(inScript);
 
-    m_jniContext->callJsBridgeVoidMethod("resolveDeferred",
-                                         "(Lkotlinx/coroutines/CompletableDeferred;Ljava/lang/Object;)V",
-                                         javaDeferred, value);
-    if (m_jsBridgeContext->hasPendingJniException()) {
-      m_jsBridgeContext->rethrowJniException();
-    }
+    getJniCache()->getJsBridgeInterface().resolveDeferred(javaDeferred, value);
+    m_jsBridgeContext->rethrowJniException();
 
     return JValue(javaDeferred);
   }
@@ -206,9 +195,7 @@ JValue Deferred::pop(bool inScript) const {
   duk_dup(m_ctx, onPromiseRejectedIdx);
   if (duk_pcall_prop(m_ctx, jsPromiseObjectIdx, 2) != DUK_EXEC_SUCCESS) {
     JniLocalRef<jthrowable> javaException = m_jsBridgeContext->getJavaExceptionForJsError();
-    m_jniContext->callJsBridgeVoidMethod("rejectDeferred",
-                                         "(Lkotlinx/coroutines/CompletableDeferred;Ljava/lang/Object;)V",
-                                         javaDeferred, javaException);
+    getJniCache()->getJsBridgeInterface().rejectDeferred(javaDeferred, JValue(javaException));
     duk_pop_2(m_ctx);  // (undefined) ret val + JsPromiseObject
     m_jsBridgeContext->rethrowJniException();
     return JValue(javaDeferred);
@@ -286,17 +273,15 @@ duk_ret_t Deferred::push(const JValue &value, bool inScript) const {
   // => STASH: [... Promise]
 
   // Call Java setUpJsPromise()
-  m_jniContext->callJsBridgeVoidMethod("setUpJsPromise", "(Ljava/lang/String;Lkotlinx/coroutines/Deferred;)V",
-                                       JStringLocalRef(m_jniContext, promiseObjectGlobalName.c_str()), jDeferred);
-  if (m_jsBridgeContext->hasPendingJniException()) {
-    m_jsBridgeContext->rethrowJniException();
-  }
+    getJniCache()->getJsBridgeInterface().setUpJsPromise(
+    JStringLocalRef(m_jniContext, promiseObjectGlobalName.c_str()), jDeferred);
+  m_jsBridgeContext->rethrowJniException();
 
   return 1;
 }
 
 void Deferred::completeJsPromise(const JsBridgeContext *jsBridgeContext, const std::string &strId, bool isFulfilled, const JniLocalRef<jobject> &value) {
-  duk_context *ctx = jsBridgeContext->getCContext();
+  duk_context *ctx = jsBridgeContext->getDuktapeContext();
   assert(ctx != nullptr);
 
   CHECK_STACK(ctx);

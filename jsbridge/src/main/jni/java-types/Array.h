@@ -37,7 +37,6 @@ public:
 #endif
 
 private:
-  JniGlobalRef<jclass> m_javaClass;
   std::unique_ptr<const JavaType> m_componentType;
 };
 

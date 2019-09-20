@@ -17,7 +17,9 @@
  * limitations under the License.
  */
 #include "JavaMethod.h"
+
 #include "JavaType.h"
+#include "JniCache.h"
 #include "JsBridgeContext.h"
 #include "jni-helpers/JniLocalRef.h"
 #include "jni-helpers/JniLocalFrame.h"
@@ -31,35 +33,27 @@ JavaMethod::JavaMethod(const JsBridgeContext *jsBridgeContext, const JniLocalRef
  : m_methodName(std::move(methodName)),
    m_isLambda(isLambda) {
 
-  JniContext *jniContext = jsBridgeContext->jniContext();
+  const JniContext *jniContext = jsBridgeContext->getJniContext();
+  MethodInterface methodInterface = jsBridgeContext->getJniCache()->getMethodInterface(method);
 
-  const JniRef<jclass> &jsBridgeMethodClass = jniContext->getJsBridgeMethodClass();
-  const JniRef<jclass> &jsBridgeParameterClass = jniContext->getJsBridgeParameterClass();
-
-  jmethodID isVarArgs = jniContext->getMethodID(jsBridgeMethodClass, "isVarArgs", "()Z");
-  m_isVarArgs = jniContext->callBooleanMethod(method, isVarArgs);
-
-  jmethodID getParameters = jniContext->getMethodID(jsBridgeMethodClass, "getParameters", "()[Lde/prosiebensat1digital/oasisjsbridge/Parameter;");
-  JObjectArrayLocalRef parameters(jniContext->callObjectMethod<jobjectArray>(method, getParameters));
+  m_isVarArgs = methodInterface.isVarArgs();
+  JObjectArrayLocalRef parameters = methodInterface.getParameters();
   const jsize numParameters = parameters.getLength();
-
-  // TODO: remove me when the next TODO has been handled
-  jmethodID getParameterJava = jniContext->getMethodID(jsBridgeParameterClass, "getJava", "()Ljava/lang/Class;");
 
   m_argumentTypes.resize((size_t) numParameters);
 
   // Create JavaType instances
   for (jsize i = 0; i < numParameters; ++i) {
     JniLocalRef<jsBridgeParameter> parameter = parameters.getElement<jsBridgeParameter>(i);
-    JniLocalRef<jclass> javaClass = jniContext->callObjectMethod<jclass>(parameter, getParameterJava);
 
     if (m_isVarArgs && i == numParameters - 1) {
       // TODO: create the array component Parameter, maybe sth like Parameter.getArrayComponent()
-      jmethodID getVarArgParameter = jniContext->getMethodID(
-          jsBridgeParameterClass, "getVarArgParameter", "()Lde/prosiebensat1digital/oasisjsbridge/Parameter;");
-      JniLocalRef<jsBridgeParameter> varArgParameter = jniContext->callObjectMethod<jsBridgeParameter>(javaClass, getVarArgParameter);
-      auto javaType = jsBridgeContext->getJavaTypeProvider().makeUniqueType(varArgParameter, m_isLambda /*boxed*/);
-      m_argumentTypes[i] = std::move(javaType);
+      //Parameter parameterInterface = jsBridgeContext->getJniCache()->getParameterInterface(parameter);
+      //jmethodID getVarArgParameter = jniContext->getMethodID(
+      //    jsBridgeParameterClass, "getVarArgParameter", "()Lde/prosiebensat1digital/oasisjsbridge/Parameter;");
+      //JniLocalRef<jsBridgeParameter> varArgParameter = jniContext->callObjectMethod<jsBridgeParameter>(javaClass, getVarArgParameter);
+      //auto javaType = jsBridgeContext->getJavaTypeProvider().makeUniqueType(varArgParameter, m_isLambda /*boxed*/);
+      //m_argumentTypes[i] = std::move(javaType);
       break;
     }
 
@@ -70,8 +64,7 @@ JavaMethod::JavaMethod(const JsBridgeContext *jsBridgeContext, const JniLocalRef
 
   {
     // Create return value loader
-    jmethodID getReturnParameter = jniContext->getMethodID(jsBridgeMethodClass, "getReturnParameter", "()Lde/prosiebensat1digital/oasisjsbridge/Parameter;");
-    JniLocalRef<jsBridgeParameter> returnParameter = jniContext->callObjectMethod<jsBridgeParameter>( method, getReturnParameter);
+    JniLocalRef<jsBridgeParameter> returnParameter = methodInterface.getReturnParameter();
     m_returnValueType = jsBridgeContext->getJavaTypeProvider().makeUniqueType(returnParameter, m_isLambda /*boxed*/);
   }
 
@@ -89,8 +82,7 @@ JavaMethod::JavaMethod(const JsBridgeContext *jsBridgeContext, const JniLocalRef
 #endif
     };
   } else {
-    jmethodID getJavaMethod = jniContext->getMethodID(jsBridgeMethodClass, "getJavaMethod", "()Ljava/lang/reflect/Method;");
-    JniLocalRef<jclass> javaMethod = jniContext->callObjectMethod<jclass>(method, getJavaMethod);
+    JniLocalRef<jobject> javaMethod = methodInterface.getJavaMethod();
     methodId = jniContext->fromReflectedMethod(javaMethod);
 
     m_methodBody = [methodId, this](const JniRef<jobject> &javaThis, const std::vector<JValue> &args) {
@@ -109,10 +101,10 @@ JavaMethod::JavaMethod(const JsBridgeContext *jsBridgeContext, const JniLocalRef
 #include "StackChecker.h"
 
 duk_ret_t JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRef<jobject> &javaThis) const {
-  duk_context *ctx = jsBridgeContext->getCContext();
+  duk_context *ctx = jsBridgeContext->getDuktapeContext();
   CHECK_STACK(ctx);
 
-  JniContext *jniContext = jsBridgeContext->jniContext();
+  const JniContext *jniContext = jsBridgeContext->getJniContext();
 
   const auto argCount = duk_get_top(ctx);
   const auto minArgs = m_isVarArgs
@@ -152,8 +144,8 @@ duk_ret_t JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRe
 
 JSValue JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRef<jobject> &javaThis, int argc, JSValueConst *argv) const {
 
-  JSContext *ctx = jsBridgeContext->getCContext();
-  JniContext *jniContext = jsBridgeContext->jniContext();
+  JSContext *ctx = jsBridgeContext->getQuickJsContext();
+  const JniContext *jniContext = jsBridgeContext->getJniContext();
 
   const int minArgs = m_isVarArgs
       ? m_argumentTypes.size() - 1
@@ -197,18 +189,19 @@ JSValue JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRef<
 
 // static
 JValue JavaMethod::callLambda(const JsBridgeContext *jsBridgeContext, const JniRef<jsBridgeMethod> &method, const JniRef<jobject> &javaThis, const std::vector<JValue> &args) {
-  const JniContext *jniContext = jsBridgeContext->jniContext();
+  const JniContext *jniContext = jsBridgeContext->getJniContext();
   assert(jniContext != nullptr);
-  JniLocalRef<jclass> objectClass = jniContext->getObjectClass();
+
+  const JniCache *jniCache = jsBridgeContext->getJniCache();
+
+  JniLocalRef<jclass> objectClass = jniCache->getObjectClass();
   JObjectArrayLocalRef argArray(jniContext, args.size(), objectClass);
   int i = 0;
   for (auto &arg : args) {
     argArray.setElement(i++, arg.isNull() ? JniLocalRef<jobject>() : arg.getLocalRef());
   }
 
-  const JniRef<jclass> &methodClass = jniContext->getJsBridgeMethodClass();
-  jmethodID callNativeLambda = jniContext->getMethodID(methodClass, "callNativeLambda", "(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
-  JniLocalRef<jobject> ret = jniContext->callObjectMethod(method, callNativeLambda, javaThis, argArray);
+  JniLocalRef<jobject> ret = jniCache->getMethodInterface(method).callNativeLambda(javaThis, argArray);
 
   if (jsBridgeContext->hasPendingJniException()) {
     jsBridgeContext->rethrowJniException();
