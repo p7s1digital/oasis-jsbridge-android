@@ -47,6 +47,11 @@ internal open class Parameter private constructor(
         return javaClass?.name
     }
 
+    @Suppress("UNUSED")  // Called from JNI
+    fun isNullable(): Boolean {
+        return kotlinType?.isMarkedNullable == true
+    }
+
 
     // For Lambdas
     // ---

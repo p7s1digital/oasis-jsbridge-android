@@ -23,7 +23,7 @@ namespace JavaTypes {
 class JsValue : public JavaType {
 
 public:
-  JsValue(const JsBridgeContext *);
+  JsValue(const JsBridgeContext *, bool isNullable);
 
 #if defined(DUKTAPE)
   JValue pop(bool inScript) const override;
@@ -32,6 +32,9 @@ public:
   JValue toJava(JSValueConst, bool inScript) const override;
   JSValue fromJava(const JValue &, bool inScript) const override;
 #endif
+
+private:
+  bool m_isNullable;
 };
 
 }  // namespace JavaTypes

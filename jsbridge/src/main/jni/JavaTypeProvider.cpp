@@ -113,7 +113,7 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
     case JavaTypeId::FunctionX:
       return new FunctionX(m_jsBridgeContext, parameter);
     case JavaTypeId::JsValue:
-      return new JsValue(m_jsBridgeContext);
+      return new JsValue(m_jsBridgeContext, isParameterNullable(parameter));
     case JavaTypeId::JsonObjectWrapper:
       return new JsonObjectWrapper(m_jsBridgeContext);
     case JavaTypeId::Deferred:
@@ -182,6 +182,13 @@ JavaTypeId JavaTypeProvider::getJavaTypeId(const JniRef<jsBridgeParameter> &para
  }
 
  return id;
+}
+
+bool JavaTypeProvider::isParameterNullable(const JniRef<jsBridgeParameter> &parameter) const {
+  JniContext *jniContext = m_jsBridgeContext->jniContext();
+  JniLocalRef<jclass> parameterClass = jniContext->getJsBridgeParameterClass();
+  jmethodID isNullable = jniContext->getMethodID(parameterClass, "isNullable", "()Z");
+  return jniContext->callBooleanMethod(parameter, isNullable);
 }
 
 JniLocalRef<jsBridgeParameter> JavaTypeProvider::getGenericParameter(const JniRef<jsBridgeParameter> &parameter) const {

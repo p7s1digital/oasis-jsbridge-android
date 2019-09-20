@@ -68,8 +68,8 @@ class PayloadArray(length: Int): Payload {
 
     fun getString(index: Int) = array.getOrNull(index) as String?
     fun getBoolean(index: Int) = array.getOrNull(index) as Boolean?
-    fun getInt(index: Int) = array.getOrNull(index) as Int?
-    fun getDouble(index: Int) = array.getOrNull(index) as Double?
+    fun getInt(index: Int) = getIntFromAny(array.getOrNull(index))
+    fun getDouble(index: Int) = getDoubleFromAny(array.getOrNull(index))
     fun getObject(index: Int) = array.getOrNull(index) as PayloadObject?
     fun getArray(index: Int) = array.getOrNull(index) as PayloadArray?
     fun isNull(index: Int) = index >= 0 && array.size > index && array[index] == null
