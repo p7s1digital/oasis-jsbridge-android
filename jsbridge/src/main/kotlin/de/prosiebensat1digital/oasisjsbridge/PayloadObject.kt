@@ -19,6 +19,9 @@ import org.json.JSONObject
 import org.json.JSONTokener
 import timber.log.Timber
 import java.util.*
+import kotlin.reflect.jvm.internal.impl.load.kotlin.JvmType
+
+fun payloadObjectOf(vararg values: Pair<String, Any?>) = PayloadObject.fromValues(*values)
 
 class PayloadObject: Payload {
 
@@ -30,7 +33,19 @@ class PayloadObject: Payload {
         // TODO: make it recursive!
         fun fromValueMap(values: Map<String, Any?>): PayloadObject {
             val payloadObject = PayloadObject()
-            payloadObject.values.putAll(values)
+
+            @Suppress("UNCHECKED_CAST")
+            val mappedValues = values.mapValues { entry ->
+                val value = entry.value
+                when {
+                    value == null -> null
+                    value is Map<*, *> -> fromValueMap(value as Map<String, Any?>)
+                    value is Array<*> -> PayloadArray.fromValueArray(value as Array<Any?>)
+                    else -> value
+                }
+            }
+
+            payloadObject.values.putAll(mappedValues)
             return payloadObject
         }
 

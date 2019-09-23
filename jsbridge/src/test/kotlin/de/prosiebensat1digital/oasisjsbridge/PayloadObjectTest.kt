@@ -65,15 +65,60 @@ class PayloadObjectTest {
     }
 
     @Test
+    fun payloadObjectOf() {
+        // WHEN
+        val subject = payloadObjectOf(
+            "key1" to 123.4,
+            "key2" to "testString",
+            "key3" to payloadArrayOf(1, "two", null),
+            "key4" to payloadObjectOf(
+                "subKey1" to 456.7,
+                "subKey2" to "anotherTestString"
+            ),
+            "key5" to null,
+            "key6" to 69,
+            "key7" to true,
+            "key8" to false
+        )
+
+        // THEN
+        assertEquals(subject.toJsonString(true).compact(), expectedJsonString)
+        assertEquals(subject.toJsString(true).compact(), expectedJsString)
+    }
+
+    @Test
+    fun fromValues() {
+        // WHEN
+        val subject = PayloadObject.fromValues(
+            "key1" to 123.4,
+            "key2" to "testString",
+            "key3" to PayloadArray.fromValues(1, "two", null),
+            "key4" to PayloadObject.fromValues(
+                "subKey1" to 456.7,
+                "subKey2" to "anotherTestString"
+            ),
+            "key5" to null,
+            "key6" to 69,
+            "key7" to true,
+            "key8" to false
+        )
+
+        // THEN
+        assertEquals(subject.toJsonString(true).compact(), expectedJsonString)
+        assertEquals(subject.toJsString(true).compact(), expectedJsString)
+    }
+
+    @Test
     fun fromValuesMap() {
         // WHEN
         val subject = PayloadObject.fromValueMap(mapOf(
             "key1" to 123.4,
             "key2" to "testString",
-            "key3" to PayloadArray.fromValuesArray(arrayOf(1, "two", null)),
-            "key4" to PayloadObject.fromValueMap(mapOf(
-                    "subKey1" to 456.7, "subKey2" to "anotherTestString"
-            )),
+            "key3" to arrayOf(1, "two", null),
+            "key4" to hashMapOf(
+                "subKey1" to 456.7,
+                "subKey2" to "anotherTestString"
+            ),
             "key5" to null,
             "key6" to 69,
             "key7" to true,

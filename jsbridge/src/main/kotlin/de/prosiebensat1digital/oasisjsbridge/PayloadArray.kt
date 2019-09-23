@@ -18,6 +18,8 @@ package de.prosiebensat1digital.oasisjsbridge
 import org.json.JSONArray
 import org.json.JSONTokener
 
+fun payloadArrayOf(vararg values: Any?) = PayloadArray.fromValues(*values)
+
 class PayloadArray(length: Int): Payload {
 
     val array = arrayOfNulls<Any?>(length)
@@ -25,7 +27,9 @@ class PayloadArray(length: Int): Payload {
     val isEmpty get() = array.isEmpty()
 
     companion object {
-        fun fromValuesArray(values: Array<Any?>): PayloadArray? {
+        fun fromValues(vararg values: Any?): PayloadArray? = fromValueArray(arrayOf(*values))
+
+        fun fromValueArray(values: Array<Any?>): PayloadArray? {
             val payloadArray = PayloadArray(values.size)
             values.forEachIndexed { index, value -> payloadArray.array[index] = value }
             return payloadArray

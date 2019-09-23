@@ -65,7 +65,7 @@ class JsonObjectWrapperTest {
 
     @Test
     fun constructorWithMap() {
-        val wrapperFromMap = JsonObjectWrapper(hashMapOf(*keyValuePairs))
+        val wrapperFromMap = JsonObjectWrapper(mapOf(*keyValuePairs))
 
         val value3 = objectString.removeWhiteSpaces()
         assertEquals(wrapperFromMap.jsonString.removeWhiteSpaces(), """{"key1":"value1","key2":2,"key3":$value3,"key4":true,"key5":false,"key7":null}""")
