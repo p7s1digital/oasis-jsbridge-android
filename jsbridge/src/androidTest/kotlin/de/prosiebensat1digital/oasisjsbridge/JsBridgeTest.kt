@@ -88,10 +88,12 @@ class JsBridgeTest {
         errors.clear()
         unhandledPromiseErrors.clear()
 
-        runBlocking {
-            jsBridge?.waitForDone()
-            jsBridge?.release()
-            jsBridge?.waitForDone()
+        jsBridge?.let {
+            runBlocking {
+                waitForDone(it)
+                jsBridge?.release()
+                waitForDone(it)
+            }
         }
     }
 
@@ -104,7 +106,7 @@ class JsBridgeTest {
         subject.registerErrorListener(errorListener)
         subject.start()
 
-        runBlocking { subject.waitForDone() }
+        runBlocking { waitForDone(subject) }
 
         // THEN
         assertTrue(errors.isEmpty())
@@ -119,7 +121,7 @@ class JsBridgeTest {
         val js = """nativeFunctionMock("testString");"""
         subject.evaluateNoRetVal(js)
 
-        runBlocking { subject.waitForDone() }
+        runBlocking { waitForDone(subject) }
 
         // THEN
         assertTrue(errors.isEmpty())
@@ -137,7 +139,7 @@ class JsBridgeTest {
             """
         subject.evaluateNoRetVal(js)
 
-        runBlocking { subject.waitForDone() }
+        runBlocking { waitForDone(subject) }
 
         // THEN
         val stringEvaluationError = errors.singleOrNull() as? JsStringEvaluationError
@@ -278,7 +280,7 @@ class JsBridgeTest {
         // nativeFunctionMock("localFileString");
         subject.evaluateLocalFile("js/test.js")
 
-        runBlocking { subject.waitForDone() }
+        runBlocking { waitForDone(subject) }
 
         // THEN
         assertTrue(errors.isEmpty())
@@ -293,7 +295,7 @@ class JsBridgeTest {
         // WHEN
         subject.evaluateLocalFile("non-existing/file.js")
 
-        runBlocking { subject.waitForDone() }
+        runBlocking { waitForDone(subject) }
 
         // THEN
         val fileEvaluationError = errors.firstOrNull() as? JsFileEvaluationError
@@ -408,7 +410,7 @@ class JsBridgeTest {
             });
         """.trimIndent())
 
-        runBlocking { subject.waitForDone() }
+        runBlocking { waitForDone(subject) }
 
         // THEN
         val unhandledJsPromiseError = errors.firstOrNull() as? UnhandledJsPromiseError
@@ -933,7 +935,7 @@ class JsBridgeTest {
             """
         subject.evaluateNoRetVal(js)
 
-        runBlocking { subject.waitForDone() }
+        runBlocking { waitForDone(subject) }
 
         // THEN
         assertEquals(receivedBool1, true)
@@ -942,7 +944,7 @@ class JsBridgeTest {
         assertEquals(receivedJsonObject1?.jsonString, """{"returnKey1":1,"returnKey2":"returnValue2"}""")
         assertEquals(receivedJsonObject2?.jsonString, """[1,"two",3]""")
 
-        runBlocking { subject.waitForDone() }
+        runBlocking { waitForDone(subject) }
 
         jsExpectations.checkDoesNotExist("unexpected")
         jsExpectations.checkEquals("resolvedDeferredValue", "returned deferred value")
@@ -1039,7 +1041,7 @@ class JsBridgeTest {
         val rejectedPromise = jsApi.jsMethodReturningRejectedPromise(987.0)
         val jsValueAsync = jsApi.jsMethodReturningJsValue("JsValue value")
 
-        runBlocking { subject.waitForDone() }
+        runBlocking { waitForDone(subject) }
 
         // THEN
         assertNotNull(callbackValues)
@@ -1151,7 +1153,7 @@ class JsBridgeTest {
         // destroyed the interpreter
         // (and the app should not crash ;))
         runBlocking {
-            subject.waitForDone()
+            waitForDone(subject)
             assertFalse(callbackCalled)
             verify(inverse = true) { jsToNativeFunctionMock(any()) }
         }
@@ -1175,7 +1177,7 @@ class JsBridgeTest {
 
         subject.evaluateNoRetVal(js)
 
-        runBlocking { subject.waitForDone() }
+        runBlocking { waitForDone(subject) }
 
         // THEN
         // no event is sent immediately
@@ -1221,7 +1223,7 @@ class JsBridgeTest {
 
         // THEN
         runBlocking {
-            subject.waitForDone()
+            waitForDone(subject)
             delay(500)
         }
         verify(exactly = 2) { jsToNativeFunctionMock(neq("timeout2")) }
@@ -1253,7 +1255,7 @@ class JsBridgeTest {
 
         subject.evaluateNoRetVal(js)
 
-        runBlocking { subject.waitForDone() }
+        runBlocking { waitForDone(subject) }
 
         // THEN
         verify(ordering = Ordering.SEQUENCE, timeout = 1000) {
@@ -1434,6 +1436,20 @@ class JsBridgeTest {
                 Timber.w("Unhandled Promise error ${index + 1}/${unhandledPromiseErrors.count()}:\n")
                 Timber.w(error)
             }
+        }
+    }
+
+    // Wait until the JS queue is empty
+    private suspend fun waitForDone(jsBridge: JsBridge) {
+       try {
+            withContext(jsBridge.coroutineContext) {
+                // ensure that triggered coroutines are processed
+                yield()
+                yield()
+                yield()
+            }
+        } catch (e: CancellationException) {
+            // Ignore cancellation
         }
     }
 }

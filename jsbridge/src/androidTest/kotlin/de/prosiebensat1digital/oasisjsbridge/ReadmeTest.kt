@@ -42,9 +42,11 @@ class ReadmeTest {
 
     @After
     fun cleanUp() {
-        runBlocking {
-            jsBridge.waitForDone()
-            jsBridge.release()
+        jsBridge?.let {
+            runBlocking {
+                waitForDone(it)
+                it.release()
+            }
         }
     }
 
@@ -189,5 +191,19 @@ class ReadmeTest {
           })
           $nativeApi.triggerEvent()
         """.trimIndent())
+    }
+
+    // Wait until the JS queue is empty
+    private suspend fun waitForDone(jsBridge: JsBridge) {
+        try {
+            withContext(jsBridge.coroutineContext) {
+                // ensure that triggered coroutines are processed
+                yield()
+                yield()
+                yield()
+            }
+        } catch (e: CancellationException) {
+            // Ignore cancellation
+        }
     }
 }

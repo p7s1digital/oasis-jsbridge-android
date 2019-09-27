@@ -297,22 +297,6 @@ class JsBridge(context: Context): CoroutineScope {
         }
     }
 
-    // Wait until the queue is empty (useful to make sure that the previous tasks have been
-    // completely executed (e.g. for unit tests))
-    suspend fun waitForDone() {
-        val job = launch {
-            yield()  // ensure that triggered coroutines are processed
-        }
-
-        try {
-            job.join()
-        } catch (e: CancellationException) {
-            // Ignore cancellation
-        }
-
-        yield()
-    }
-
 
     // Internal
     // ---
