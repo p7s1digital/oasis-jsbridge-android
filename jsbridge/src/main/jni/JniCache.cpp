@@ -21,15 +21,15 @@
 JniCache::JniCache(const JsBridgeContext *jsBridgeContext, const JniLocalRef<jobject> &jsBridgeJavaObject)
  : m_jsBridgeContext(jsBridgeContext)
  , m_jniContext(m_jsBridgeContext->getJniContext())
- , m_jsBridgeClass(JniGlobalRef<jclass>(m_jniContext->findClass(JSBRIDGE_PKG_PATH "/JsBridge")))
- , m_jsBridgeInterface(this, jsBridgeJavaObject)
- , m_objectClass(JniGlobalRef<jclass>(m_jniContext->findClass("java/lang/Object")))
- , m_illegalArgumentExceptionClass(JniGlobalRef<jclass>(m_jniContext->findClass("java/lang/IllegalArgumentException")))
- , m_jsExceptionClass(JniGlobalRef<jclass>(m_jniContext->findClass(JSBRIDGE_PKG_PATH "/JsException")))
- , m_jsBridgeMethodClass(JniGlobalRef<jclass>(m_jniContext->findClass(JSBRIDGE_PKG_PATH "/Method")))
- , m_jsBridgeParameterClass(JniGlobalRef<jclass>(m_jniContext->findClass(JSBRIDGE_PKG_PATH "/Parameter")))
+ , m_objectClass(m_jniContext->findClass("java/lang/Object"))
+ , m_jsBridgeClass(m_jniContext->findClass(JSBRIDGE_PKG_PATH "/JsBridge"))
+ , m_jsExceptionClass(m_jniContext->findClass(JSBRIDGE_PKG_PATH "/JsException"))
+ , m_illegalArgumentExceptionClass(m_jniContext->findClass("java/lang/IllegalArgumentException"))
+ , m_jsBridgeMethodClass(m_jniContext->findClass(JSBRIDGE_PKG_PATH "/Method"))
+ , m_jsBridgeParameterClass(m_jniContext->findClass(JSBRIDGE_PKG_PATH "/Parameter"))
  , m_jsBridgeJsValueClass(getJavaClass(JavaTypeId::JsValue))
- , m_jsonObjectWrapperClass(getJavaClass(JavaTypeId::JsonObjectWrapper)) {
+ , m_jsonObjectWrapperClass(getJavaClass(JavaTypeId::JsonObjectWrapper))
+ , m_jsBridgeInterface(this, jsBridgeJavaObject) {
 }
 
 const JniGlobalRef<jclass> &JniCache::getJavaClass(JavaTypeId id) const {

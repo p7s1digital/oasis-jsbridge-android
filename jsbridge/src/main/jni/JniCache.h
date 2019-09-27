@@ -74,16 +74,17 @@ private:
   mutable std::unordered_map<JavaTypeId, JniGlobalRef<jclass>> m_javaClasses;
 
   JniGlobalRef<jclass> m_objectClass;
-  JniGlobalRef<jclass> m_illegalArgumentExceptionClass;
-  JniGlobalRef<jclass> m_jsExceptionClass;
-
-  const JsBridgeInterface m_jsBridgeInterface;
   JniGlobalRef<jclass> m_jsBridgeClass;
+  JniGlobalRef<jclass> m_jsExceptionClass;
+  JniGlobalRef<jclass> m_illegalArgumentExceptionClass;
+
   JniGlobalRef<jclass> m_jsBridgeMethodClass;
   JniGlobalRef<jclass> m_jsBridgeParameterClass;
 
   JniGlobalRef<jclass> m_jsBridgeJsValueClass;
   JniGlobalRef<jclass> m_jsonObjectWrapperClass;
+
+  const JsBridgeInterface m_jsBridgeInterface;
 };
 
 #endif

@@ -34,7 +34,7 @@ protected:
     : m_jniCache(cache) , m_class(javaClass) , m_object(object) {}
 
   const JniCache * const m_jniCache;
-  const JniRef<jclass> &m_class;
+  JniGlobalRef<jclass> m_class;
   JniGlobalRef<T> m_object;
 };
 
