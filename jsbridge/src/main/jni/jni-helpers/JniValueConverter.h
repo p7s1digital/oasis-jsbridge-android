@@ -29,6 +29,9 @@ namespace JniValueConverter {
   static jfloat toJniValue(jfloat v) { return v; }
   static jdouble toJniValue(jdouble v) { return v; }
 
+  // nullptr to null jobject
+  static jobject toJniValue(std::nullptr_t) { return nullptr; }
+
   // JniRef to jobject
   template<typename JniT>
   static JniT toJniValue(const JniRef<JniT> &ref) {
