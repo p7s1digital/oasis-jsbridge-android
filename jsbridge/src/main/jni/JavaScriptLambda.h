@@ -40,7 +40,7 @@ public:
 #if defined(DUKTAPE)
   JavaScriptLambda(const JsBridgeContext *, const JniRef<jsBridgeMethod> &method, std::string strName, duk_idx_t jsLambdaIndex);
 #elif defined(QUICKJS)
-  JavaScriptLambda(const JsBridgeContext *, const JniRef<jsBridgeMethod> &method, std::string strName, JSValue);
+  JavaScriptLambda(const JsBridgeContext *, const JniRef<jsBridgeMethod> &method, std::string strName, JSValue jsLambdaValue);
 #endif
 
   ~JavaScriptLambda();
@@ -56,7 +56,7 @@ private:
   void *m_jsHeapPtr;
 #elif defined(QUICKJS)
   JSContext *m_ctx;
-  JSValue m_jsValue;
+  std::string m_name;
 #endif
 };
 

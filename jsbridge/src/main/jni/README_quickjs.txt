@@ -26,15 +26,6 @@ into jsbridge/quickjs/jni/quickjs
  #else
      /* change this to `NULL,` if compilation fails */
      malloc_usable_size,
-@@ -1637,7 +1637,7 @@
-             printf("Secondary object leaks: %d\n", count);
-     }
- #endif
--    assert(list_empty(&rt->obj_list));
-+    //assert(list_empty(&rt->obj_list));
- 
-     /* free the classes */
-     for(i = 0; i < rt->class_count; i++) {
 @@ -1769,7 +1769,7 @@
      }
  }

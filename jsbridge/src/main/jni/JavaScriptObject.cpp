@@ -131,9 +131,8 @@ JValue JavaScriptObject::call(const JniLocalRef<jobject> &javaMethod, const JObj
 
 #include "QuickJsUtils.h"
 
-JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::string strName, JSValue v, const JObjectArrayLocalRef &methods)
+JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::string strName, JSValueConst jsObjectValue, const JObjectArrayLocalRef &methods)
  : m_name(std::move(strName))
- , m_jsValue(v)
  , m_jsBridgeContext(jsBridgeContext) {
 
   JSContext *ctx = jsBridgeContext->getQuickJsContext();
@@ -141,11 +140,11 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
   const JniCache *jniCache = jsBridgeContext->getJniCache();
   const QuickJsUtils *utils = jsBridgeContext->getUtils();
 
-  if (!JS_IsObject(v)) {
+  if (!JS_IsObject(jsObjectValue)) {
     throw std::runtime_error("JavaScript object " + strName + " cannot be accessed (not an object)");
   }
 
-  if (utils->hasPropertyStr(v, "then")) {
+  if (utils->hasPropertyStr(jsObjectValue, "then")) {
     alog_warn("Registering a JS object from a promise... You probably need to call JsValue.await(), first!");
   }
 
@@ -157,10 +156,11 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
 
     // Sanity check that as of right now, the object we're proxying has a function with this name.
     std::string strMethodName = methodInterface.getName().c_str();
-    JSValue methodValue = JS_GetPropertyStr(ctx, m_jsValue, strMethodName.c_str());
+    JSValue methodValue = JS_GetPropertyStr(ctx, jsObjectValue, strMethodName.c_str());
     if (JS_IsUndefined(methodValue)) {
       throw std::runtime_error("JS global " + m_name + " has no method called " + strMethodName);
     } else if (!JS_IsFunction(ctx, methodValue)) {
+      JS_FreeValue(ctx, methodValue);
       throw std::runtime_error("JS property " + m_name + "." + strMethodName + " is not function");
     }
 
@@ -181,7 +181,7 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
   }
 }
 
-JValue JavaScriptObject::call(const JniLocalRef<jobject> &javaMethod, const JObjectArrayLocalRef &args) const {
+JValue JavaScriptObject::call(JSValueConst jsObjectValue, const JniLocalRef<jobject> &javaMethod, const JObjectArrayLocalRef &args) const {
 
   JSContext *ctx = m_jsBridgeContext->getQuickJsContext();
   const JniContext *jniContext = m_jsBridgeContext->getJniContext();
@@ -197,22 +197,33 @@ JValue JavaScriptObject::call(const JniLocalRef<jobject> &javaMethod, const JObj
 
   const auto methodIt = m_methods.find(methodId);
 
+  if (methodIt == m_methods.end()) {
+    throw std::runtime_error("Could not find method " + m_name + "." + getMethodName());
+  }
+
+  const JavaScriptMethod *jsMethod = methodIt->second.get();
+
+  if (!JS_IsObject(jsObjectValue) || JS_IsNull(jsObjectValue)) {
+    throw std::invalid_argument("Cannot call " + m_name + ". It does not exist or is not a valid object.");
+  }
+
+  JSValue jsMethodValue = JS_GetPropertyStr(ctx, jsObjectValue, jsMethod->getName().c_str());
+
   try {
-    if (methodIt == m_methods.end()) {
-      throw std::runtime_error("Could not find method " + m_name + "." + getMethodName());
-    }
-
-    const JavaScriptMethod *jsMethod = methodIt->second.get();
-
-    JSValue jsMethodValue = JS_GetPropertyStr(ctx, m_jsValue, jsMethod->getName().c_str());
     if (!JS_IsFunction(ctx, jsMethodValue)) {
-      JS_FreeValue(ctx, jsMethodValue);
       throw std::runtime_error("Error while calling JS method");
     }
 
-    return jsMethod->invoke(m_jsBridgeContext, jsMethodValue, m_jsValue, args, false);
+    JValue javaValue = jsMethod->invoke(m_jsBridgeContext, jsMethodValue, jsObjectValue, args, false);
+    JS_FreeValue(ctx, jsMethodValue);
+    return std::move(javaValue);
+  } catch (const std::invalid_argument &e) {
+    std::string strError("Invalid argument while calling JS method " + m_name + "." + getMethodName() + ": " + e.what());
+    JS_FreeValue(ctx, jsMethodValue);
+    throw std::runtime_error(strError);
   } catch (const std::runtime_error &e) {
-    std::string strError("Error while calling JS method " + m_name + "." + getMethodName() + ": " + e.what());
+    std::string strError("Runtime error while calling JS method " + m_name + "." + getMethodName() + ": " + e.what());
+    JS_FreeValue(ctx, jsMethodValue);
     throw std::runtime_error(strError);
   }
 

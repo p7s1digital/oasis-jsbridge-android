@@ -21,6 +21,10 @@
 #include "jni-helpers/JValue.h"
 #include "jni-helpers/JniContext.h"
 
+JavaScriptLambda::~JavaScriptLambda() {
+  delete m_method;
+}
+
 #if defined(DUKTAPE)
 
 #include "StackChecker.h"
@@ -42,36 +46,46 @@ JavaScriptLambda::JavaScriptLambda(const JsBridgeContext *jsBridgeContext, const
   duk_pop(ctx);  // JS lambda
 }
 
-JavaScriptLambda::~JavaScriptLambda() {
-  delete m_method;
-}
-
 JValue JavaScriptLambda::call(const JsBridgeContext *jsBridgeContext, const JObjectArrayLocalRef &args, bool awaitJsPromise) const {
   return m_method->invoke(jsBridgeContext, m_jsHeapPtr, args, awaitJsPromise);
 }
 
 #elif defined(QUICKJS)
 
-JavaScriptLambda::JavaScriptLambda(const JsBridgeContext *jsBridgeContext, const JniRef<jsBridgeMethod> &method, std::string strName, JSValue v)
+JavaScriptLambda::JavaScriptLambda(const JsBridgeContext *jsBridgeContext, const JniRef<jsBridgeMethod> &method, std::string strName, JSValue jsLambdaValue)
  : m_method(nullptr)
- , m_jsValue(v) {
+ , m_name(std::move(strName)) {
 
   m_ctx = jsBridgeContext->getQuickJsContext();
 
-  if (!JS_IsFunction(m_ctx, v)) {
+  if (!JS_IsFunction(m_ctx, jsLambdaValue)) {
     throw std::runtime_error("JavaScript lambda " + strName + " cannot be accessed (not a function)");
   }
 
-  m_method = new JavaScriptMethod(jsBridgeContext, method, std::move(strName), true);
-}
-
-JavaScriptLambda::~JavaScriptLambda() {
-  JS_FreeValue(m_ctx, m_jsValue);
-  delete m_method;
+  m_method = new JavaScriptMethod(jsBridgeContext, method, strName, true);
 }
 
 JValue JavaScriptLambda::call(const JsBridgeContext *jsBridgeContext, const JObjectArrayLocalRef &args, bool awaitJsPromise) const {
-  return m_method->invoke(jsBridgeContext, m_jsValue, JS_UNDEFINED, args, awaitJsPromise);
+  JSValue globalObj = JS_GetGlobalObject(m_ctx);
+  JSValue jsLambdaValue = JS_GetPropertyStr(m_ctx, globalObj, m_name.c_str());
+  JS_FreeValue(m_ctx, globalObj);
+
+  try {
+    if (!JS_IsFunction(m_ctx, jsLambdaValue) || JS_IsNull(jsLambdaValue)) {
+      throw std::invalid_argument(
+          "Cannot call " + m_name + " lambda. It does not exist or is not a valid function.");
+    }
+    JValue ret = m_method->invoke(jsBridgeContext, jsLambdaValue, JS_UNDEFINED, args,
+                                  awaitJsPromise);
+    JS_FreeValue(m_ctx, jsLambdaValue);
+    return std::move(ret);
+  } catch (const std::invalid_argument &e) {
+    JS_FreeValue(m_ctx, jsLambdaValue);
+    throw e;
+  } catch (const std::runtime_error &e) {
+    JS_FreeValue(m_ctx, jsLambdaValue);
+    throw e;
+  }
 }
 
 #endif

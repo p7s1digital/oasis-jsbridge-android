@@ -141,8 +141,9 @@ JValue JsBridgeContext::evaluateString(const std::string &strCode, const JniLoca
 void JsBridgeContext::evaluateFileContent(const std::string &strCode, const std::string &strFileName) const {
   JSValue v = JS_Eval(m_ctx, strCode.c_str(), strCode.size(), strFileName.c_str(), 0);
 
+  JS_FreeValue(m_ctx, v);
+
   if (JS_IsException(v)) {
-    JS_FreeValue(m_ctx, v);
     queueJavaExceptionForJsError();
   }
 }
@@ -208,11 +209,13 @@ void JsBridgeContext::registerJsObject(const std::string &strName,
     alog_warn("Attempting to register a JS promise (%s)... JsValue.await() should probably be called, first...");
   }
 
-  // Create the JavaScriptObject instance (which takes over jsObjectValue and will free it in its destructor)
+  // Create the JavaScriptObject instance
   auto cppJsObject = new JavaScriptObject(this, strName, jsObjectValue, methods);  // auto-deleted
 
   // Wrap it inside the JS object
   m_utils->createMappedCppPtrValue(cppJsObject, jsObjectValue, strName.c_str());
+
+  JS_FreeValue(m_ctx, jsObjectValue);
 }
 
 void JsBridgeContext::registerJsLambda(const std::string &strName,
@@ -226,11 +229,13 @@ void JsBridgeContext::registerJsLambda(const std::string &strName,
     throw std::invalid_argument("Cannot register " + strName + ". It does not exist or is not a valid function.");
   }
 
-  // Create the JavaScriptObject instance (which takes over jsLambdaValue and will free it in its destructor)
+  // Create the JavaScriptObject instance
   auto cppJsLambda = new JavaScriptLambda(this, method, strName, jsLambdaValue);  // auto-deleted
 
   // Wrap it inside the JS object
   m_utils->createMappedCppPtrValue(cppJsLambda, jsLambdaValue, strName.c_str());
+
+  JS_FreeValue(m_ctx, jsLambdaValue);
 }
 
 JValue JsBridgeContext::callJsMethod(const std::string &objectName,
@@ -253,9 +258,10 @@ JValue JsBridgeContext::callJsMethod(const std::string &objectName,
                                 " because it does not exist or has been deleted!");
   }
 
+  JValue ret = cppJsObject->call(jsObjectValue, javaMethod, args);
   JS_FreeValue(m_ctx, jsObjectValue);
 
-  return cppJsObject->call(javaMethod, args);
+  return std::move(ret);
 }
 
 JValue JsBridgeContext::callJsLambda(const std::string &strFunctionName,
@@ -267,11 +273,13 @@ JValue JsBridgeContext::callJsLambda(const std::string &strFunctionName,
   JS_FreeValue(m_ctx, globalObj);
 
   if (!JS_IsFunction(m_ctx, jsLambdaValue)) {
+    JS_FreeValue(m_ctx, jsLambdaValue);
     throw std::invalid_argument("The JS method " + strFunctionName + " cannot be called (not a function)");
   }
 
   // Get C++ JavaScriptLambda instance
   auto cppJsLambda = m_utils->getMappedCppPtrValue<JavaScriptLambda>(jsLambdaValue, strFunctionName.c_str());
+  JS_FreeValue(m_ctx, jsLambdaValue);
   if (cppJsLambda == nullptr) {
     queueJsException("Cannot invoke the JS function " + strFunctionName +
                      " because it does not exist or has been deleted!");
@@ -433,8 +441,8 @@ JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
   if (!JS_IsUndefined(javaExceptionValue)) {
     cause = JniLocalRef<jthrowable>(m_jniContext, m_utils->getJavaRef<jthrowable>(javaExceptionValue).toNewRawGlobalRef());
   }
+  JS_FreeValue(m_ctx, javaExceptionValue);
 
-  //JS_FreeValue(m_ctx, javaExceptionValue);
   if (JS_IsError(m_ctx, exceptionValue)) {
     // Error message
     std::string msg = m_utils->toString(JS_GetPropertyStr(m_ctx, exceptionValue, "message"));
@@ -468,7 +476,7 @@ JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
   }
 
   JS_FreeValue(m_ctx, jsonValue);
-  //JS_FreeValue(m_ctx, exceptionValue);
+  JS_FreeValue(m_ctx, exceptionValue);
   return ret;
 }
 

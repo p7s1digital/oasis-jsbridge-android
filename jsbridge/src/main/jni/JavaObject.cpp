@@ -280,6 +280,7 @@ namespace {
     // Manually check for pending exceptions
     JSValue pendingException = JS_GetException(ctx);
     if (!JS_IsNull(pendingException)) {
+      JS_FreeValue(ctx, ret);
       JS_Throw(ctx, pendingException);
       return JS_EXCEPTION;
     }

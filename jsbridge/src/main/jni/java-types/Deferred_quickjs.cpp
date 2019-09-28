@@ -200,6 +200,7 @@ JSValue Deferred::fromJava(const JValue &value, bool inScript) const {
   JSValue promiseInstance = JS_CallConstructor(m_ctx, promiseCtor, 1, &promiseFunctionValue);
   assert(JS_IsObject(promiseInstance));
   JS_FreeValue(m_ctx, promiseCtor);
+  JS_FreeValue(m_ctx, promiseFunctionValue);
 
   // Call Java setUpJsPromise()
   getJniCache()->getJsBridgeInterface().setUpJsPromise(
@@ -212,50 +213,50 @@ JSValue Deferred::fromJava(const JValue &value, bool inScript) const {
   return promiseInstance;
 }
 
-  void Deferred::completeJsPromise(const JsBridgeContext *jsBridgeContext, const std::string &strId, bool isFulfilled, const JniLocalRef<jobject> &value) {
-    JSContext *ctx = jsBridgeContext->getQuickJsContext();
-    assert(ctx != nullptr);
+void Deferred::completeJsPromise(const JsBridgeContext *jsBridgeContext, const std::string &strId, bool isFulfilled, const JniLocalRef<jobject> &value) {
+  JSContext *ctx = jsBridgeContext->getQuickJsContext();
+  assert(ctx != nullptr);
 
-    const QuickJsUtils *utils = jsBridgeContext->getUtils();
+  const QuickJsUtils *utils = jsBridgeContext->getUtils();
 
-    // Get the global PromiseObject
-    JSValue globalObj = JS_GetGlobalObject(ctx);
-    JSValue promiseObj = JS_GetPropertyStr(ctx, globalObj, strId.c_str());
-    JS_FreeValue(ctx, globalObj);
-    if (!JS_IsObject(promiseObj)) {
-      alog_warn("Could not find PromiseObject with id %s", strId.c_str());
-      return;
-    }
-
-    // Get attached type ptr...
-    JSValue componentTypeValue = JS_GetPropertyStr(ctx, promiseObj, JavaTypes::Deferred::PROMISE_COMPONENT_TYPE_PROP_NAME);
-    if (JS_IsNull(componentTypeValue) || !JS_IsObject(componentTypeValue)) {
-      alog_warn("Could not get component type from Promise with id %s", strId.c_str());
-      JS_FreeValue(ctx, promiseObj);
-      return;
-    }
-    auto componentType = *utils->getCppPtr<std::shared_ptr<const JavaType>>(componentTypeValue);
-    JS_FreeValue(ctx, componentTypeValue);
-
-    // Get the resolve/reject function
-    const char *resolveOrRejectStr = isFulfilled ? "resolve" : "reject";
-    JSValue resolveOrReject = JS_GetPropertyStr(ctx, promiseObj, resolveOrRejectStr);
-    if (JS_IsFunction(ctx, resolveOrReject)) {
-      // Call it with the Promise value
-      JSValue promiseParam = componentType->fromJava(JValue(value), false /*inScript*/);
-      JSValue ret = JS_Call(ctx, resolveOrReject, promiseObj, 1, &promiseParam);
-      if (JS_IsException(ret)) {
-        alog("Could not complete Promise with id %s", strId.c_str());
-      }
-
-      JS_FreeValue(ctx, ret);
-      JS_FreeValue(ctx, promiseParam);
-    } else {
-      alog("Could not complete Promise with id %s: cannot find %s", strId.c_str(), resolveOrRejectStr);
-    }
-
-    JS_FreeValue(ctx, resolveOrReject);
-    JS_FreeValue(ctx, promiseObj);
+  // Get the global PromiseObject
+  JSValue globalObj = JS_GetGlobalObject(ctx);
+  JSValue promiseObj = JS_GetPropertyStr(ctx, globalObj, strId.c_str());
+  JS_FreeValue(ctx, globalObj);
+  if (!JS_IsObject(promiseObj)) {
+    alog_warn("Could not find PromiseObject with id %s", strId.c_str());
+    return;
   }
+
+  // Get attached type ptr...
+  JSValue componentTypeValue = JS_GetPropertyStr(ctx, promiseObj, JavaTypes::Deferred::PROMISE_COMPONENT_TYPE_PROP_NAME);
+  if (JS_IsNull(componentTypeValue) || !JS_IsObject(componentTypeValue)) {
+    alog_warn("Could not get component type from Promise with id %s", strId.c_str());
+    JS_FreeValue(ctx, promiseObj);
+    return;
+  }
+  auto componentType = *utils->getCppPtr<std::shared_ptr<const JavaType>>(componentTypeValue);
+  JS_FreeValue(ctx, componentTypeValue);
+
+  // Get the resolve/reject function
+  const char *resolveOrRejectStr = isFulfilled ? "resolve" : "reject";
+  JSValue resolveOrReject = JS_GetPropertyStr(ctx, promiseObj, resolveOrRejectStr);
+  if (JS_IsFunction(ctx, resolveOrReject)) {
+    // Call it with the Promise value
+    JSValue promiseParam = componentType->fromJava(JValue(value), false /*inScript*/);
+    JSValue ret = JS_Call(ctx, resolveOrReject, promiseObj, 1, &promiseParam);
+    if (JS_IsException(ret)) {
+      alog("Could not complete Promise with id %s", strId.c_str());
+    }
+
+    JS_FreeValue(ctx, ret);
+    JS_FreeValue(ctx, promiseParam);
+  } else {
+    alog("Could not complete Promise with id %s: cannot find %s", strId.c_str(), resolveOrRejectStr);
+  }
+
+  JS_FreeValue(ctx, resolveOrReject);
+  JS_FreeValue(ctx, promiseObj);
+}
 
 }  // namespace JavaTypes

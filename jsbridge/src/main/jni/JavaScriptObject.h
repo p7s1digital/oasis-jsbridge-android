@@ -46,15 +46,17 @@ public:
 
 #if defined(DUKTAPE)
   JavaScriptObject(const JsBridgeContext *, std::string strName, duk_idx_t jsObjectIndex, const JObjectArrayLocalRef &methods);
+
+  JValue call(const JniLocalRef<jobject> &javaMethod, const JObjectArrayLocalRef &args) const;
 #elif defined(QUICKJS)
-  JavaScriptObject(const JsBridgeContext *, std::string strName, JSValue, const JObjectArrayLocalRef &methods);
+  JavaScriptObject(const JsBridgeContext *, std::string strName, JSValueConst jsObjectValue, const JObjectArrayLocalRef &methods);
+
+  JValue call(JSValueConst jsObjectValue, const JniLocalRef<jobject> &javaMethod, const JObjectArrayLocalRef &args) const;
 #endif
 
   JavaScriptObject() = delete;
   JavaScriptObject(const JavaScriptObject &) = delete;
   JavaScriptObject& operator=(const JavaScriptObject &) = delete;
-
-  JValue call(const JniLocalRef<jobject> &javaMethod, const JObjectArrayLocalRef &args) const;
 
 private:
   const std::string m_name;
@@ -63,8 +65,6 @@ private:
 
 #if defined(DUKTAPE)
   void *m_jsHeapPtr = nullptr;
-#elif defined(QUICKJS)
-  JSValue m_jsValue;
 #endif
 };
 

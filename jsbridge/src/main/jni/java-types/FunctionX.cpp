@@ -224,7 +224,7 @@ JValue FunctionX::toJava(JSValueConst v, bool inScript) const {
   auto javaScriptLambda = new JavaScriptLambda(m_jsBridgeContext, jniJavaMethod, jsFunctionGlobalName, v);
 
   // 3. Wrap it inside the JS function
-  utils->createMappedCppPtrValue<JavaScriptLambda>(javaScriptLambda, JS_DupValue(m_ctx, v), jsFunctionGlobalName.c_str());
+  utils->createMappedCppPtrValue<JavaScriptLambda>(javaScriptLambda, v, jsFunctionGlobalName.c_str());
 
   // 4. Call native createJsLambdaProxy(id, javaMethod)
   JniLocalRef<jobject> javaFunction = getJniCache()->getJsBridgeInterface().createJsLambdaProxy(
@@ -265,6 +265,8 @@ JSValue FunctionX::fromJava(const JValue &value, bool inScript) const {
   auto payload = new CallJavaLambdaPayload { JniGlobalRef<jobject>(javaFunctionObject), javaMethodPtr };
   JSValue payloadValue = utils->createCppPtrValue<CallJavaLambdaPayload>(payload, true);
   JSValue invokeFunctionValue = JS_NewCFunctionData(m_ctx, callJavaLambda, 1, 0, 1, &payloadValue);
+
+  JS_FreeValue(m_ctx, payloadValue);
 
   return invokeFunctionValue;
 }
