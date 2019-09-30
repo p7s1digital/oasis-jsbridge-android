@@ -1,10 +1,9 @@
 To add/update QuickJS (tested with quickjs 2019-07-21):
 $ download source code from https://bellard.org/quickjs/
 $ cd quickjs-XXXX-XX-XX
-- copy cutils.c, libregexp-opcode.h, libregexp.h, libunicode.c, list.h, quickjs-opcode.h,
+- copy VERSION, cutils.c, libregexp-opcode.h, libregexp.h, libunicode.c, list.h, quickjs-opcode.h,
 quickjs.h, cutils.h, libregexp.c, libunicode-table.h, libunicode.h, quickjs-atom.h, quickjs.c
 into jsbridge/quickjs/jni/quickjs
-- update QuickJS version in jsbridge/CMakelists.txt (TODO: read it from the version file)
 - apply the following change in quickjs.c:
 
 --- original quickjs.c	2019-08-18 11:50:45.000000000 +0200

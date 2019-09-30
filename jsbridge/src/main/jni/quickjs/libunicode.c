@@ -271,7 +271,7 @@ BOOL lre_is_case_ignorable(uint32_t c)
 
 /* character range */
 
-static __attribute__((unused)) void cr_dump(CharRange *cr)
+static __maybe_unused void cr_dump(CharRange *cr)
 {
     int i;
     for(i = 0; i < cr->len; i++)
@@ -361,7 +361,7 @@ int cr_op(CharRange *cr, const uint32_t *a_pt, int a_len,
     a_idx = 0;
     b_idx = 0;
     for(;;) {
-        /* create one more point from a or b in increasing order */
+        /* get one more point from a or b in increasing order */
         if (a_idx < a_len && b_idx < b_len) {
             if (a_pt[a_idx] < b_pt[b_idx]) {
                 goto a_add;
