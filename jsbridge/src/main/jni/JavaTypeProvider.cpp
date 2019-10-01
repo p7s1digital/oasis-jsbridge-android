@@ -151,7 +151,7 @@ JavaTypeId JavaTypeProvider::getJavaTypeId(const JniRef<jsBridgeParameter> &para
     throw std::invalid_argument("Could not get Java name from Parameter!");
   }
 
-  JavaTypeId id = getJavaTypeIdByJavaName(javaName.toUtf8Chars());
+  JavaTypeId id = getJavaTypeIdByJavaName(javaName.getUtf16View());
   if (id == JavaTypeId::Unknown) {
     throw std::invalid_argument(std::string("Unsupported Java type: ") + javaName.toUtf8Chars());
   }

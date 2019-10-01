@@ -20,75 +20,78 @@
 #include <string>
 
 // map<javaName, JavaTypeId>
-// where javaName: Java name as returned by Java::class.getName(), e.g.: "java.lang.Integer"
-static thread_local std::unordered_map<std::string_view, JavaTypeId> sJavaNameToID = {
-  { "", JavaTypeId::Unknown },
+// where javaName: Java name (UTF16) as returned by Java::class.getName(), e.g.: "java.lang.Integer"
+static thread_local std::unordered_map<std::u16string_view, JavaTypeId> sJavaNameToID = {
+  { u"", JavaTypeId::Unknown },
 
-  { "V", JavaTypeId::Void },
-  { "java.lang.Void", JavaTypeId::BoxedVoid },
-  { "kotlin.Unit", JavaTypeId::Unit },
+  { u"V", JavaTypeId::Void },
+  { u"java.lang.Void", JavaTypeId::BoxedVoid },
+  { u"kotlin.Unit", JavaTypeId::Unit },
 
-  { "boolean", JavaTypeId::Boolean },
-  { "int", JavaTypeId::Int },
-  { "long", JavaTypeId::Long },
-  { "float", JavaTypeId::Float },
-  { "double", JavaTypeId::Double },
+  { u"boolean", JavaTypeId::Boolean },
+  { u"int", JavaTypeId::Int },
+  { u"long", JavaTypeId::Long },
+  { u"float", JavaTypeId::Float },
+  { u"double", JavaTypeId::Double },
 
-  { "java.lang.Boolean", JavaTypeId::BoxedBoolean },
-  { "java.lang.Integer", JavaTypeId::BoxedInt },
-  { "java.lang.Long", JavaTypeId::BoxedLong },
-  { "java.lang.Float", JavaTypeId::BoxedFloat },
-  { "java.lang.Double", JavaTypeId::BoxedDouble },
+  { u"java.lang.Boolean", JavaTypeId::BoxedBoolean },
+  { u"java.lang.Integer", JavaTypeId::BoxedInt },
+  { u"java.lang.Long", JavaTypeId::BoxedLong },
+  { u"java.lang.Float", JavaTypeId::BoxedFloat },
+  { u"java.lang.Double", JavaTypeId::BoxedDouble },
 
-  { "java.lang.String", JavaTypeId::String },
-  { "java.lang.Object", JavaTypeId::Object },
+  { u"java.lang.String", JavaTypeId::String },
+  { u"java.lang.Object", JavaTypeId::Object },
 
-  { "[Ljava.lang.Object;",JavaTypeId::ObjectArray },
+  { u"[Ljava.lang.Object;",JavaTypeId::ObjectArray },
 
-  { "[Z", JavaTypeId::BooleanArray },
-  { "[I", JavaTypeId::IntArray },
-  { "[J", JavaTypeId::LongArray },
-  { "[F", JavaTypeId::FloatArray },
-  { "[D", JavaTypeId::DoubleArray },
+  { u"[Z", JavaTypeId::BooleanArray },
+  { u"[I", JavaTypeId::IntArray },
+  { u"[J", JavaTypeId::LongArray },
+  { u"[F", JavaTypeId::FloatArray },
+  { u"[D", JavaTypeId::DoubleArray },
 
-  { "kotlin.jvm.functions.Function0", JavaTypeId::FunctionX },
-  { "kotlin.jvm.functions.Function1", JavaTypeId::FunctionX },
-  { "kotlin.jvm.functions.Function2", JavaTypeId::FunctionX },
-  { "kotlin.jvm.functions.Function3", JavaTypeId::FunctionX },
-  { "kotlin.jvm.functions.Function4", JavaTypeId::FunctionX },
-  { "kotlin.jvm.functions.Function5", JavaTypeId::FunctionX },
-  { "kotlin.jvm.functions.Function6", JavaTypeId::FunctionX },
-  { "kotlin.jvm.functions.Function7", JavaTypeId::FunctionX },
-  { "kotlin.jvm.functions.Function8", JavaTypeId::FunctionX },
-  { "kotlin.jvm.functions.Function9", JavaTypeId::FunctionX },
+  { u"kotlin.jvm.functions.Function0", JavaTypeId::FunctionX },
+  { u"kotlin.jvm.functions.Function1", JavaTypeId::FunctionX },
+  { u"kotlin.jvm.functions.Function2", JavaTypeId::FunctionX },
+  { u"kotlin.jvm.functions.Function3", JavaTypeId::FunctionX },
+  { u"kotlin.jvm.functions.Function4", JavaTypeId::FunctionX },
+  { u"kotlin.jvm.functions.Function5", JavaTypeId::FunctionX },
+  { u"kotlin.jvm.functions.Function6", JavaTypeId::FunctionX },
+  { u"kotlin.jvm.functions.Function7", JavaTypeId::FunctionX },
+  { u"kotlin.jvm.functions.Function8", JavaTypeId::FunctionX },
+  { u"kotlin.jvm.functions.Function9", JavaTypeId::FunctionX },
 
-  { "de.prosiebensat1digital.oasisjsbridge.JsValue", JavaTypeId::JsValue },
-  { "de.prosiebensat1digital.oasisjsbridge.JsonObjectWrapper", JavaTypeId::JsonObjectWrapper },
+  { u"de.prosiebensat1digital.oasisjsbridge.JsValue", JavaTypeId::JsValue },
+  { u"de.prosiebensat1digital.oasisjsbridge.JsonObjectWrapper", JavaTypeId::JsonObjectWrapper },
 
-  { "kotlinx.coroutines.Deferred", JavaTypeId::Deferred }
+  { u"kotlinx.coroutines.Deferred", JavaTypeId::Deferred }
 };
 
 // map<javaName, JavaTypeId> => map<JavaTypeId, jniClassName>
 // where:
-// - javaName = string_view: Java name as returned by Java::class.getName(), e.g.: "java.lang.Integer"
-// - jniClassName = string: JNI class name as needed by JNIenv::findClass(...), e.g.: "java/lang/Integer"
+// - javaName = string_view: Java name (UTF16) as returned by Java::class.getName(), e.g.: "java.lang.Integer"
+// - jniClassName = string: JNI class name (UTF8) as needed by JNIenv::findClass(...), e.g.: "java/lang/Integer"
 static std::unordered_map<JavaTypeId, std::string> createIdToJniClassName() {
   std::unordered_map<JavaTypeId, std::string> idTojniClassName;
 
   for (const auto &p : sJavaNameToID) {
-    std::string_view javaName = p.first;
+    std::u16string_view javaName = p.first;
     JavaTypeId id = p.second;
 
     size_t length = javaName.length();
-    std::string jniClassName;
-    jniClassName.reserve(length);
+    std::string strJniClassName;
+    strJniClassName.reserve(length);
 
-    for (char c : javaName) {
-      if (c == '.') c = '/';
-      jniClassName += c;
+    // Basic UTF16 -> UTF8 conversion + replace '.' into '/'
+    for (char16_t u16char : javaName) {
+      assert(u16char <= 0x7F);  // plain ASCII
+      auto u8char = static_cast<char>(u16char);
+      if (u8char == '.') u8char = '/';
+      strJniClassName += u8char;
     }
 
-    idTojniClassName[id] = jniClassName;
+    idTojniClassName[id] = strJniClassName;
   }
 
   return idTojniClassName;
@@ -96,8 +99,8 @@ static std::unordered_map<JavaTypeId, std::string> createIdToJniClassName() {
 
 static std::unordered_map<JavaTypeId, std::string> sIdToJavaName = createIdToJniClassName();
 
-// Get the id from the Java name returned by Java::class.getName(), e.g.: "java.lang.Integer"
-JavaTypeId getJavaTypeIdByJavaName(std::string_view javaName) {
+// Get the id from the Java name (UTF16) returned by Java::class.getName(), e.g.: "java.lang.Integer"
+JavaTypeId getJavaTypeIdByJavaName(std::u16string_view javaName) {
   auto itFind = sJavaNameToID.find(javaName);
   if (itFind != sJavaNameToID.end()) {
     return itFind->second;
@@ -116,7 +119,7 @@ JavaTypeId getJavaTypeIdByJavaName(std::string_view javaName) {
   return JavaTypeId::Unknown;
 }
 
-// Returns the JNI class name needed by JNIenv::findClass(...), e.g.: "java/lang/Integer"
+// Returns the JNI class name (UTF8) needed by JNIenv::findClass(...), e.g.: "java/lang/Integer"
 const std::string &getJniClassNameByJavaTypeId(JavaTypeId id) {
   return sIdToJavaName[id];
 }

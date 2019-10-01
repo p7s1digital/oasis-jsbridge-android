@@ -54,7 +54,7 @@ enum class JavaTypeId {
   Deferred = 103
 };
 
-JavaTypeId getJavaTypeIdByJavaName(std::string_view javaName);
+JavaTypeId getJavaTypeIdByJavaName(std::u16string_view javaName);
 const std::string &getJniClassNameByJavaTypeId(JavaTypeId id);
 
 #endif

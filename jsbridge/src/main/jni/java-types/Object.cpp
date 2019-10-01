@@ -167,7 +167,7 @@ JavaType *Object::newJavaType(const JniLocalRef<jobject> &jobject) const {
   jmethodID getName = m_jniContext->getMethodID(objectJavaClass, "getName", "()Ljava/lang/String;");
   JStringLocalRef javaNameRef = m_jniContext->callStringMethod(objectJavaClass, getName);
 
-  JavaTypeId id = getJavaTypeIdByJavaName(javaNameRef.toUtf8Chars());
+  JavaTypeId id = getJavaTypeIdByJavaName(javaNameRef.getUtf16View());
   javaNameRef.release();
 
   switch (id) {
