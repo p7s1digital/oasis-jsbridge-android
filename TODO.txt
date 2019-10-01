@@ -5,8 +5,6 @@ Features:
   * varargs JsonObjectWrapper (debug)
   * varargs String (release)
 - unit test for all kinds of exceptions
-- QuickJS: ensure that all instances (and especially JniGlobalRef's) are destroyed
-on JsBridge.release()
 
 Performance:
 - Long-based JsValue (*)
