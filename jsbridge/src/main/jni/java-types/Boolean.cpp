@@ -18,8 +18,9 @@
  */
 #include "Boolean.h"
 
-#include "../JsBridgeContext.h"
+#include "JsBridgeContext.h"
 #include "jni-helpers/JArrayLocalRef.h"
+#include "log.h"
 
 #ifdef DUKTAPE
 # include "JsBridgeContext.h"
@@ -63,13 +64,21 @@ JValue Boolean::popArray(uint32_t count, bool expanded, bool inScript) const {
   }
 
   JArrayLocalRef<jboolean> boolArray(m_jniContext, count);
+  jboolean *elements = boolArray.isNull() ? nullptr : boolArray.getMutableElements();
+  if (elements == nullptr) {
+    if (expanded) {
+      duk_pop_n(m_ctx, count);
+    }
+    m_jsBridgeContext->rethrowJniException();
+    return JValue();
+  }
 
   for (int i = count - 1; i >= 0; --i) {
     if (!expanded) {
       duk_get_prop_index(m_ctx, -1, i);
     }
     JValue value = pop(inScript);
-    boolArray.setElement(i, value.getBool());
+    elements[i] = value.getBool();
   }
   return JValue(boolArray);
 }
@@ -86,9 +95,15 @@ duk_ret_t Boolean::pushArray(const JniLocalRef<jarray>& values, bool expand, boo
   if (!expand) {
     duk_push_array(m_ctx);
   }
+
+  const jboolean *elements = boolArray.getElements();
+  if (elements == nullptr) {
+    m_jsBridgeContext->rethrowJniException();
+    return DUK_RET_ERROR;
+  }
+
   for (jsize i = 0; i < count; ++i) {
-    jboolean element = boolArray.getElement(i);
-    duk_push_boolean(m_ctx, duk_bool_t(element == JNI_TRUE));
+    duk_push_boolean(m_ctx, duk_bool_t(elements[i] == JNI_TRUE));
     if (!expand) {
       duk_put_prop_index(m_ctx, -2, static_cast<duk_uarridx_t>(i));
     }
@@ -105,8 +120,7 @@ JValue Boolean::toJava(JSValueConst v, bool inScript) const {
     return JValue();
   }
 
-  bool b = (bool) JS_VALUE_GET_BOOL(v);
-  return JValue(b);
+  return JValue(static_cast<jboolean>(JS_VALUE_GET_BOOL(v)));
 }
 
 JValue Boolean::toJavaArray(JSValueConst v, bool inScript) const {
@@ -125,12 +139,27 @@ JValue Boolean::toJavaArray(JSValueConst v, bool inScript) const {
   JS_FreeValue(m_ctx, lengthValue);
 
   JArrayLocalRef<jboolean> boolArray(m_jniContext, count);
-
-  for (uint32_t i = 0; i < count; ++i) {
-    JValue elementValue = toJava(JS_GetPropertyUint32(m_ctx, v, i), inScript);
-    boolArray.setElement(i, elementValue.getBool());
+  if (boolArray.isNull()) {
+    m_jsBridgeContext->rethrowJniException();
+    return JValue();
   }
 
+  jboolean *elements = boolArray.getMutableElements();
+  if (elements == nullptr) {
+    m_jsBridgeContext->rethrowJniException();
+    return JValue();
+  }
+
+  for (uint32_t i = 0; i < count; ++i) {
+    JSValue ev = JS_GetPropertyUint32(m_ctx, v, i);
+    if (!JS_IsBool(ev)) {
+      alog_warn("Cannot get int from JS: returning 0");  // TODO: proper exception handling
+    }
+
+    elements[i] = static_cast<jboolean>(JS_VALUE_GET_BOOL(ev));
+  }
+
+  boolArray.releaseArrayElements();  // copy back elements to Java
   return JValue(boolArray);
 }
 
@@ -144,15 +173,16 @@ JSValue Boolean::fromJavaArray(const JniLocalRef<jarray>& values, bool inScript)
 
   JSValue jsArray = JS_NewArray(m_ctx);
 
+  const jboolean *elements = boolArray.getElements();
+  if (elements == nullptr) {
+    JS_FreeValue(m_ctx, jsArray);
+    m_jsBridgeContext->rethrowJniException();
+    return JS_EXCEPTION;
+  }
+
   for (jsize i = 0; i < count; ++i) {
-    jboolean b = boolArray.getElement(i);
-    try {
-      JSValue elementValue = fromJava(JValue(b), inScript);
-      JS_SetPropertyUint32(m_ctx, jsArray, static_cast<uint32_t>(i), elementValue);
-    } catch (std::invalid_argument &e) {
-      JS_FreeValue(m_ctx, jsArray);
-      throw e;
-    }
+    JSValue elementValue = JS_NewBool(m_ctx, elements[i]);
+    JS_SetPropertyUint32(m_ctx, jsArray, static_cast<uint32_t>(i), elementValue);
   }
 
   return jsArray;
@@ -179,7 +209,8 @@ JValue Boolean::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
 JValue Boolean::box(const JValue &booleanValue) const {
   // From boolean to Boolean
   static thread_local jmethodID boxId = m_jniContext->getStaticMethodID(getBoxedJavaClass(), "valueOf", "(Z)Ljava/lang/Boolean;");
-  return JValue(m_jniContext->callStaticObjectMethod(getBoxedJavaClass(), boxId, booleanValue.getBool()));
+  auto boxedBoolean = m_jniContext->callStaticObjectMethod(getBoxedJavaClass(), boxId, booleanValue.getBool());
+  return JValue(std::move(boxedBoolean));
 }
 
 JValue Boolean::unbox(const JValue &boxedValue) const {

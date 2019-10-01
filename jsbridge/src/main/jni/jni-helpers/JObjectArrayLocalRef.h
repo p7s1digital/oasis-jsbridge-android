@@ -28,8 +28,8 @@ class JObjectArrayLocalRef : public JniLocalRef<jobjectArray> {
 public:
   JObjectArrayLocalRef() = delete;
 
-  JObjectArrayLocalRef(const JniContext *jniContext, jobjectArray o, bool fromJniParam = false)
-      : JniLocalRef<jobjectArray>(jniContext, o, fromJniParam) {
+  JObjectArrayLocalRef(const JniContext *jniContext, jobjectArray o, ReleaseMode releaseMode = ReleaseMode::Auto)
+      : JniLocalRef<jobjectArray>(jniContext, o, releaseMode) {
   }
 
   JObjectArrayLocalRef(const JniContext *jniContext, jsize count, const JniRef<jclass> &elementClass)
@@ -37,29 +37,16 @@ public:
   }
 
   explicit JObjectArrayLocalRef(const JniLocalRef<jobjectArray> &other)
-    : JniLocalRef<jobjectArray>(other.getJniContext(), newObjectArrayLocalRef(other)) {
-
-    if (other.isNull()) {
-      return;
-    }
-
-    const JniContext *jniContext = other.getJniContext();
-    assert(jniContext != nullptr);
-
-    JNIEnv *env = JniRefHelper::getJNIEnv(other.getJniContext());
-    assert(env != nullptr);
-
-    // Copy elements to make sure that we have our local references
-    auto count = env->GetArrayLength(other.get());
-    for (auto i = 0L; i < count; ++i) {
-      jobject otherElement = env->GetObjectArrayElement(other.get(), i);
-      if (otherElement != nullptr) {
-        setElement(i, JniLocalRef<jobject>(jniContext, env->NewLocalRef(otherElement)));
-      }
-    }
+      : JniLocalRef<jobjectArray>(other) {
   }
 
-  JObjectArrayLocalRef(const JObjectArrayLocalRef &other) = default;
+  explicit JObjectArrayLocalRef(JniLocalRef<jobjectArray> &&other)
+    : JniLocalRef<jobjectArray>(std::forward<JniLocalRef<jobjectArray>>(other)) {
+  }
+
+  JObjectArrayLocalRef(JObjectArrayLocalRef &&) = default;
+  JObjectArrayLocalRef(const JObjectArrayLocalRef &) = default;
+  JObjectArrayLocalRef &operator=(JObjectArrayLocalRef &&) = default;
   JObjectArrayLocalRef &operator=(const JObjectArrayLocalRef &) = default;
 
   // Explicitly disable a dangerous cast to bool
@@ -87,21 +74,6 @@ public:
     assert(env != nullptr);
 
     env->SetObjectArrayElement(get(), index, element.get());
-  }
-
-private:
-  jobjectArray newObjectArrayLocalRef(const JniLocalRef<jobjectArray> &other) const {
-    if (other.isNull()) {
-      return nullptr;
-    }
-
-    const JniContext *jniContext = other.getJniContext();
-    assert(jniContext != nullptr);
-
-    JNIEnv *env = jniContext->getJNIEnv();
-    assert(env != nullptr);
-
-    return (jobjectArray) env->NewLocalRef(other.get());
   }
 };
 

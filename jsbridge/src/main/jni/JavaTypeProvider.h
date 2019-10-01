@@ -17,9 +17,9 @@
 #define _JSBRIDGE_JAVATYPEPROVIDER_H
 
 #include "JavaTypeId.h"
+#include "JniTypes.h"
 #include "jni-helpers/JniGlobalRef.h"
 #include "jni-helpers/JniLocalRef.h"
-#include "jni-helpers/JniTypes.h"
 #include <memory>
 #include <unordered_map>
 

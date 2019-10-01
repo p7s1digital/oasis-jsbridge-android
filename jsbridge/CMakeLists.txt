@@ -3,7 +3,7 @@
 
 cmake_minimum_required(VERSION 3.6.0)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -DANDROID_STL=c++_static -DANDROID_TOOLCHAIN=clang -DDUK_DEBUG_PORT=${DEBUGGER_SERVER_PORT}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -DANDROID_STL=c++_static -DANDROID_TOOLCHAIN=clang -DDUK_DEBUG_PORT=${DEBUGGER_SERVER_PORT}")
 
 message("CMake - Flavor = ${FLAVOR}")
 

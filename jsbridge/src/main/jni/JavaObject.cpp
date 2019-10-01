@@ -184,7 +184,7 @@ duk_ret_t JavaObject::push(const JsBridgeContext *jsBridgeContext, const std::st
     JniLocalRef<jsBridgeMethod> method = methods.getElement<jsBridgeMethod>(i);
     MethodInterface methodInterface = jsBridgeContext->getJniCache()->getMethodInterface(method);
 
-    std::string strMethodName = methodInterface.getName().str();
+    std::string strMethodName = methodInterface.getName().toUtf8Chars();
     std::string qualifiedMethodName = qualifiedMethodPrefix + strMethodName;
 
     std::unique_ptr<JavaMethod> javaMethod;
@@ -213,7 +213,7 @@ duk_ret_t JavaObject::push(const JsBridgeContext *jsBridgeContext, const std::st
   assert(env != nullptr);
 
   // Keep a reference in JavaScript to the object being bound.
-  duk_push_pointer(ctx, object.toNewRawGlobalRef());  // JNI global ref will be deleted via JS finalizer
+  duk_push_pointer(ctx, JniGlobalRef(object, JniRefReleaseMode::Never).get());  // JNI global ref will be deleted via JS finalizer
   duk_put_prop_string(ctx, objIndex, JAVA_THIS_PROP_NAME);
 
   return 1;
@@ -228,7 +228,7 @@ duk_ret_t JavaObject::pushLambda(const JsBridgeContext *jsBridgeContext, const s
 
   MethodInterface methodInterface = jsBridgeContext->getJniCache()->getMethodInterface(method);
 
-  std::string strMethodName = methodInterface.getName().str();
+  std::string strMethodName = methodInterface.getName().toUtf8Chars();
   std::string qualifiedMethodName = strName + "::" + strMethodName;
 
   std::unique_ptr<JavaMethod> javaMethod;
@@ -251,7 +251,7 @@ duk_ret_t JavaObject::pushLambda(const JsBridgeContext *jsBridgeContext, const s
   duk_put_prop_string(ctx, funcIndex, JAVA_METHOD_PROP_NAME);
 
   // Keep a reference in JavaScript to the lambda being bound.
-  duk_push_pointer(ctx, object.toNewRawGlobalRef());  // JNI global ref will be deleted via JS finalizer
+  duk_push_pointer(ctx, JniGlobalRef(object, JniRefReleaseMode::Never).get());  // JNI global ref will be deleted via JS finalizer
   duk_put_prop_string(ctx, funcIndex, JAVA_THIS_PROP_NAME);
 
   // Set a finalizer
@@ -304,7 +304,7 @@ JSValue JavaObject::create(const JsBridgeContext *jsBridgeContext, const std::st
     JniLocalRef<jsBridgeMethod> method = methods.getElement<jsBridgeMethod>(i);
     MethodInterface methodInterface = jsBridgeContext->getJniCache()->getMethodInterface(method);
 
-    std::string strMethodName = methodInterface.getName().str();
+    std::string strMethodName = methodInterface.getName().toUtf8Chars();
     std::string qualifiedMethodName = qualifiedMethodPrefix + strMethodName;
 
     std::unique_ptr<JavaMethod> javaMethod;
@@ -349,7 +349,7 @@ JSValue JavaObject::createLambda(const JsBridgeContext *jsBridgeContext, const s
 
   MethodInterface methodInterface = jsBridgeContext->getJniCache()->getMethodInterface(method);
 
-  std::string strMethodName = methodInterface.getName().str();
+  std::string strMethodName = methodInterface.getName().toUtf8Chars();
   std::string qualifiedMethodName = strName + "::" + strMethodName;
 
   std::unique_ptr<JavaMethod> javaMethod;

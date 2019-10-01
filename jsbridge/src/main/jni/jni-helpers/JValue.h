@@ -20,7 +20,9 @@
 #include <jni.h>
 #include <vector>
 
-// Small wrapper around JNI value using LocalRef
+// Small wrapper around JNI value
+// It has the (small) memory cost of having an additional LocalRef but makes the management of JNI
+// references safe
 class JValue {
 public:
   JValue()
@@ -53,49 +55,48 @@ public:
     m_value.f = f;
   }
 
+  explicit JValue(JniLocalRef<jobject> &&localRef)
+      : m_value() {
+
+    m_localRef.swap(localRef);
+    m_value.l = m_localRef.get();
+  }
+
   template <class T>
   explicit JValue(const JniLocalRef<T> &localRef)
     : m_value()
-    , m_localRefPtr(new JniLocalRef<jobject>(localRef.template staticCast<jobject>())) {
+    , m_localRef(localRef.template staticCast<jobject>()) {
 
-    m_value.l = m_localRefPtr->get();
+    m_value.l = m_localRef.get();
   }
 
   JValue(const JValue &other)
     : m_value(other.m_value)
-    , m_localRefPtr(other.m_localRefPtr == nullptr ? nullptr : new JniLocalRef<jobject>(*other.m_localRefPtr)) {
+    , m_localRef(other.m_localRef) {
+
+    assert(m_localRef.isNull() || m_value.l == m_localRef.get());
   }
 
   JValue(JValue &&other)
-      : m_value(other.m_value)
-      , m_localRefPtr(other.m_localRefPtr) {
+      : m_value(other.m_value) {
 
-      other.m_localRefPtr = nullptr;
+    m_localRef.swap(other.m_localRef);
   }
 
   JValue& operator=(const JValue &other) {
-    delete m_localRefPtr;
-
     m_value = other.m_value;
-    m_localRefPtr = other.m_localRefPtr == nullptr ? nullptr : new JniLocalRef<jobject>(*other.m_localRefPtr);
+    m_localRef = other.m_localRef;
+
+    assert(m_localRef.isNull() || m_value.l == m_localRef.get());
 
     return *this;
   }
 
   JValue& operator=(JValue &&other) {
-    if (other.m_localRefPtr == m_localRefPtr) {
-      return *this;
-    }
+    m_localRef.swap(other.m_localRef);
+    std::swap(m_value, other.m_value);
 
-    m_localRefPtr = other.m_localRefPtr;
-    m_value = other.m_value;
-
-    other.m_localRefPtr = nullptr;
     return *this;
-  }
-
-  ~JValue() {
-    delete m_localRefPtr;
   }
 
   const jvalue &get() const { return m_value; }
@@ -108,27 +109,15 @@ public:
   jdouble getDouble() const { return m_value.d; }
   jfloat getFloat() const { return m_value.f; }
 
-  const JniLocalRef<jobject> &getLocalRef() const {
-    if (m_localRefPtr == nullptr) {
-      static const auto nullLocalRef = JniLocalRef<jobject>();
-      return nullLocalRef;
-    }
+  const JniLocalRef<jobject> &getLocalRef() const { return m_localRef; }
 
-    return *m_localRefPtr;
-  }
-
-  void detachLocalRef() const {
-    if (m_localRefPtr) {
-      m_localRefPtr->detach();
-    }
+  void detachLocalRef() {
+    m_localRef.detach();
   }
 
   void releaseLocalRef() const {
-    if (m_localRefPtr) {
-      m_localRefPtr->release();
-      delete m_localRefPtr;
-      const_cast<JValue *>(this)->m_localRefPtr = nullptr;
-    }
+    m_localRef.release();
+    m_localRef.reset();
   }
 
   // Note: returned array needs to be explictly deleted!!!
@@ -142,14 +131,14 @@ public:
   }
 
   static void releaseAll(const std::vector<JValue> &values) {
-    for (const JValue &value: values) {
+    for (const JValue & value: values) {
       value.releaseLocalRef();
     }
   }
 
 private:
   jvalue m_value;
-  JniLocalRef<jobject> *m_localRefPtr = nullptr;
+  mutable JniLocalRef<jobject> m_localRef;
 };
 
 #endif

@@ -306,9 +306,8 @@ const std::shared_ptr<JavaMethod> &FunctionX::getCppJavaMethod() const {
 #ifdef NDEBUG
   static const char *functionXName = "<FunctionX>";
 #else
-  JStringLocalRef paramNameRef = getJniCache()->getParameterInterface(m_parameter).getName();
+  std::string paramName = getJniCache()->getParameterInterface(m_parameter).getName().toUtf8Chars();
   std::string methodName = "<method>";
-  std::string paramName = paramNameRef.isNull() ? "_" : paramNameRef.str();
   std::string functionXName = "<FunctionX>/" + methodName + "::" + paramName;
 #endif
 

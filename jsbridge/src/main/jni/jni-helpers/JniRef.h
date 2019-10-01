@@ -16,41 +16,64 @@
 #ifndef JSBRIDGE_JNIREF_H
 #define JSBRIDGE_JNIREF_H
 
+#include "JniRefHelper.h"
 #include <jni.h>
+#include <cassert>
+
+enum class JniRefReleaseMode {
+  Auto,  // JNI ref will be released when the JniRef instance has been destroyed
+  Never  // JNI ref will never be released (e.g. for local references given to entry JNI functions)
+};
 
 class JniContext;
 
-// Common functionalities of JniLocalRef and JniGlobalRef.
-template <class T>
-class JniRef {
+class JniRefBase {
 public:
-  virtual ~JniRef() = default;
+  const JniContext *getJniContext() const { return m_jniContext; }
 
-  virtual const JniContext *getJniContext() const = 0;
-
-  virtual T get() const = 0;
-  virtual T toNewRawLocalRef() const = 0;
-  virtual T toNewRawGlobalRef() const = 0;
-  virtual T toNewRawWeakGlobalRef() const = 0;
-  virtual bool isNull() const = 0;
-
-  //virtual operator T () const = 0;
+  bool isNull() const { return m_object == nullptr; }
 
   // Explicitly disable a dangerous cast to bool
   explicit operator bool() const = delete;
 
 protected:
-  JniRef() = default;
+  JniRefBase(const JniContext *jniContext, jobject object)
+      : m_jniContext(jniContext)
+      , m_object(object) {
+  }
+
+  JNIEnv *getJniEnv() const {
+    assert(m_jniContext);
+
+    JNIEnv *env = JniRefHelper::getJNIEnv(m_jniContext);
+    assert(env);
+
+    return env;
+  }
+
+  const JniContext *m_jniContext;
+  jobject m_object;
 };
 
-template<typename T>
-struct is_jniref {
-  static const bool value = false;
-};
+// Common functionalities of JniLocalRef and JniGlobalRef.
+// Note: no virtual method to avoid vtable and improve performance
+template <class T>
+class JniRef : JniRefBase {
+public:
+  using JniRefBase::getJniContext;
+  using JniRefBase::isNull;
 
-template<typename RefT>
-struct is_jniref<JniRef<RefT>>{
-  static const bool value = true;
+  T get() const { return static_cast<T>(m_object); }
+
+protected:
+  using JniRefBase::getJniEnv;
+  using JniRefBase::m_jniContext;
+  using JniRefBase::m_object;
+
+  JniRef(const JniContext *jniContext, jobject object)
+   : JniRefBase(jniContext, object) {
+  }
 };
 
 #endif
+

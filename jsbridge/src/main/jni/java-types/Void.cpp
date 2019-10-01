@@ -36,7 +36,7 @@ JValue Void::pop(bool) const {
     const auto &javaClass = getJavaClass();
     jmethodID newInstance = m_jniContext->getMethodID(getJavaClass(), "<init>", "()V");
     auto instance = m_jniContext->newObject<jthrowable>(getJavaClass(), newInstance);
-    return JValue(instance);
+    return JValue(std::move(instance));
   }
 
   return JValue();

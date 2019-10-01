@@ -19,7 +19,7 @@
 #ifndef _JSBRIDGE_JAVASCRIPTMETHOD_H
 #define _JSBRIDGE_JAVASCRIPTMETHOD_H
 
-#include "jni-helpers/JniTypes.h"
+#include "JniTypes.h"
 #include "jni-helpers/JniGlobalRef.h"
 #include <string>
 #include <vector>

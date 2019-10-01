@@ -16,6 +16,7 @@
 #ifndef _JSBRIDGE_JNIINTERFACES_H
 #define _JSBRIDGE_JNIINTERFACES_H
 
+#include "JniTypes.h"
 #include "jni-helpers/JniGlobalRef.h"
 #include "jni-helpers/JObjectArrayLocalRef.h"
 #include "jni-helpers/JStringLocalRef.h"

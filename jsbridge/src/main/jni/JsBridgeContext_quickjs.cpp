@@ -93,11 +93,13 @@ void JsBridgeContext::cancelDebug() {
   // Not supported yet
 }
 
-JValue JsBridgeContext::evaluateString(const std::string &strCode, const JniLocalRef<jsBridgeParameter> &returnParameter,
-                                      bool awaitJsPromise) const {
-  JSValue v = JS_Eval(m_ctx, strCode.c_str(), strCode.size(), "JsBridgeContext/evaluateString", 0);
+JValue JsBridgeContext::evaluateString(const JStringLocalRef &strCode, const JniLocalRef<jsBridgeParameter> &returnParameter,
+                                       bool awaitJsPromise) const {
+  JSValue v = JS_Eval(m_ctx, strCode.toUtf8Chars(), strCode.utf8Length(), "JsBridgeContext/evaluateString", 0);
+  strCode.releaseChars();  // release chars now as we don't need them anymore
 
   if (JS_IsException(v)) {
+    alog("Could not evaluate string");
     JS_FreeValue(m_ctx, v);
     queueJavaExceptionForJsError();
     return JValue();
@@ -138,8 +140,9 @@ JValue JsBridgeContext::evaluateString(const std::string &strCode, const JniLoca
   return value;
 }
 
-void JsBridgeContext::evaluateFileContent(const std::string &strCode, const std::string &strFileName) const {
-  JSValue v = JS_Eval(m_ctx, strCode.c_str(), strCode.size(), strFileName.c_str(), 0);
+void JsBridgeContext::evaluateFileContent(const JStringLocalRef &strCode, const std::string &strFileName) const {
+  JSValue v = JS_Eval(m_ctx, strCode.toUtf8Chars(), strCode.utf8Length(), strFileName.c_str(), 0);
+  strCode.releaseChars();  // release chars now as we don't need them anymore
 
   JS_FreeValue(m_ctx, v);
 
@@ -172,7 +175,7 @@ void JsBridgeContext::registerJavaObject(const std::string &strName, const JniLo
 }
 
 void JsBridgeContext::registerJavaLambda(const std::string &strName, const JniLocalRef<jobject> &object,
-                                        const JniLocalRef<jsBridgeMethod> &method) {
+                                         const JniLocalRef<jsBridgeMethod> &method) {
 
   JSValue globalObj = JS_GetGlobalObject(m_ctx);
   if (m_utils->hasPropertyStr(globalObj, strName.c_str())) {
@@ -289,9 +292,10 @@ JValue JsBridgeContext::callJsLambda(const std::string &strFunctionName,
   return cppJsLambda->call(this, args, awaitJsPromise);
 }
 
-void JsBridgeContext::assignJsValue(const std::string &strGlobalName, const std::string &strCode) {
+void JsBridgeContext::assignJsValue(const std::string &strGlobalName, const JStringLocalRef &strCode) {
 
-  JSValue v = JS_Eval(m_ctx, strCode.c_str(), strCode.size(), strGlobalName.c_str(), 0);
+  JSValue v = JS_Eval(m_ctx, strCode.toUtf8Chars(), strCode.utf8Length(), strGlobalName.c_str(), 0);
+  strCode.releaseChars();  // release chars now as we don't need them anymore
 
   if (JS_IsException(v)) {
     JS_FreeValue(m_ctx, v);
@@ -305,15 +309,16 @@ void JsBridgeContext::assignJsValue(const std::string &strGlobalName, const std:
   JS_FreeValue(m_ctx, globalObj);
 }
 
-void JsBridgeContext::newJsFunction(const std::string &strGlobalName, const JObjectArrayLocalRef &args, const std::string &strCode) {
-  JSValue codeValue = JS_NewString(m_ctx, strCode.c_str());
+void JsBridgeContext::newJsFunction(const std::string &strGlobalName, const JObjectArrayLocalRef &args, const JStringLocalRef &strCode) {
+  JSValue codeValue = JS_NewString(m_ctx, strCode.toUtf8Chars());
+  strCode.releaseChars();  // release chars now as we don't need them anymore
 
   jsize argCount = args.getLength();
   JSValue functionArgValues[argCount + 1];
 
   for (jsize i = 0; i < argCount; ++i) {
     JStringLocalRef argString(args.getElement<jstring>(i));
-    functionArgValues[i] = JS_NewString(m_ctx, argString.c_str());
+    functionArgValues[i] = JS_NewString(m_ctx, argString.toUtf8Chars());
   }
 
   functionArgValues[argCount] = codeValue;
@@ -384,7 +389,7 @@ void JsBridgeContext::rethrowJniException() const {
   }
 
   // Get (and clear) the Java exception and read its message
-  auto exception = JniLocalRef<jthrowable>(m_jniContext, m_jniContext->exceptionOccurred(), true);
+  JniLocalRef<jthrowable> exception(m_jniContext, m_jniContext->exceptionOccurred(), JniRefReleaseMode::Never);
   m_jniContext->exceptionClear();
 
   auto exceptionClass = m_jniContext->getObjectClass(exception);
@@ -396,7 +401,7 @@ void JsBridgeContext::rethrowJniException() const {
   // ---
 
   JSValue errorValue = JS_NewError(m_ctx);
-  JSValue messageValue = JS_NewString(m_ctx, message.c_str());
+  JSValue messageValue = JS_NewString(m_ctx, message.toUtf8Chars());
   JS_SetPropertyStr(m_ctx, errorValue, "message", messageValue);
   // No JS_FreeValue(m_ctx, messageValue) after JS_SetPropertyStr()
 
@@ -439,7 +444,7 @@ JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
   JniLocalRef<jthrowable> cause;
   JSValue javaExceptionValue = JS_GetPropertyStr(m_ctx, exceptionValue, JAVA_EXCEPTION_PROP_NAME);
   if (!JS_IsUndefined(javaExceptionValue)) {
-    cause = JniLocalRef<jthrowable>(m_jniContext, m_utils->getJavaRef<jthrowable>(javaExceptionValue).toNewRawGlobalRef());
+    cause = m_utils->getJavaRef<jthrowable>(javaExceptionValue);
   }
   JS_FreeValue(m_ctx, javaExceptionValue);
 

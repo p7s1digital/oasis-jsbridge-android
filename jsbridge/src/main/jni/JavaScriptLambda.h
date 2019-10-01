@@ -16,8 +16,8 @@
 #ifndef _JSBRIDGE_JAVASCRIPTLAMBDA_H
 #define _JSBRIDGE_JAVASCRIPTLAMBDA_H
 
+#include "JniTypes.h"
 #include "jni-helpers/JniRef.h"
-#include "jni-helpers/JniTypes.h"
 #include "jni-helpers/JValue.h"
 #include <string>
 

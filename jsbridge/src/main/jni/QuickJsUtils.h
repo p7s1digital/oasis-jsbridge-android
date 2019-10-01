@@ -144,7 +144,6 @@ public:  // internal
     std::function<void()> deleter;
   } CppWrapper;
 
-  static JSClassID js_finalizer_class_id;
   static JSClassID js_cppwrapper_class_id;
 
 private:

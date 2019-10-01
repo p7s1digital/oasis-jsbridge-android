@@ -54,9 +54,9 @@ public:
   void initDebugger();
   void cancelDebug();
 
-  JValue evaluateString(const std::string &strSourceCode, const JniLocalRef<jsBridgeParameter> &returnParameter,
-                                bool awaitJsPromise) const;
-  void evaluateFileContent(const std::string &strSourceCode, const std::string &strFileName) const;
+  JValue evaluateString(const JStringLocalRef &strSourceCode, const JniLocalRef<jsBridgeParameter> &returnParameter,
+                        bool awaitJsPromise) const;
+  void evaluateFileContent(const JStringLocalRef &strSourceCode, const std::string &strFileName) const;
 
   void registerJavaObject(const std::string &strName, const JniLocalRef<jobject> &object,
                                   const JObjectArrayLocalRef &methods);
@@ -69,8 +69,8 @@ public:
   JValue callJsLambda(const std::string &strFunctionName, const JObjectArrayLocalRef &args,
                               bool awaitJsPromise);
 
-  void assignJsValue(const std::string &strGlobalName, const std::string &strCode);
-  void newJsFunction(const std::string &strGlobalName, const JObjectArrayLocalRef &args, const std::string &strCode);
+  void assignJsValue(const std::string &strGlobalName, const JStringLocalRef &strCode);
+  void newJsFunction(const std::string &strGlobalName, const JObjectArrayLocalRef &args, const JStringLocalRef &strCode);
 
   void processPromiseQueue();
 
@@ -118,15 +118,5 @@ private:
   QuickJsUtils *m_utils = nullptr;
 #endif
 };
-
-#define RETHROW_JNI_EXCEPTION_AND(jsBridgeContext, block) \
-  if (!jsBridgeContext->jniContext()->exceptionCheck()) {\
-    return block();\
-  }
-
-#define JNI_EXCEPTION_TO_JS_ERROR(jsBridgeContext, block) \
-  if (!jsBridgeContext->jniContext()->exceptionCheck()) {\
-    return block(JSValue());\
-  }
 
 #endif

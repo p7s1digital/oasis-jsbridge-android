@@ -31,100 +31,59 @@ class JniContext;
 // underlying global reference count on the object in the JVM.
 template <class T>
 class JniGlobalRef: public JniRef<T> {
+  using JniRef<T>::m_jniContext;
+  using JniRef<T>::m_object;
+
 public:
+  typedef JniRefReleaseMode ReleaseMode;
+
   JniGlobalRef()
-    : m_jniContext(nullptr)
-    , m_object(nullptr)
-    , m_refCounter(nullptr) {
+    : JniRef<T>(nullptr, nullptr) {
   }
 
-  explicit JniGlobalRef(const JniRef<T> &other)
-    : m_jniContext(other.isNull() ? nullptr : other.getJniContext())
-    , m_object(nullptr)
-    , m_refCounter(nullptr) {
+  explicit JniGlobalRef(const JniLocalRef<T> &localRef, ReleaseMode releaseMode = ReleaseMode::Auto)
+   : JniRef<T>(localRef.getJniContext(), nullptr) {
 
-    if (m_jniContext == nullptr) {
-      return;
-    }
-
-    auto otherAsGlobalRef = dynamic_cast<const JniGlobalRef *>(&other);
-
-    if (otherAsGlobalRef == nullptr) {
-      // Another JniRef instance (probably a JniLocalRef)
-      if (!other.isNull()) {
-        m_object = static_cast<T>(JniRefHelper::getJNIEnv(m_jniContext)->NewGlobalRef(other.get()));
-        m_refCounter = new RefCounter(1);
-      }
-    } else {
-      // Other is already a JniGlobalRef instance, use its JNI object and increment ref counter
-      m_object = otherAsGlobalRef->m_object;
-      m_refCounter = otherAsGlobalRef->m_refCounter;
-      if (m_refCounter != nullptr) {
-        m_refCounter->increment();
+    if (!localRef.isNull()) {
+      m_object = static_cast<T>(JniRefHelper::getJNIEnv(m_jniContext)->NewGlobalRef(localRef.get()));
+      if (releaseMode == ReleaseMode::Auto) {
+        m_sharedAutoRelease = makeSharedAutoRelease(true);
       }
     }
   }
 
   JniGlobalRef(JniGlobalRef<T> &&other)
-   : m_jniContext(other.m_jniContext)
-   , m_object(other.m_object)
-   , m_refCounter(other.m_refCounter) {
+     : JniRef<T>(other.m_jniContext, other.m_object) {
 
-    // Make sure that the "old" instance does not delete the global ref which is used in the new one
-    other.m_object = nullptr;
-    other.m_refCounter = nullptr;
+    std::swap(m_sharedAutoRelease, other.m_sharedAutoRelease);
   }
 
   JniGlobalRef(const JniGlobalRef<T> &other)
-    : m_jniContext(other.m_jniContext)
-    , m_object(other.m_object)
-    , m_refCounter(other.m_refCounter) {
-    if (m_refCounter != nullptr) {
-      m_refCounter->increment();
-    }
-  }
-
-  JniGlobalRef &operator=(const JniGlobalRef<T> &other) {
-    if (&other == this) {
-      return *this;
-    }
-
-    if (m_object != other.m_object) {
-      release();
-    }
-
-    m_jniContext = other.getJniContext();
-    m_object = other.m_object;
-    m_refCounter = other.m_refCounter;
-    if (m_refCounter != nullptr) {
-      m_refCounter->increment();
-    }
-
-    return *this;
+    : JniRef<T>(other.isNull() ? nullptr : other.getJniContext(), other.m_object)
+    , m_sharedAutoRelease(other.m_sharedAutoRelease) {
   }
 
   JniGlobalRef &operator=(JniGlobalRef<T> &&other) noexcept {
-    if (&other == this) {
-      return *this;
-    }
+    m_jniContext = other.m_jniContext;
+    m_object = other.m_object;
+    m_sharedAutoRelease.reset();
+    std::swap(m_sharedAutoRelease, other.m_sharedAutoRelease);
 
-    if (m_object != other.m_object) {
-      release();
+    other.m_object = nullptr;
+    return *this;
+  }
+
+  JniGlobalRef &operator=(const JniGlobalRef<T> &other) {
+    if (other.m_object == m_object) {
+      // Same object
+      return *this;
     }
 
     m_jniContext = other.m_jniContext;
     m_object = other.m_object;
-    m_refCounter = other.m_refCounter;
-
-    other.m_jniContext = nullptr;
-    other.m_object = nullptr;
-    other.m_refCounter = nullptr;
+    m_sharedAutoRelease = other.m_sharedAutoRelease;
 
     return *this;
-  }
-
-  ~JniGlobalRef() override {
-    release();
   }
 
   static void deleteRawGlobalRef(const JniContext *jniContext, jobject object) {
@@ -141,76 +100,41 @@ public:
     env->DeleteWeakGlobalRef(object);
   }
 
-  bool isNull() const override {
-    return m_object == nullptr;
-  }
-
-  const JniContext *getJniContext() const override { return m_jniContext; }
-
-  //operator T () const override {
-  //    return m_object;
-  //}
-
-  T get() const override {
-    return m_object;
-  }
-
-  JniLocalRef<T> toLocalRef() const {
-    return JniLocalRef<T>(m_jniContext, toNewRawLocalRef());
-  }
-
-  T toNewRawLocalRef() const override {
-    JNIEnv *env = JniRefHelper::getJNIEnv(m_jniContext);
-    assert(env != nullptr);
-
-    return m_object == nullptr ? nullptr : static_cast<T>(env->NewLocalRef(m_object));
-  }
-
-  T toNewRawGlobalRef() const override {
-    JNIEnv *env = JniRefHelper::getJNIEnv(m_jniContext);
-    assert(env != nullptr);
-    return m_object == nullptr ? nullptr : static_cast<T>(env->NewGlobalRef(m_object));
-  }
-
-  T toNewRawWeakGlobalRef() const override {
-    JNIEnv *env = JniRefHelper::getJNIEnv(m_jniContext);
-    assert(env != nullptr);
-
-    return m_object == nullptr ? nullptr : static_cast<T>(env->NewWeakGlobalRef(m_object));
+  void release() {
+    if (m_sharedAutoRelease.get() != nullptr) {
+      *m_sharedAutoRelease = true;
+      m_sharedAutoRelease.reset();  // delete local ref (when the last shared ref has been deleted)
+    }
   }
 
   void detach() {
-    if (m_refCounter) {
-      m_refCounter->disable();  // make sure that other instance with same counter don't get destroyed
+    if (m_sharedAutoRelease.get() != nullptr) {
+      *m_sharedAutoRelease = false;
+      m_sharedAutoRelease.reset();
     }
-
-    delete m_refCounter;
-    m_refCounter = nullptr;
   }
 
 private:
-  void release() {
-    if (m_refCounter == nullptr) {
-      return;
+  std::shared_ptr<bool> makeSharedAutoRelease(bool autoRelease) const {
+    if (m_object == nullptr) {
+      return std::shared_ptr<bool>();
     }
 
-    m_refCounter->decrement();
-    if (!m_refCounter->isZero()) {
-      return;
-    }
+    // Copy the variables needed to be captured in the lambda
+    auto jniContext = m_jniContext;
+    auto object = m_object;
 
-    delete m_refCounter;
-    m_refCounter = nullptr;
-
-    if (m_object != nullptr) {
-      assert(m_jniContext != nullptr);
-      JniRefHelper::getJNIEnv(m_jniContext)->DeleteGlobalRef(m_object);
-    }
+    return std::shared_ptr<bool>(new bool(autoRelease), [jniContext, object](bool *pAutoRelease) {
+      if (*pAutoRelease) {
+        JniRefHelper::getJNIEnv(jniContext)->DeleteGlobalRef(object);
+      }
+      delete pAutoRelease;
+    });
   }
 
-  const JniContext *m_jniContext;
-  T m_object;
-  RefCounter *m_refCounter;
+public:
+  // Internal
+  mutable std::shared_ptr<bool> m_sharedAutoRelease;
 };
 
 #endif

@@ -61,7 +61,7 @@ duk_ret_t String::push(const JValue &value, bool inScript) const {
     return 1;
   }
 
-  duk_push_string(m_ctx, jString.c_str());
+  duk_push_string(m_ctx, jString.toUtf8Chars());
   return 1;
 }
 
@@ -87,7 +87,7 @@ JSValue String::fromJava(const JValue &value, bool inScript) const {
     return JS_NULL;
   }
 
-  return JS_NewString(m_ctx, jString.c_str());
+  return JS_NewString(m_ctx, jString.toUtf8Chars());
 }
 
 #endif

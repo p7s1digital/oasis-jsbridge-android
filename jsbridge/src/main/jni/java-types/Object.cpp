@@ -165,9 +165,11 @@ JSValue Object::fromJava(const JValue &value, bool inScript) const {
 JavaType *Object::newJavaType(const JniLocalRef<jobject> &jobject) const {
   JniLocalRef<jclass> objectJavaClass = m_jniContext->getObjectClass(jobject);
   jmethodID getName = m_jniContext->getMethodID(objectJavaClass, "getName", "()Ljava/lang/String;");
-  auto strName = m_jniContext->callStringMethod(objectJavaClass, getName).str();
+  JStringLocalRef javaNameRef = m_jniContext->callStringMethod(objectJavaClass, getName);
 
-  JavaTypeId id = getJavaTypeIdByJavaName(strName);
+  JavaTypeId id = getJavaTypeIdByJavaName(javaNameRef.toUtf8Chars());
+  javaNameRef.release();
+
   switch (id) {
     case JavaTypeId::Boolean:
     case JavaTypeId::BoxedBoolean:

@@ -79,7 +79,7 @@ duk_ret_t JsValue::push(const JValue &value, bool inScript) const {
   m_jsBridgeContext->rethrowJniException();
 
   // Push the global JS value with that name
-  duk_get_global_string(m_ctx, jsValueName.c_str());
+  duk_get_global_string(m_ctx, jsValueName.toUtf8Chars());
   return 1;
 }
 
@@ -120,7 +120,7 @@ JSValue JsValue::fromJava(const JValue &value, bool inScript) const {
   }
 
   // Get JsValue JS name from Java
-  JStringLocalRef jsValueName = getJniCache()->getJsValueName(jValue);
+  std::string jsValueName = getJniCache()->getJsValueName(jValue).toUtf8Chars();
   if (m_jsBridgeContext->hasPendingJniException()) {
     m_jsBridgeContext->rethrowJniException();
     return JS_EXCEPTION;

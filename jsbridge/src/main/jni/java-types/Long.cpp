@@ -18,8 +18,9 @@
  */
 #include "Long.h"
 
-#include "../JsBridgeContext.h"
+#include "JsBridgeContext.h"
 #include "jni-helpers/JArrayLocalRef.h"
+#include "log.h"
 
 #ifdef DUKTAPE
 # include "JsBridgeContext.h"
@@ -48,7 +49,7 @@ JValue Long::pop(bool inScript) const {
     duk_pop(m_ctx);
     return JValue();
   }
-  auto l = (jlong) duk_require_number(m_ctx, -1);
+  auto l = (jlong) duk_require_number(m_ctx, -1);  // no real Duktape for int64 so needing a cast from double
   duk_pop(m_ctx);
   return JValue(l);
 }
@@ -66,18 +67,27 @@ JValue Long::popArray(uint32_t count, bool expanded, bool inScript) const {
   }
 
   JArrayLocalRef<jlong> longArray(m_jniContext, count);
+  jlong *elements = longArray.isNull() ? nullptr : longArray.getMutableElements();
+  if (elements == nullptr) {
+    if (expanded) {
+      duk_pop_n(m_ctx, count);
+    }
+    m_jsBridgeContext->rethrowJniException();
+    return JValue();
+  }
+
   for (int i = count - 1; i >= 0; --i) {
     if (!expanded) {
-      duk_get_prop_index(m_ctx, -1, i);
+      duk_get_prop_index(m_ctx, -1, static_cast<duk_uarridx_t>(i));
     }
     JValue value = pop(inScript);
-    longArray.setElement(i, value.getLong());
+    elements[i] = value.getLong();
   }
   return JValue(longArray);
 }
 
 duk_ret_t Long::push(const JValue &value, bool inScript) const {
-  duk_push_number(m_ctx, (duk_double_t) value.getLong());
+  duk_push_number(m_ctx, static_cast<duk_double_t>(value.getLong()));  // no real Duktape for int64 so needing a cast to double
   return 1;
 }
 
@@ -89,9 +99,14 @@ duk_ret_t Long::pushArray(const JniLocalRef<jarray> &values, bool expand, bool i
     duk_push_array(m_ctx);
   }
 
+  const jlong *elements = longArray.getElements();
+  if (elements == nullptr) {
+    m_jsBridgeContext->rethrowJniException();
+    return DUK_RET_ERROR;
+  }
+
   for (jsize i = 0; i < count; ++i) {
-    jlong element = longArray.getElement(i);
-    duk_push_number(m_ctx, (duk_double_t) element);
+    duk_push_number(m_ctx, elements[i]);
     if (!expand) {
       duk_put_prop_index(m_ctx, -2, static_cast<duk_uarridx_t>(i));
     }
@@ -100,6 +115,23 @@ duk_ret_t Long::pushArray(const JniLocalRef<jarray> &values, bool expand, bool i
 }
 
 #elif defined(QUICKJS)
+
+namespace {
+  inline jlong getLong(JSContext *ctx, JSValue v) {
+    if (JS_IsInteger(v)) {
+      int64_t i64;
+      JS_ToInt64(ctx, &i64, v);
+      return i64;
+    }
+
+    if (JS_IsNumber(v)) {
+      return jlong(JS_VALUE_GET_FLOAT64(v));
+    }
+
+    alog_warn("Cannot get long from JS: returning 0");  // TODO: proper exception handling
+    return jlong();
+  }
+}
 
 JValue Long::toJava(JSValueConst v, bool inScript) const {
   if (!JS_IsNumber(v)) {
@@ -111,13 +143,7 @@ JValue Long::toJava(JSValueConst v, bool inScript) const {
     return JValue();
   }
 
-  jlong l;
-  if (JS_IsInteger(v)) {
-    l = JS_VALUE_GET_INT(v);
-  } else {
-    l = long(JS_VALUE_GET_FLOAT64(v));
-  }
-  return JValue(l);
+  return JValue(getLong(m_ctx, v));
 }
 
 JValue Long::toJavaArray(JSValueConst v, bool inScript) const {
@@ -136,12 +162,23 @@ JValue Long::toJavaArray(JSValueConst v, bool inScript) const {
   JS_FreeValue(m_ctx, lengthValue);
 
   JArrayLocalRef<jlong> longArray(m_jniContext, count);
-
-  for (uint32_t i = 0; i < count; ++i) {
-    JValue elementValue = toJava(JS_GetPropertyUint32(m_ctx, v, i), inScript);
-    longArray.setElement(i, elementValue.getLong());
+  if (longArray.isNull()) {
+    m_jsBridgeContext->rethrowJniException();
+    return JValue();
   }
 
+  jlong *elements = longArray.getMutableElements();
+  if (elements == nullptr) {
+    m_jsBridgeContext->rethrowJniException();
+    return JValue();
+  }
+
+  for (uint32_t i = 0; i < count; ++i) {
+    JSValue ev = JS_GetPropertyUint32(m_ctx, v, i);
+    elements[i] = getLong(m_ctx, ev);
+  }
+
+  longArray.releaseArrayElements();  // copy back elements to Java
   return JValue(longArray);
 }
 
@@ -155,15 +192,16 @@ JSValue Long::fromJavaArray(const JniLocalRef<jarray> &values, bool inScript) co
 
   JSValue jsArray = JS_NewArray(m_ctx);
 
+  const jlong *elements = longArray.getElements();
+  if (elements == nullptr) {
+    JS_FreeValue(m_ctx, jsArray);
+    m_jsBridgeContext->rethrowJniException();
+    return JS_EXCEPTION;
+  }
+
   for (jsize i = 0; i < count; ++i) {
-    jlong lValue = longArray.getElement(i);
-    try {
-      JSValue elementValue = fromJava(JValue(lValue), inScript);
-      JS_SetPropertyUint32(m_ctx, jsArray, static_cast<uint32_t>(i), elementValue);
-    } catch (std::invalid_argument &e) {
-      JS_FreeValue(m_ctx, jsArray);
-      throw e;
-    }
+    JSValue elementValue = JS_NewInt64(m_ctx, elements[i]);
+    JS_SetPropertyUint32(m_ctx, jsArray, static_cast<uint32_t>(i), elementValue);
   }
 
   return jsArray;

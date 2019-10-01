@@ -14,11 +14,14 @@
  * limitations under the License.
  */
 #include "JavaTypeId.h"
+#include "log.h"
 #include <unordered_map>
 #include <algorithm>
 #include <string>
 
-static std::unordered_map<std::string, JavaTypeId> sJavaNameToID = {
+// map<javaName, JavaTypeId>
+// where javaName: Java name as returned by Java::class.getName(), e.g.: "java.lang.Integer"
+static thread_local std::unordered_map<std::string_view, JavaTypeId> sJavaNameToID = {
   { "", JavaTypeId::Unknown },
 
   { "V", JavaTypeId::Void },
@@ -65,19 +68,36 @@ static std::unordered_map<std::string, JavaTypeId> sJavaNameToID = {
   { "kotlinx.coroutines.Deferred", JavaTypeId::Deferred }
 };
 
-static std::unordered_map<JavaTypeId, std::string> createInversedMap() {
-  std::unordered_map<JavaTypeId, std::string> ret;
+// map<javaName, JavaTypeId> => map<JavaTypeId, jniClassName>
+// where:
+// - javaName = string_view: Java name as returned by Java::class.getName(), e.g.: "java.lang.Integer"
+// - jniClassName = string: JNI class name as needed by JNIenv::findClass(...), e.g.: "java/lang/Integer"
+static std::unordered_map<JavaTypeId, std::string> createIdToJniClassName() {
+  std::unordered_map<JavaTypeId, std::string> idTojniClassName;
+
   for (const auto &p : sJavaNameToID) {
-    std::string s = p.first;
-    std::replace(s.begin(), s.end(), '.', '/');
-    ret[p.second] = s;
+    std::string_view javaName = p.first;
+    JavaTypeId id = p.second;
+
+    size_t length = javaName.length();
+    std::string jniClassName;
+    jniClassName.reserve(length);
+
+    for (char c : javaName) {
+      if (c == '.') c = '/';
+      jniClassName += c;
+    }
+
+    idTojniClassName[id] = jniClassName;
   }
-  return ret;
+
+  return idTojniClassName;
 }
 
-static std::unordered_map<JavaTypeId, std::string> sIdToJavaName = createInversedMap();
+static std::unordered_map<JavaTypeId, std::string> sIdToJavaName = createIdToJniClassName();
 
-JavaTypeId getJavaTypeIdByJavaName(const std::string &javaName) {
+// Get the id from the Java name returned by Java::class.getName(), e.g.: "java.lang.Integer"
+JavaTypeId getJavaTypeIdByJavaName(std::string_view javaName) {
   auto itFind = sJavaNameToID.find(javaName);
   if (itFind != sJavaNameToID.end()) {
     return itFind->second;
@@ -96,6 +116,7 @@ JavaTypeId getJavaTypeIdByJavaName(const std::string &javaName) {
   return JavaTypeId::Unknown;
 }
 
-const std::string &getJavaNameByJavaTypeId(JavaTypeId id) {
+// Returns the JNI class name needed by JNIenv::findClass(...), e.g.: "java/lang/Integer"
+const std::string &getJniClassNameByJavaTypeId(JavaTypeId id) {
   return sIdToJavaName[id];
 }

@@ -146,14 +146,14 @@ JavaTypeId JavaTypeProvider::getJavaTypeId(const JniRef<jsBridgeParameter> &para
   const JniContext *jniContext = m_jsBridgeContext->getJniContext();
   assert(jniContext != nullptr);
 
-  auto strName = m_jsBridgeContext->getJniCache()->getParameterInterface(parameter).getJavaName();
-  if (strName.isNull()) {
+  JStringLocalRef javaName = m_jsBridgeContext->getJniCache()->getParameterInterface(parameter).getJavaName();
+  if (javaName.isNull()) {
     throw std::invalid_argument("Could not get Java name from Parameter!");
   }
 
-  JavaTypeId id = getJavaTypeIdByJavaName(strName.str());
+  JavaTypeId id = getJavaTypeIdByJavaName(javaName.toUtf8Chars());
   if (id == JavaTypeId::Unknown) {
-    throw std::invalid_argument(std::string("Unsupported Java type: ") + strName.str());
+    throw std::invalid_argument(std::string("Unsupported Java type: ") + javaName.toUtf8Chars());
   }
 
   return id;

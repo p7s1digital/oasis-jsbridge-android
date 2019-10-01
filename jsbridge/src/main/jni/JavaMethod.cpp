@@ -20,11 +20,11 @@
 
 #include "JavaType.h"
 #include "JniCache.h"
+#include "JniTypes.h"
 #include "JsBridgeContext.h"
 #include "jni-helpers/JniLocalRef.h"
 #include "jni-helpers/JniLocalFrame.h"
 #include "jni-helpers/JniContext.h"
-#include "jni-helpers/JniTypes.h"
 #include "jni-helpers/JObjectArrayLocalRef.h"
 #include <string>
 #include <stdexcept>
@@ -134,7 +134,7 @@ duk_ret_t JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRe
   for (ssize_t i = minArgs - 1; i >= 0; --i) {
     const auto &argumentType = m_argumentTypes[i];
     JValue value = argumentType->pop(true /*inScript*/);
-    args[i] = value;
+    args[i] = std::move(value);
   }
 
   return m_methodBody(javaThis, args);
@@ -179,7 +179,7 @@ JSValue JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRef<
   for (int i = 0; i < minArgs; ++i) {
     const auto &argumentType = m_argumentTypes[i];
     JValue value = argumentType->toJava(argv[i], true /*inScript*/);
-    args[i] = value;
+    args[i] = std::move(value);
   }
 
   return m_methodBody(javaThis, args);
@@ -197,8 +197,9 @@ JValue JavaMethod::callLambda(const JsBridgeContext *jsBridgeContext, const JniR
   JniLocalRef<jclass> objectClass = jniCache->getObjectClass();
   JObjectArrayLocalRef argArray(jniContext, args.size(), objectClass);
   int i = 0;
-  for (auto &arg : args) {
-    argArray.setElement(i++, arg.isNull() ? JniLocalRef<jobject>() : arg.getLocalRef());
+  for (const auto &arg : args) {
+    const auto &argLocalRef = arg.getLocalRef();
+    argArray.setElement(i++, argLocalRef);
   }
 
   JniLocalRef<jobject> ret = jniCache->getMethodInterface(method).callNativeLambda(javaThis, argArray);

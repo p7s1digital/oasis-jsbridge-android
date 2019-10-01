@@ -19,6 +19,7 @@
 #ifndef _JSBRIDGE_JAVAOBJECT_H
 #define _JSBRIDGE_JAVAOBJECT_H
 
+#include "JniTypes.h"
 #include "jni-helpers/JniLocalRef.h"
 #include "jni-helpers/JObjectArrayLocalRef.h"
 #include <string>

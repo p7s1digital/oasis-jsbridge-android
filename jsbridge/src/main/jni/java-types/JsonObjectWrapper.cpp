@@ -75,7 +75,8 @@ duk_ret_t JsonObjectWrapper::push(const JValue &value, bool inScript) const {
     return 1;
   }
 
-  JStringLocalRef str = getJniCache()->getJsonObjectWrapperString(jWrapper);
+  JStringLocalRef strRef = getJniCache()->getJsonObjectWrapperString(jWrapper);
+  const char *str = strRef.toUtf8Chars();
 
   if (m_jsBridgeContext->hasPendingJniException()) {
     duk_push_undefined(m_ctx);
@@ -83,13 +84,13 @@ duk_ret_t JsonObjectWrapper::push(const JValue &value, bool inScript) const {
   }
 
   // Undefined values are returned as an empty string
-  if (strlen(str.c_str()) == 0) {
+  if (!str) {
     duk_push_undefined(m_ctx);
     return 1;
   }
 
-  duk_push_string(m_ctx, str.c_str());
-  str.release();
+  duk_push_string(m_ctx, str);
+  strRef.release();
 
   if (duk_safe_call(m_ctx, tryJsonDecode, nullptr, 1, 1) != DUK_EXEC_SUCCESS) {
     const char *err = duk_safe_to_string(m_ctx, -1);
@@ -138,7 +139,8 @@ JSValue JsonObjectWrapper::fromJava(const JValue &value, bool inScript) const {
     return JS_NULL;
   }
 
-  JStringLocalRef str = getJniCache()->getJsonObjectWrapperString(jWrapper);
+  JStringLocalRef strRef = getJniCache()->getJsonObjectWrapperString(jWrapper);
+  const char *str = strRef.toUtf8Chars();
 
   if (m_jsBridgeContext->hasPendingJniException()) {
     m_jsBridgeContext->rethrowJniException();
@@ -146,12 +148,12 @@ JSValue JsonObjectWrapper::fromJava(const JValue &value, bool inScript) const {
   }
 
   // Undefined values are returned as an empty string
-  if (strlen(str.c_str()) == 0) {
+  if (!str) {
     return JS_UNDEFINED;
   }
 
-  JSValue decodedValue = JS_ParseJSON(m_ctx, str.c_str(), str.length(), "JsonObjectWrapper.cpp");
-  str.release();
+  JSValue decodedValue = JS_ParseJSON(m_ctx, str, strlen(str), "JsonObjectWrapper.cpp");
+  strRef.release();
 
   if (JS_IsException(decodedValue)) {
     const char *message = "Error while reading JsonObjectWrapper value";

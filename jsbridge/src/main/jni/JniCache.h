@@ -20,8 +20,8 @@
 
 #include "JavaTypeId.h"
 #include "JniInterfaces.h"
+#include "JniTypes.h"
 #include "jni-helpers/JniGlobalRef.h"
-#include "jni-helpers/JniTypes.h"
 #include "jni-helpers/JObjectArrayLocalRef.h"
 #include "jni-helpers/JStringLocalRef.h"
 #include <jni.h>

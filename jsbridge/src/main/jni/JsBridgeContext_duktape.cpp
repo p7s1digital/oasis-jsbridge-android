@@ -132,12 +132,17 @@ void JsBridgeContext::cancelDebug() {
     duk_trans_socket_finish();
 }
 
-JValue JsBridgeContext::evaluateString(const std::string &strCode, const JniLocalRef<jsBridgeParameter> &returnParameter,
-                                      bool awaitJsPromise) const {
+JValue JsBridgeContext::evaluateString(const JStringLocalRef &strCode, const JniLocalRef<jsBridgeParameter> &returnParameter,
+                                       bool awaitJsPromise) const {
   CHECK_STACK(m_ctx);
 
-  if (duk_peval_string(m_ctx, strCode.c_str()) != DUK_EXEC_SUCCESS) {
-    alog("Could not evaluate string:\n%s", strCode.c_str());
+  //alog("Evaluating string: %s", strCode.toUtf8Chars());
+
+  duk_int_t ret = duk_peval_string(m_ctx, strCode.toUtf8Chars());
+  strCode.releaseChars();  // release chars now as we don't need them anymore
+
+  if (ret != DUK_EXEC_SUCCESS) {
+    alog("Could not evaluate string");
     queueJavaExceptionForJsError();
     duk_pop(m_ctx);
     return JValue();
@@ -171,13 +176,16 @@ JValue JsBridgeContext::evaluateString(const std::string &strCode, const JniLoca
   return returnType->pop(false /*inScript*/);
 }
 
-void JsBridgeContext::evaluateFileContent(const std::string &strCode, const std::string &strFileName) const {
+void JsBridgeContext::evaluateFileContent(const JStringLocalRef &strCode, const std::string &strFileName) const {
 
   CHECK_STACK(m_ctx);
 
   duk_push_string(m_ctx, strFileName.c_str());
 
-  if (duk_pcompile_string_filename(m_ctx, DUK_COMPILE_EVAL, strCode.c_str()) != DUK_EXEC_SUCCESS) {
+  duk_int_t ret = duk_pcompile_string_filename(m_ctx, DUK_COMPILE_EVAL, strCode.toUtf8Chars());
+  strCode.releaseChars();  // release chars now as we don't need them anymore
+
+  if (ret != DUK_EXEC_SUCCESS) {
     alog("Could not compile file %s", strFileName.c_str());
     queueJavaExceptionForJsError();
     duk_pop(m_ctx);  // pcompile error
@@ -328,11 +336,14 @@ JValue JsBridgeContext::callJsLambda(const std::string &strFunctionName,
   return cppJsLambda->call(this, args, awaitJsPromise);
 }
 
-void JsBridgeContext::assignJsValue(const std::string &strGlobalName, const std::string &strCode) {
+void JsBridgeContext::assignJsValue(const std::string &strGlobalName, const JStringLocalRef &strCode) {
   CHECK_STACK(m_ctx);
 
-  if (duk_peval_string(m_ctx, strCode.c_str()) != DUK_EXEC_SUCCESS) {
-    alog("Could not assign JS value:\n%s", strCode.c_str());
+  duk_int_t ret = duk_peval_string(m_ctx, strCode.toUtf8Chars());
+  strCode.releaseChars();  // release chars now as we don't need them anymore
+
+  if (ret != DUK_EXEC_SUCCESS) {
+    alog("Could not assign JS value %s", strGlobalName.c_str());
     queueJavaExceptionForJsError();
     duk_pop(m_ctx);
     return;
@@ -341,7 +352,7 @@ void JsBridgeContext::assignJsValue(const std::string &strGlobalName, const std:
   duk_put_global_string(m_ctx, strGlobalName.c_str());
 }
 
-void JsBridgeContext::newJsFunction(const std::string &strGlobalName, const JObjectArrayLocalRef &args, const std::string &strCode) {
+void JsBridgeContext::newJsFunction(const std::string &strGlobalName, const JObjectArrayLocalRef &args, const JStringLocalRef &strCode) {
   CHECK_STACK(m_ctx);
 
   // Push global Function (which can be constructed with "new Function"
@@ -354,11 +365,12 @@ void JsBridgeContext::newJsFunction(const std::string &strGlobalName, const JObj
   jsize argCount = args.getLength();
   for (jsize i = 0; i < argCount; ++i) {
     JStringLocalRef argString(args.getElement<jstring>(i));
-    duk_push_string(m_ctx, argString.c_str());
+    duk_push_string(m_ctx, argString.toUtf8Chars());
   }
 
   // Push JS code as string
-  duk_push_string(m_ctx, strCode.c_str());
+  duk_push_string(m_ctx, strCode.toUtf8Chars());
+  strCode.releaseChars();  // release chars now as we don't need them anymore
 
   // New Function(arg1, arg2, ..., jsCode)
   if (duk_pnew(m_ctx, argCount + 1) != DUK_EXEC_SUCCESS) {
@@ -420,16 +432,16 @@ void JsBridgeContext::rethrowJniException() const {
   }
 
   // Get (and clear) the Java exception and read its message
-  auto exception = JniLocalRef<jthrowable>(m_jniContext, m_jniContext->exceptionOccurred(), true);
+  JniLocalRef<jthrowable> exception(m_jniContext, m_jniContext->exceptionOccurred(), JniRefReleaseMode::Never);
   m_jniContext->exceptionClear();
   
   auto exceptionClass = m_jniContext->getObjectClass(exception);
   jmethodID getMessage = m_jniContext->getMethodID(exceptionClass, "getMessage", "()Ljava/lang/String;");
-  JStringLocalRef message = m_jniContext->callStringMethod(exception, getMessage);
+  std::string message = m_jniContext->callStringMethod(exception, getMessage).toUtf8Chars();
 
   // Propagate Java exception to JavaScript (and store pointer to Java exception)
   duk_push_error_object(m_ctx, DUK_ERR_ERROR, message.c_str());
-  duk_push_pointer(m_ctx, exception.toNewRawLocalRef());
+  m_utils->pushJavaRefValue(exception);
   duk_put_prop_string(m_ctx, -2, JAVA_EXCEPTION_PROP_NAME);
 
   duk_throw(m_ctx);
@@ -465,7 +477,7 @@ JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
   JniLocalRef<jthrowable> cause;
   if (duk_is_object(m_ctx, -1) && !duk_is_null(m_ctx, -1) && duk_has_prop_string(m_ctx, -1, JAVA_EXCEPTION_PROP_NAME)) {
     duk_get_prop_string(m_ctx, -1, JAVA_EXCEPTION_PROP_NAME);
-    cause = JniLocalRef<jthrowable>(m_jniContext, static_cast<jthrowable>(duk_get_pointer(m_ctx, -1)));
+    cause = m_utils->getJavaRef<jthrowable>(-1);
     duk_pop(m_ctx);  // Java exception
   }
 

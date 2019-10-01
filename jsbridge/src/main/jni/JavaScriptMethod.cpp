@@ -19,10 +19,10 @@
 #include "JavaScriptMethod.h"
 
 #include "JniCache.h"
+#include "JniTypes.h"
 #include "JsBridgeContext.h"
 #include "JavaType.h"
 #include "jni-helpers/JniContext.h"
-#include "jni-helpers/JniTypes.h"
 #include "jni-helpers/JObjectArrayLocalRef.h"
 #include <stdexcept>
 #include <string>

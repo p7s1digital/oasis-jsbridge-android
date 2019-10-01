@@ -63,7 +63,7 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
     MethodInterface methodInterface = jniCache->getMethodInterface(method);
 
     // Sanity check that as of right now, the object we're proxying has a function with this name.
-    std::string strMethodName = methodInterface.getName().c_str();
+    std::string strMethodName = methodInterface.getName().toUtf8Chars();
     if (!duk_get_prop_string(ctx, -1, strMethodName.c_str())) {
       duk_pop_2(ctx);
       throw std::runtime_error("JS global " + m_name + " has no method called " + strMethodName);
@@ -105,8 +105,8 @@ JValue JavaScriptObject::call(const JniLocalRef<jobject> &javaMethod, const JObj
 
   jmethodID methodId = jniContext->fromReflectedMethod(javaMethod);
 
-  auto getMethodName = [&]() {
-    return jniCache->getJavaReflectedMethodName(javaMethod).c_str();
+  auto getMethodName = [&]() -> std::string {
+    return jniCache->getJavaReflectedMethodName(javaMethod).toUtf8Chars();
   };
 
   //alog("Invoking JS method %s.%s...", m_name.c_str(), getMethodName().c_str());
@@ -155,7 +155,7 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
     MethodInterface methodInterface = jniCache->getMethodInterface(method);
 
     // Sanity check that as of right now, the object we're proxying has a function with this name.
-    std::string strMethodName = methodInterface.getName().c_str();
+    std::string strMethodName = methodInterface.getName().toUtf8Chars();
     JSValue methodValue = JS_GetPropertyStr(ctx, jsObjectValue, strMethodName.c_str());
     if (JS_IsUndefined(methodValue)) {
       throw std::runtime_error("JS global " + m_name + " has no method called " + strMethodName);
@@ -189,8 +189,8 @@ JValue JavaScriptObject::call(JSValueConst jsObjectValue, const JniLocalRef<jobj
 
   jmethodID methodId = jniContext->fromReflectedMethod(javaMethod);
 
-  auto getMethodName = [&]() {
-    return jniCache->getJavaReflectedMethodName(javaMethod).c_str();
+  auto getMethodName = [&]() -> std::string {
+    return jniCache->getJavaReflectedMethodName(javaMethod).toUtf8Chars();
   };
 
   //alog("Invoking JS method %s.%s...", m_name.c_str(), getMethodName().c_str());

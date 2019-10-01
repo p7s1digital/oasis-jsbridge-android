@@ -41,7 +41,7 @@ const JniGlobalRef<jclass> &JniCache::getJavaClass(JavaTypeId id) const {
   const JniContext *jniContext = m_jsBridgeContext->getJniContext();
   assert(jniContext != nullptr);
 
-  const char *javaName = getJavaNameByJavaTypeId(id).c_str();
+  const char *javaName = getJniClassNameByJavaTypeId(id).c_str();
   JniLocalRef<jclass> javaClass = jniContext->findClass(javaName);
 
   // If the above findClass() call throws an exception, try to get the class from the primitive type

@@ -20,10 +20,10 @@
 #define _JSBRIDGE_JAVATYPE_H
 
 #include "JavaTypeId.h"
+#include "JniTypes.h"
 #include "JsBridgeContext.h"
 #include "jni-helpers/JniGlobalRef.h"
-#include <jni-helpers/JniTypes.h>
-#include <jni-helpers/JValue.h>
+#include "jni-helpers/JValue.h"
 #include <jni.h>
 #include <map>
 #include <vector>

@@ -20,6 +20,7 @@
 
 #include "JsBridgeContext.h"
 #include "jni-helpers/JArrayLocalRef.h"
+#include "log.h"
 
 #if defined(DUKTAPE)
 # include "JsBridgeContext.h"
@@ -66,13 +67,21 @@ JValue Integer::popArray(uint32_t count, bool expanded, bool inScript) const {
   }
 
   JArrayLocalRef<jint> intArray(m_jniContext, count);
+  jint *elements = intArray.isNull() ? nullptr : intArray.getMutableElements();
+  if (elements == nullptr) {
+    if (expanded) {
+      duk_pop_n(m_ctx, count);
+    }
+    m_jsBridgeContext->rethrowJniException();
+    return JValue();
+  }
 
   for (int i = count - 1; i >= 0; --i) {
     if (!expanded) {
       duk_get_prop_index(m_ctx, -1, i);
     }
     JValue value = pop(inScript);
-    intArray.setElement(i, value.getInt());
+    elements[i] = value.getInt();
   }
 
   return JValue(intArray);
@@ -90,9 +99,15 @@ duk_ret_t Integer::pushArray(const JniLocalRef<jarray> &values, bool expand, boo
   if (!expand) {
     duk_push_array(m_ctx);
   }
+
+  const jint *elements = intArray.getElements();
+  if (elements == nullptr) {
+    m_jsBridgeContext->rethrowJniException();
+    return DUK_RET_ERROR;
+  }
+
   for (jsize i = 0; i < count; ++i) {
-    jint element = intArray.getElement(i);
-    duk_push_int(m_ctx, element);
+    duk_push_int(m_ctx, elements[i]);
     if (!expand) {
       duk_put_prop_index(m_ctx, -2, static_cast<duk_uarridx_t>(i));
     }
@@ -101,6 +116,21 @@ duk_ret_t Integer::pushArray(const JniLocalRef<jarray> &values, bool expand, boo
 }
 
 #elif defined(QUICKJS)
+
+namespace {
+  inline jint getInt(JSValue v) {
+    if (JS_IsInteger(v)) {
+      return JS_VALUE_GET_INT(v);
+    }
+
+    if (JS_IsNumber(v)) {
+      return jint(JS_VALUE_GET_FLOAT64(v));
+    }
+
+    alog_warn("Cannot get int from JS: returning 0");  // TODO: proper exception handling
+    return jint();
+  }
+}
 
 JValue Integer::toJava(JSValueConst v, bool inScript) const {
   if (!JS_IsNumber(v)) {
@@ -113,14 +143,7 @@ JValue Integer::toJava(JSValueConst v, bool inScript) const {
     return JValue();
   }
 
-  int i;
-  if (JS_IsInteger(v)) {
-    i = JS_VALUE_GET_INT(v);
-  } else {
-    i = int(JS_VALUE_GET_FLOAT64(v));
-  }
-
-  return JValue(i);
+  return JValue(getInt(v));
 }
 
 JValue Integer::toJavaArray(JSValueConst v, bool inScript) const {
@@ -139,12 +162,23 @@ JValue Integer::toJavaArray(JSValueConst v, bool inScript) const {
   JS_FreeValue(m_ctx, lengthValue);
 
   JArrayLocalRef<jint> intArray(m_jniContext, count);
-
-  for (uint32_t i = 0; i < count; ++i) {
-    JValue elementValue = toJava(JS_GetPropertyUint32(m_ctx, v, i), inScript);
-    intArray.setElement(i, elementValue.getInt());
+  if (intArray.isNull()) {
+    m_jsBridgeContext->rethrowJniException();
+    return JValue();
   }
 
+  jint *elements = intArray.getMutableElements();
+  if (elements == nullptr) {
+    m_jsBridgeContext->rethrowJniException();
+    return JValue();
+  }
+
+  for (uint32_t i = 0; i < count; ++i) {
+    JSValue ev = JS_GetPropertyUint32(m_ctx, v, i);
+    elements[i] = getInt(ev);
+  }
+
+  intArray.releaseArrayElements();  // copy back elements to Java
   return JValue(intArray);
 }
 
@@ -158,16 +192,16 @@ JSValue Integer::fromJavaArray(const JniLocalRef<jarray> &values, bool inScript)
 
   JSValue jsArray = JS_NewArray(m_ctx);
 
-  // TODO: use std::vector<jint> objectArray.getAllElements() when available
+  const jint *elements = intArray.getElements();
+  if (elements == nullptr) {
+    JS_FreeValue(m_ctx, jsArray);
+    m_jsBridgeContext->rethrowJniException();
+    return JS_EXCEPTION;
+  }
+
   for (jsize i = 0; i < count; ++i) {
-    jint iValue = intArray.getElement(i);
-    try {
-      JSValue elementValue = fromJava(JValue(iValue), inScript);
-      JS_SetPropertyUint32(m_ctx, jsArray, static_cast<uint32_t>(i), elementValue);
-    } catch (std::invalid_argument &e) {
-      JS_FreeValue(m_ctx, jsArray);
-      throw e;
-    }
+    JSValue elementValue = JS_NewInt32(m_ctx, elements[i]);
+    JS_SetPropertyUint32(m_ctx, jsArray, static_cast<uint32_t>(i), elementValue);
   }
 
   return jsArray;

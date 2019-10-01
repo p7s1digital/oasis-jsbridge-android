@@ -19,7 +19,7 @@
 #ifndef _JSBRIDGE_JAVASCRIPTOBJECT_H
 #define _JSBRIDGE_JAVASCRIPTOBJECT_H
 
-#include "jni-helpers/JniTypes.h"
+#include "JniTypes.h"
 #include "jni-helpers/JValue.h"
 #include "jni-helpers/JniLocalRef.h"
 #include <functional>

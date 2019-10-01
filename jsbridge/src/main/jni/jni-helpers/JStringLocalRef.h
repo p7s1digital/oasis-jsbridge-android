@@ -28,59 +28,103 @@
 class JStringLocalRef : public JniLocalRef<jstring> {
 public:
   JStringLocalRef()
-      : JniLocalRef()
-      , m_str(nullptr)
-      , m_needsReleaseChars(false) {
+      : JniLocalRef() {
   }
 
-  JStringLocalRef(const JniContext *jniContext, jstring o, bool fromJniParam = false)
-      : JniLocalRef<jstring>(jniContext, o, fromJniParam)
-      , m_str(o == nullptr ? nullptr : JniRefHelper::getJNIEnv(jniContext)->GetStringUTFChars(o, nullptr))
-      , m_needsReleaseChars(true) {
+  // From Java String
+  JStringLocalRef(const JniContext *jniContext, jstring o, ReleaseMode releaseMode = ReleaseMode::Auto)
+      : JniLocalRef<jstring>(jniContext, o, releaseMode) {
   }
 
+  // From null-terminated UTF-8 string
   JStringLocalRef(const JniContext *jniContext, const char *s)
-      : JniLocalRef<jstring>(jniContext, JniRefHelper::getJNIEnv(jniContext)->NewStringUTF(s))
-      , m_str(s)
-      , m_needsReleaseChars(false) {
+      : JniLocalRef<jstring>(jniContext, JniRefHelper::getJNIEnv(jniContext)->NewStringUTF(s)) {
+  }
+
+  // From UTF-16 string view
+  JStringLocalRef(const JniContext *jniContext, std::u16string_view sv)
+      : JniLocalRef<jstring>(jniContext, JniRefHelper::getJNIEnv(jniContext)->NewString(
+          reinterpret_cast<const jchar *>(sv.data()), sv.length())) {
+  }
+
+  // From UTF-16 string
+  JStringLocalRef(const JniContext *jniContext, const jchar *s, jsize len)
+      : JniLocalRef<jstring>(jniContext, JniRefHelper::getJNIEnv(jniContext)->NewString(s, len)) {
   }
 
   explicit JStringLocalRef(const JniLocalRef<jstring> &localRef)
-      : JniLocalRef<jstring>(localRef)
-      , m_str(localRef.get() ? JniRefHelper::getJNIEnv(localRef.getJniContext())->GetStringUTFChars(localRef.get(), nullptr) : nullptr)
-      , m_needsReleaseChars(true) {
+      : JniLocalRef<jstring>(localRef) {
+  }
+
+  explicit JStringLocalRef(JniLocalRef<jstring> &&localRef)
+      : JniLocalRef<jstring>(std::forward<JniLocalRef<jstring>>(localRef)) {
   }
 
   JStringLocalRef(const JStringLocalRef &other)
-      : JniLocalRef(other)
-      , m_str(other.m_needsReleaseChars ? JniRefHelper::getJNIEnv(getJniContext())->GetStringUTFChars(get(), nullptr) : other.m_str)
-      , m_needsReleaseChars(other.m_needsReleaseChars) {
+      : JniLocalRef(other) {
+  }
+
+  ~JStringLocalRef() {
+    releaseChars();
   }
 
   // Explicitly disable a dangerous cast to bool
   operator bool() const = delete;
 
-  void releaseNow() override {
-    if (m_str && m_needsReleaseChars) {
-      assert(getJniContext() != nullptr);
-      JNIEnv *env = JniRefHelper::getJNIEnv(getJniContext());
-      assert(env != nullptr);
-      env->ReleaseStringUTFChars(get(), m_str);
+  void release() {
+    releaseChars();
+    JniLocalRef::release();
+  }
+
+  void releaseChars() const {
+    if (m_utf8Chars != nullptr) {
+      getJniEnv()->ReleaseStringUTFChars(jstr(), m_utf8Chars);
+      m_utf8Chars = nullptr;
     }
 
-    JniLocalRef<jstring>::releaseNow();
+    if (m_utf16Chars != nullptr) {
+      getJniEnv()->ReleaseStringChars(jstr(), reinterpret_cast<const jchar *>(m_utf16Chars));
+      m_utf16Chars = nullptr;
+    }
   }
 
-  std::string str() const {
-      return m_str;
+  // Return a pointer to a new null-terminated UTF-8 string converted from the UTF-16 Java string
+  // WARNING: the returned const char * is invalid after the JStringLocalRef instance has been released!
+  // Note: when called multiple times, only 1 Java string -> UTF8 string conversion will be done
+  const char *toUtf8Chars() const {
+    if (jstr() == nullptr) {
+      return nullptr;
+    }
+
+    if (m_utf8Chars == nullptr) {
+      m_utf8Chars = getJniEnv()->GetStringUTFChars(jstr(), nullptr);
+    }
+
+    return m_utf8Chars;
   }
 
-  const char *c_str() const {
-      return m_str;
+  // Return a string_view to the Java UTF-16 string. This is indeed a direct pointer to the Java String
+  // (which is *not* null-terminated)
+  // WARNING: the returned string_view is invalid after the JStringLocalRef instance has been released!
+  std::u16string_view getUtf16View() const {
+    if (jstr() == nullptr) {
+      return std::u16string_view();
+    }
+
+    if (m_utf16Chars == nullptr) {
+      m_utf16Chars = reinterpret_cast<const char16_t *>(getJniEnv()->GetStringChars(jstr(), nullptr));
+    }
+
+    return std::u16string_view(m_utf16Chars, static_cast<size_t>(utf16Length()));
   }
 
-  size_t length() const {
-    return strlen(m_str);
+  size_t utf8Length() const {
+     return m_utf8Chars ? strlen(m_utf8Chars) :
+           jstr() ? getJniEnv()->GetStringUTFLength(jstr()) : 0;
+  }
+
+  jsize utf16Length() const {
+    return jstr() ? getJniEnv()->GetStringLength(jstr()) : 0;
   }
 
   jstring jstr() const {
@@ -88,8 +132,8 @@ public:
   }
 
 private:
-  const char *m_str;
-  bool m_needsReleaseChars;
+  mutable const char *m_utf8Chars = nullptr;  // null-terminated
+  mutable const char16_t *m_utf16Chars = nullptr;  // *not* null-terminated
 };
 
 #endif
