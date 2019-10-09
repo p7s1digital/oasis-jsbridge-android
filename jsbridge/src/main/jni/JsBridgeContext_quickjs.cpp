@@ -389,7 +389,7 @@ void JsBridgeContext::rethrowJniException() const {
   }
 
   // Get (and clear) the Java exception and read its message
-  JniLocalRef<jthrowable> exception(m_jniContext, m_jniContext->exceptionOccurred(), JniRefReleaseMode::Never);
+  JniLocalRef<jthrowable> exception(m_jniContext, m_jniContext->exceptionOccurred(), JniLocalRefMode::Borrowed);
   m_jniContext->exceptionClear();
 
   auto exceptionClass = m_jniContext->getObjectClass(exception);

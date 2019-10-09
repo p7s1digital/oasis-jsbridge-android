@@ -61,7 +61,7 @@ JNIEXPORT jlong JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniC
   auto jniContext = new JniContext(env, JniContext::EnvironmentSource::Manual);
 
   try {
-    jsBridgeContext->init(jniContext, JniLocalRef<jobject>(jniContext, object, JniRefReleaseMode::Never));
+    jsBridgeContext->init(jniContext, JniLocalRef<jobject>(jniContext, object, JniLocalRefMode::Borrowed));
 
     if (doDebug) {
       jsBridgeContext->initDebugger();
@@ -102,7 +102,7 @@ JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jn
 
   JValue returnValue;
   try {
-    returnValue = jsBridgeContext->evaluateString(JStringLocalRef(jniContext, code, JniRefReleaseMode::Never), JniLocalRef<jsBridgeParameter >(jniContext, returnParameter, JniRefReleaseMode::Never), awaitJsPromise);
+    returnValue = jsBridgeContext->evaluateString(JStringLocalRef(jniContext, code, JniLocalRefMode::Borrowed), JniLocalRef<jsBridgeParameter >(jniContext, returnParameter, JniLocalRefMode::Borrowed), awaitJsPromise);
   } catch (const std::invalid_argument &e) {
     jsBridgeContext->queueIllegalArgumentException(e.what());
     return nullptr;
@@ -125,10 +125,10 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniEv
   auto jsBridgeContext = getJsBridgeContext(env, lctx);
   auto jniContext = jsBridgeContext->getJniContext();
 
-  std::string strFilename = JStringLocalRef(jniContext, filename, JniRefReleaseMode::Never).toUtf8Chars();
+  std::string strFilename = JStringLocalRef(jniContext, filename, JniLocalRefMode::Borrowed).toUtf8Chars();
 
   try {
-    jsBridgeContext->evaluateFileContent(JStringLocalRef(jniContext, code, JniRefReleaseMode::Never), strFilename);
+    jsBridgeContext->evaluateFileContent(JStringLocalRef(jniContext, code, JniLocalRefMode::Borrowed), strFilename);
   } catch (const std::invalid_argument &e) {
     jsBridgeContext->queueIllegalArgumentException(e.what());
   } catch (const std::runtime_error &e) {
@@ -144,11 +144,11 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
   auto jsBridgeContext = getJsBridgeContext(env, lctx);
   auto jniContext = jsBridgeContext->getJniContext();
 
-  std::string strName = JStringLocalRef(jniContext, name, JniRefReleaseMode::Never).toUtf8Chars();
+  std::string strName = JStringLocalRef(jniContext, name, JniLocalRefMode::Borrowed).toUtf8Chars();
 
   try {
-    jsBridgeContext->registerJavaObject(strName, JniLocalRef<jobject>(jniContext, javaObject, JniRefReleaseMode::Never),
-                                       JObjectArrayLocalRef(jniContext, javaMethods, JniRefReleaseMode::Never));
+    jsBridgeContext->registerJavaObject(strName, JniLocalRef<jobject>(jniContext, javaObject, JniLocalRefMode::Borrowed),
+                                       JObjectArrayLocalRef(jniContext, javaMethods, JniLocalRefMode::Borrowed));
   } catch (const std::invalid_argument &e) {
     jsBridgeContext->queueIllegalArgumentException(e.what());
   } catch (const std::runtime_error &e) {
@@ -164,11 +164,11 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
   auto jsBridgeContext = getJsBridgeContext(env, lctx);
   auto jniContext = jsBridgeContext->getJniContext();
 
-  std::string strName = JStringLocalRef(jniContext, name, JniRefReleaseMode::Never).toUtf8Chars();
+  std::string strName = JStringLocalRef(jniContext, name, JniLocalRefMode::Borrowed).toUtf8Chars();
 
   try {
-    jsBridgeContext->registerJavaLambda(strName, JniLocalRef<jobject>(jniContext, javaObject, JniRefReleaseMode::Never),
-                                       JniLocalRef<jsBridgeMethod>(jniContext, javaMethod, JniRefReleaseMode::Never));
+    jsBridgeContext->registerJavaLambda(strName, JniLocalRef<jobject>(jniContext, javaObject, JniLocalRefMode::Borrowed),
+                                       JniLocalRef<jsBridgeMethod>(jniContext, javaMethod, JniLocalRefMode::Borrowed));
   } catch (const std::invalid_argument &e) {
     jsBridgeContext->queueIllegalArgumentException(e.what());
   } catch (const std::runtime_error &e) {
@@ -184,10 +184,10 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
   auto jsBridgeContext = getJsBridgeContext(env, lctx);
   auto jniContext = jsBridgeContext->getJniContext();
 
-  std::string strName = JStringLocalRef(jniContext, name, JniRefReleaseMode::Never).toUtf8Chars();
+  std::string strName = JStringLocalRef(jniContext, name, JniLocalRefMode::Borrowed).toUtf8Chars();
 
   try {
-    jsBridgeContext->registerJsObject(strName, JObjectArrayLocalRef(jniContext, methods, JniRefReleaseMode::Never));
+    jsBridgeContext->registerJsObject(strName, JObjectArrayLocalRef(jniContext, methods, JniLocalRefMode::Borrowed));
   } catch (const std::invalid_argument &e) {
     jsBridgeContext->queueIllegalArgumentException(e.what());
   } catch (const std::runtime_error &e) {
@@ -203,10 +203,10 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
   auto jsBridgeContext = getJsBridgeContext(env, lctx);
   auto jniContext = jsBridgeContext->getJniContext();
 
-  std::string strName = JStringLocalRef(jniContext, name, JniRefReleaseMode::Never).toUtf8Chars();
+  std::string strName = JStringLocalRef(jniContext, name, JniLocalRefMode::Borrowed).toUtf8Chars();
 
   try {
-    jsBridgeContext->registerJsLambda(strName, JniLocalRef<jsBridgeMethod>(jniContext, method, JniRefReleaseMode::Never));
+    jsBridgeContext->registerJsLambda(strName, JniLocalRef<jsBridgeMethod>(jniContext, method, JniLocalRefMode::Borrowed));
   } catch (const std::invalid_argument &e) {
     jsBridgeContext->queueIllegalArgumentException(e.what());
   } catch (const std::runtime_error &e) {
@@ -222,14 +222,14 @@ JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jn
   auto jsBridgeContext = getJsBridgeContext(env, lctx);
   auto jniContext = jsBridgeContext->getJniContext();
 
-  std::string strObjectName = JStringLocalRef(jniContext, objectName, JniRefReleaseMode::Never).toUtf8Chars();
+  std::string strObjectName = JStringLocalRef(jniContext, objectName, JniLocalRefMode::Borrowed).toUtf8Chars();
 
   JValue value;
 
   try {
     value = jsBridgeContext->callJsMethod(strObjectName,
-                                          JniLocalRef<jobject>(jniContext, javaMethod, JniRefReleaseMode::Never),
-                                          JObjectArrayLocalRef(jniContext, args, JniRefReleaseMode::Never));
+                                          JniLocalRef<jobject>(jniContext, javaMethod, JniLocalRefMode::Borrowed),
+                                          JObjectArrayLocalRef(jniContext, args, JniLocalRefMode::Borrowed));
   } catch (const std::invalid_argument &e) {
       jsBridgeContext->queueIllegalArgumentException(e.what());
   } catch (const std::runtime_error &e) {
@@ -250,13 +250,13 @@ JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jn
   auto jsBridgeContext = getJsBridgeContext(env, lctx);
   auto jniContext = jsBridgeContext->getJniContext();
 
-  std::string strObjectName = JStringLocalRef(jniContext, objectName, JniRefReleaseMode::Never).toUtf8Chars();
+  std::string strObjectName = JStringLocalRef(jniContext, objectName, JniLocalRefMode::Borrowed).toUtf8Chars();
 
   JValue value;
 
   try {
     value = jsBridgeContext->callJsLambda(strObjectName,
-                                          JObjectArrayLocalRef(jniContext, args, JniRefReleaseMode::Never),
+                                          JObjectArrayLocalRef(jniContext, args, JniLocalRefMode::Borrowed),
                                           awaitJsPromise);
   } catch (const std::invalid_argument &e) {
     jsBridgeContext->queueIllegalArgumentException(e.what());
@@ -278,9 +278,9 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniAs
   auto jsBridgeContext = getJsBridgeContext(env, lctx);
   auto jniContext = jsBridgeContext->getJniContext();
 
-  std::string strGlobalName = JStringLocalRef(jniContext, globalName, JniRefReleaseMode::Never).toUtf8Chars();
+  std::string strGlobalName = JStringLocalRef(jniContext, globalName, JniLocalRefMode::Borrowed).toUtf8Chars();
 
-  jsBridgeContext->assignJsValue(strGlobalName, JStringLocalRef(jniContext, jsCode, JniRefReleaseMode::Never));
+  jsBridgeContext->assignJsValue(strGlobalName, JStringLocalRef(jniContext, jsCode, JniLocalRefMode::Borrowed));
 }
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniNewJsFunction
@@ -291,9 +291,9 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniNe
   auto jsBridgeContext = getJsBridgeContext(env, lctx);
   auto jniContext = jsBridgeContext->getJniContext();
 
-  std::string strGlobalName = JStringLocalRef(jniContext, globalName, JniRefReleaseMode::Never).toUtf8Chars();
-  JObjectArrayLocalRef objectArgs(jniContext, args, JniRefReleaseMode::Never);
-  JStringLocalRef strCode(jniContext, jsCode, JniRefReleaseMode::Never);
+  std::string strGlobalName = JStringLocalRef(jniContext, globalName, JniLocalRefMode::Borrowed).toUtf8Chars();
+  JObjectArrayLocalRef objectArgs(jniContext, args, JniLocalRefMode::Borrowed);
+  JStringLocalRef strCode(jniContext, jsCode, JniLocalRefMode::Borrowed);
 
   jsBridgeContext->newJsFunction(strGlobalName, objectArgs, strCode);
 }
@@ -306,8 +306,8 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCo
   auto jsBridgeContext = getJsBridgeContext(env, lctx);
   auto jniContext = jsBridgeContext->getJniContext();
 
-  std::string strId = JStringLocalRef(jniContext, id, JniRefReleaseMode::Never).toUtf8Chars();
-  JniLocalRef<jobject> valueRef(jniContext, value, JniRefReleaseMode::Never);
+  std::string strId = JStringLocalRef(jniContext, id, JniLocalRefMode::Borrowed).toUtf8Chars();
+  JniLocalRef<jobject> valueRef(jniContext, value, JniLocalRefMode::Borrowed);
 
   try {
     JavaTypes::Deferred::completeJsPromise(jsBridgeContext, strId, isFulfilled, valueRef);

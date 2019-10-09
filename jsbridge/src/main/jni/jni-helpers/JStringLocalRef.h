@@ -22,6 +22,7 @@
 #include "JniLocalRef.h"
 #include "JniRefHelper.h"
 #include <jni.h>
+#include <cstring>
 #include <string>
 
 // Same as LocalRef<jstring> with additional conversion from/to native string
@@ -32,8 +33,8 @@ public:
   }
 
   // From Java String
-  JStringLocalRef(const JniContext *jniContext, jstring o, ReleaseMode releaseMode = ReleaseMode::Auto)
-      : JniLocalRef<jstring>(jniContext, o, releaseMode) {
+  JStringLocalRef(const JniContext *jniContext, jstring o, Mode mode = Mode::AutoReleased)
+      : JniLocalRef<jstring>(jniContext, o, mode) {
   }
 
   // From null-terminated UTF-8 string

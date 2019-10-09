@@ -22,6 +22,7 @@
 #include "JniRef.h"
 #include "JniRefHelper.h"
 #include <jni.h>
+#include <memory>
 #include <optional>
 #include <type_traits>
 #include <cassert>
@@ -32,23 +33,31 @@ class JniContext;
  #define CHECK_ENV
 #endif
 
+enum class JniLocalRefMode {
+  AutoReleased,  // JNI ref will be released when the JniLocalRef instance has been destroyed
+  NewLocalRef,  // initial JNI ref will be copied via JNIEnv::NewLocalRef() and the copy will be auto-released
+  Borrowed,  // JNI ref will never be released (e.g. for local references given to entry JNI functions)
+};
+
 // Wrapper around JNI local references using the RAII idiom for clearing resource.
 // It has been designed to limit the number of local references, even when copying instances.
 // Compared to a "raw" local references, it has the (small) overhead of storing the JNI environment
 // and has a shared pointer to manage shared references
 template <class T>
 class JniLocalRef : public JniRef<T> {
-public:
-  typedef JniRefReleaseMode ReleaseMode;
 
+protected:
+  typedef JniLocalRefMode Mode;
+
+public:
   JniLocalRef()
     : JniRef<T>(nullptr, nullptr) {
   }
 
-  JniLocalRef(const JniContext *jniContext, jobject o, ReleaseMode releaseMode = ReleaseMode::Auto)
-    : JniRef<T>(jniContext, static_cast<T>(o)) {
+  JniLocalRef(const JniContext *jniContext, jobject o, Mode mode = Mode::AutoReleased)
+    : JniRef<T>(jniContext, static_cast<T>(mode == Mode::NewLocalRef ? copyRawLocalRef(jniContext, o) : o)) {
 
-    if (releaseMode != ReleaseMode::Never) {
+    if (mode != Mode::Borrowed) {
       // TODO(bwa): we could theoritically avoid 1 heap allocation for JniLocalRefs which are
       // referenced only once and create the shared pointer only when creating the 2nd copy
       m_sharedAutoRelease = makeSharedAutoRelease(true);
@@ -132,8 +141,8 @@ public:
   template <class T2, class Q = T>
   typename std::enable_if<!std::is_same<Q, T2>::value, JniLocalRef<T2>>::type
   staticCast() const {
-    // Create a new local ref, initially disabling auto release
-    auto ret = JniLocalRef<T2>(m_jniContext, static_cast<T2>(m_object), ReleaseMode::Never);
+    // Create a new local ref, initially disabling auto-release
+    auto ret = JniLocalRef<T2>(m_jniContext, static_cast<T2>(m_object), Mode::Borrowed);
 
     // Now, share ownership of the new local ref with this
     ret.m_sharedAutoRelease = this->m_sharedAutoRelease;
@@ -147,6 +156,15 @@ protected:
 
 private:
   friend class JValue;
+
+  static jobject copyRawLocalRef(const JniContext *jniContext, jobject src) {
+    if (src == nullptr) {
+      return nullptr;
+    }
+
+    assert(jniContext != nullptr);
+    return JniRefHelper::getJNIEnv(jniContext)->NewLocalRef(src);
+  }
 
   std::shared_ptr<bool> makeSharedAutoRelease(bool autoRelease) {
     if (m_object == nullptr) {
