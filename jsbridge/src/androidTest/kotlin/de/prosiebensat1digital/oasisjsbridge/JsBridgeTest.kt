@@ -29,6 +29,7 @@ import org.junit.Ignore
 import org.junit.Test
 import timber.log.Timber
 import java.lang.IllegalArgumentException
+import java.lang.NullPointerException
 
 interface TestNativeApiInterface : JsToNativeInterface {
     fun nativeMethodReturningTrue(): Boolean
@@ -416,6 +417,168 @@ class JsBridgeTest {
         val unhandledJsPromiseError = errors.firstOrNull() as? UnhandledJsPromiseError
         assertNotNull(unhandledJsPromiseError)
         assertEquals(unhandledJsPromiseError.reason, "Test unhandled promise rejection")
+    }
+
+    @Test
+    fun testJsErrorStack() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        val jsException: JsException = assertFailsWith {
+            subject.evaluateBlocking<Unit>("""
+                function testFunction1() {
+                  throw new Error("function1exception");
+                }
+                
+                function testFunction2() {
+                  testFunction1();
+                }
+                
+                function testFunction3() {
+                  testFunction2();
+                }
+                
+                testFunction3();
+            """.trimIndent()
+            )
+        }
+
+        // THEN
+        assertNotNull(jsException)
+        assertEquals(true, jsException.message?.contains("function1exception"))
+
+        // Expected stack trace:
+        // - at JavaScript.testFunction1 (eval:2)
+        // - at JavaScript.testFunction2 (eval:6)
+        // - at JavaScript.testFunction3 (eval:10)
+        // - at JavaScript.eval (eval:13)
+        // - ...
+        assertTrue(jsException.stackTrace.size >= 4)
+        jsException.stackTrace[0].let { e ->
+            assertEquals(e.className, "JavaScript")
+            assertEquals(e.methodName, "testFunction1")
+            assertEquals(e.fileName, "eval")
+            assertEquals(e.lineNumber, 2)
+        }
+        jsException.stackTrace[1].let { e ->
+            assertEquals(e.className, "JavaScript")
+            assertEquals(e.methodName, "testFunction2")
+            assertEquals(e.fileName, "eval")
+            assertEquals(e.lineNumber, 6)
+        }
+        jsException.stackTrace[2].let { e ->
+            assertEquals(e?.className, "JavaScript")
+            assertEquals(e?.methodName, "testFunction3")
+            assertEquals(e?.fileName, "eval")
+            assertEquals(e?.lineNumber, 10)
+        }
+        jsException.stackTrace[3].let { e ->
+            assertEquals(e.className, "JavaScript")
+            assertEquals(true, """^<?eval>?$""".toRegex().matches(e.methodName))
+            assertEquals(e?.fileName, "eval")
+            assertEquals(e?.lineNumber, 13)
+        }
+        jsException.stackTrace[4].let { e ->
+            assert(e.className.endsWith(".JsBridge"))
+            assertEquals(e.methodName, "jniEvaluateString")
+            assertEquals(e.fileName, "JsBridge.kt")
+        }
+    }
+
+    @Test
+    fun testJavaExceptionInJs() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+        val createExceptionNative = JsValue.fromNativeFunction0<Unit>(subject) { throw Exception("Kotlin exception") }
+
+        // WHEN
+        val jsException: JsException = assertFailsWith {
+            subject.evaluateBlocking<Unit>("""
+                function testFunction() {
+                  $createExceptionNative();
+                }
+                
+                testFunction();
+            """.trimIndent())
+        }
+        createExceptionNative.hold()
+
+        // THEN
+        assertNotNull(jsException)
+        assertEquals(true, jsException.message?.contains("Kotlin exception"))
+
+        jsException.printStackTrace()
+
+        // Expected stack trace:
+        // - at JavaScript.testFunction (eval:2)
+        // - at JavaScript.eval (eval:5)
+        // - ...
+        // cause: Exception: Kotlin exception
+        // - ...
+        assertTrue(jsException.stackTrace.size >= 2)
+        jsException.stackTrace[0].let { e ->
+            assertEquals(e.className, "JavaScript")
+            assertEquals(e.methodName, "testFunction")
+            assertEquals(e.fileName, "eval")
+            assertEquals(e.lineNumber, 2)
+        }
+        jsException.stackTrace[1].let { e ->
+            assertEquals(e.className, "JavaScript")
+            assertEquals(true, """^<?eval>?$""".toRegex().matches(e.methodName))
+            assertEquals(e?.fileName, "eval")
+            assertEquals(e?.lineNumber, 5)
+        }
+        jsException.stackTrace[2].let { e ->
+            assert(e.className.endsWith(".JsBridge"))
+            assertEquals(e.methodName, "jniEvaluateString")
+            assertEquals(e.fileName, "JsBridge.kt")
+        }
+        assert(jsException.cause is java.lang.Exception)
+        assertEquals(jsException.cause?.message, "Kotlin exception")
+    }
+
+    @Test
+    fun testNullPointerException() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+        val testFunctionNative = JsValue.fromNativeFunction1(subject) { _: Int -> Unit }
+
+        // WHEN
+        val jsException: JsException = assertFailsWith {
+            subject.evaluateBlocking<Unit>("$testFunctionNative(null);")
+        }
+        testFunctionNative.hold()
+
+        // THEN
+        assertNotNull(jsException.cause is NullPointerException)
+    }
+
+    @Test
+    fun testTooLargeArray() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+        val arrayLength = Int.MAX_VALUE
+
+        // THEN
+        assertFailsWith<OutOfMemoryError> {
+            subject.evaluateBlocking<BooleanArray>("new Array($arrayLength);")
+        }
+        assertFailsWith<OutOfMemoryError> {
+            subject.evaluateBlocking<IntArray>("new Array($arrayLength);")
+        }
+        assertFailsWith<OutOfMemoryError> {
+            subject.evaluateBlocking<LongArray>("new Array($arrayLength);")
+        }
+        assertFailsWith<OutOfMemoryError> {
+            subject.evaluateBlocking<FloatArray>("new Array($arrayLength);")
+        }
+        assertFailsWith<OutOfMemoryError> {
+            subject.evaluateBlocking<DoubleArray>("new Array($arrayLength);")
+        }
+        assertFailsWith<OutOfMemoryError> {
+            subject.evaluateBlocking<Array<Any>>("new Array($arrayLength);")
+        }
     }
 
     @Test
