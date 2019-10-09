@@ -17,12 +17,11 @@ static JSValue js_print(JSContext *ctx, JSValueConst this_val, int argc, JSValue
   const char *logType = "d";  // TODO: param!
 
   std::ostringstream oss;
-  const char *str;
 
   for (int i = 0; i < argc; ++i) {
       if (i != 0)
         oss << ' ';
-      str = JS_ToCString(ctx, argv[i]);
+      const char *str = JS_ToCString(ctx, argv[i]);
       if (!str)
         return JS_EXCEPTION;
       oss << str;
@@ -37,7 +36,7 @@ static JSValue js_print(JSContext *ctx, JSValueConst this_val, int argc, JSValue
   JniContext *jniContext = jsBridgeContext->getJniContext();
   const JniCache *jniCache = jsBridgeContext->getJniCache();
 
-  jniCache->getJsBridgeInterface().consoleLogHelper(JStringLocalRef(jniContext, logType), JStringLocalRef(jniContext, str));
+  jniCache->getJsBridgeInterface().consoleLogHelper(JStringLocalRef(jniContext, logType), JStringLocalRef(jniContext, oss.str().c_str()));
 
   return JS_UNDEFINED;
 }
