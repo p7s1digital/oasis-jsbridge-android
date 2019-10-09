@@ -49,6 +49,7 @@ duk_int_t custom_stringify(duk_context *ctx, duk_idx_t idx) {
   // 1. Fast/easy way. BUT: (like JSON.stringify) does not properly serialize Error instances!
   duk_dup(ctx, idx);
   duk_json_encode(ctx, -1);  // object to JSON string
+  return DUK_EXEC_SUCCESS;
 #else
   // 2. Custom stringify which properly serializes Error instances
   duk_get_global_string(ctx, "__jsBridge__stringify");
@@ -57,11 +58,10 @@ duk_int_t custom_stringify(duk_context *ctx, duk_idx_t idx) {
     duk_eval_string_noresult(ctx, customStringifyJs);
     duk_get_global_string(ctx, "__jsBridge__stringify");
   }
-  duk_dup(ctx, idx);
-  duk_int_t ret = duk_pcall(ctx, 1);
-#endif
 
-  return DUK_EXEC_SUCCESS;
+  duk_dup(ctx, idx);
+  return duk_pcall(ctx, 1);
+#endif
 }
 
 #elif defined(QUICKJS)

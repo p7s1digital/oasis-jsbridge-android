@@ -18,13 +18,13 @@
  */
 #include "Double.h"
 #include "JsBridgeContext.h"
-#include "jni-helpers/JArrayLocalRef.h"
 #include "log.h"
+#include "exceptions/JniException.h"
+#include "jni-helpers/JArrayLocalRef.h"
 
 #ifdef DUKTAPE
 # include "JsBridgeContext.h"
 # include "StackChecker.h"
-# include "StackUnwinder.h"
 #endif
 
 namespace JavaTypes {
@@ -35,14 +35,13 @@ Double::Double(const JsBridgeContext *jsBridgeContext)
 
 #if defined(DUKTAPE)
 
-JValue Double::pop(bool inScript) const {
+JValue Double::pop() const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
   if (!duk_is_number(m_ctx, -1)) {
     const auto message = std::string("Cannot convert JS value ") + duk_safe_to_string(m_ctx, -1) + " to double";
     duk_pop(m_ctx);
-    CHECK_STACK_NOW();
-    m_jsBridgeContext->throwTypeException(message, inScript);
+    throw std::invalid_argument(message);
   }
 
   double d = duk_require_number(m_ctx, -1);
@@ -50,56 +49,56 @@ JValue Double::pop(bool inScript) const {
   return JValue(d);
 }
 
-JValue Double::popArray(uint32_t count, bool expanded, bool inScript) const {
-  // If we're not expanded, pop the array off the stack no matter what.
-  const StackUnwinder _(m_ctx, expanded ? 0 : 1);
-
+JValue Double::popArray(uint32_t count, bool expanded) const {
   if (!expanded) {
     count = static_cast<uint32_t>(duk_get_length(m_ctx, -1));
     if (!duk_is_array(m_ctx, -1)) {
       const auto message = std::string("Cannot convert JS value ") + duk_safe_to_string(m_ctx, -1) + " to Array<Double>";
-      m_jsBridgeContext->throwTypeException(message, inScript);
+      duk_pop(m_ctx);  // pop the array
+      throw std::invalid_argument(message);
     }
   }
 
   JArrayLocalRef<jdouble> doubleArray(m_jniContext, count);
   jdouble *elements = doubleArray.isNull() ? nullptr : doubleArray.getMutableElements();
   if (elements == nullptr) {
-    if (expanded) {
-      duk_pop_n(m_ctx, count);
-    }
-    m_jsBridgeContext->rethrowJniException();
-    return JValue();
+    duk_pop_n(m_ctx, expanded ? count : 1);  // pop the expanded elements or the array
+    throw JniException(m_jniContext);
   }
 
   for (int i = count - 1; i >= 0; --i) {
     if (!expanded) {
-      duk_get_prop_index(m_ctx, -1, i);
+      duk_get_prop_index(m_ctx, -1, static_cast<duk_uarridx_t>(i));
     }
-    JValue value = pop(inScript);
+    JValue value = pop();
     elements[i] = value.getDouble();
+  }
+
+  if (!expanded) {
+    duk_pop(m_ctx);  // pop the array
   }
 
   return JValue(doubleArray);
 }
 
-duk_ret_t Double::push(const JValue &value, bool inScript) const {
+duk_ret_t Double::push(const JValue &value) const {
   duk_push_number(m_ctx, value.getDouble());
   return 1;
 }
 
-duk_ret_t Double::pushArray(const JniLocalRef<jarray> &values, bool expand, bool inScript) const {
+duk_ret_t Double::pushArray(const JniLocalRef<jarray> &values, bool expand) const {
   JArrayLocalRef<jdouble> doubleArray(values);
   const auto count = doubleArray.getLength();
 
-  if (!expand) {
-    duk_push_array(m_ctx);
-  }
-
   const jdouble *elements = doubleArray.getElements();
   if (elements == nullptr) {
-    m_jsBridgeContext->rethrowJniException();
-    return DUK_RET_ERROR;
+    throw JniException(m_jniContext);
+  }
+
+  CHECK_STACK_OFFSET(m_ctx, expand ? count : 1);
+
+  if (!expand) {
+    duk_push_array(m_ctx);
   }
 
   for (jsize i = 0; i < count; ++i) {
@@ -129,11 +128,9 @@ namespace {
   }
 }
 
-JValue Double::toJava(JSValueConst v, bool inScript) const {
+JValue Double::toJava(JSValueConst v) const {
   if (!JS_IsNumber(v)) {
-    const auto message = "Cannot convert return value to double";
-    m_jsBridgeContext->throwTypeException(message, inScript);
-    return JValue();
+    throw std::invalid_argument("Cannot convert return value to double");
   }
 
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
@@ -143,14 +140,13 @@ JValue Double::toJava(JSValueConst v, bool inScript) const {
   return JValue(getDouble(v));
 }
 
-JValue Double::toJavaArray(JSValueConst v, bool inScript) const {
+JValue Double::toJavaArray(JSValueConst v) const {
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
     return JValue();
   }
 
   if (!JS_IsArray(m_ctx, v)) {
-    m_jsBridgeContext->throwTypeException("Cannot convert JS value to Java array", inScript);
-    return JValue();
+    throw std::invalid_argument("Cannot convert JS value to Java array");
   }
 
   JSValue lengthValue = JS_GetPropertyStr(m_ctx, v, "length");
@@ -160,14 +156,12 @@ JValue Double::toJavaArray(JSValueConst v, bool inScript) const {
 
   JArrayLocalRef<jdouble> doubleArray(m_jniContext, count);
   if (doubleArray.isNull()) {
-    m_jsBridgeContext->rethrowJniException();
-    return JValue();
+    throw JniException(m_jniContext);
   }
 
   jdouble *elements = doubleArray.getMutableElements();
   if (elements == nullptr) {
-    m_jsBridgeContext->rethrowJniException();
-    return JValue();
+    throw JniException(m_jniContext);
   }
 
   for (uint32_t i = 0; i < count; ++i) {
@@ -179,11 +173,11 @@ JValue Double::toJavaArray(JSValueConst v, bool inScript) const {
   return JValue(doubleArray);
 }
 
-JSValue Double::fromJava(const JValue &value, bool inScript) const {
+JSValue Double::fromJava(const JValue &value) const {
   return JS_NewFloat64(m_ctx, value.getDouble());
 }
 
-JSValue Double::fromJavaArray(const JniLocalRef<jarray> &values, bool inScript) const {
+JSValue Double::fromJavaArray(const JniLocalRef<jarray> &values) const {
   JArrayLocalRef<jdouble> doubleArray(values);
   const auto count = doubleArray.getLength();
 
@@ -192,8 +186,7 @@ JSValue Double::fromJavaArray(const JniLocalRef<jarray> &values, bool inScript) 
   const jdouble *elements = doubleArray.getElements();
   if (elements == nullptr) {
     JS_FreeValue(m_ctx, jsArray);
-    m_jsBridgeContext->rethrowJniException();
-    return JS_EXCEPTION;
+    throw JniException(m_jniContext);
   }
 
   for (jsize i = 0; i < count; ++i) {
@@ -214,9 +207,8 @@ JValue Double::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
   // Explicitly release all values now because they won't be used afterwards
   JValue::releaseAll(args);
 
-  if (m_jsBridgeContext->hasPendingJniException()) {
-    m_jsBridgeContext->rethrowJniException();
-    return JValue();
+  if (m_jniContext->exceptionCheck()) {
+    throw JniException(m_jniContext);
   }
 
   return JValue(d);

@@ -28,11 +28,11 @@ public:
   Deferred(const JsBridgeContext *, std::unique_ptr<const JavaType> &&componentType);
 
 #if defined(DUKTAPE)
-  JValue pop(bool inScript) const override;
-  duk_ret_t push(const JValue &, bool inScript) const override;
+  JValue pop() const override;
+  duk_ret_t push(const JValue &) const override;
 #elif defined(QUICKJS)
-  JValue toJava(JSValueConst, bool inScript) const override;
-  JSValue fromJava(const JValue &, bool inScript) const override;
+  JValue toJava(JSValueConst) const override;
+  JSValue fromJava(const JValue &) const override;
 #endif
 
   bool isDeferred() const override { return true; }

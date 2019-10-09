@@ -46,17 +46,21 @@ public:
   virtual ~JavaType() = default;
 
 #if defined(DUKTAPE)
-  virtual JValue pop(bool inScript) const = 0;
-  virtual JValue popArray(uint32_t count, bool expanded, bool inScript) const;
+  // Pop values from JS to Java
+  // Note: in case of exception, no value will be popped
+  virtual JValue pop() const = 0;
+  virtual JValue popArray(uint32_t count, bool expanded) const;
 
-  virtual duk_ret_t push(const JValue &value, bool inScript) const = 0;
-  virtual duk_ret_t pushArray(const JniLocalRef<jarray> &values, bool expand, bool inScript) const;
+  // Push values from Java to JS
+  // Note: in case of exception, no value will be pushed
+  virtual duk_ret_t push(const JValue &value) const = 0;
+  virtual duk_ret_t pushArray(const JniLocalRef<jarray> &values, bool expand) const;
 #elif defined(QUICKJS)
-  virtual JValue toJava(JSValueConst, bool inScript) const = 0;
-  virtual JValue toJavaArray(JSValueConst, bool inScript) const;
+  virtual JValue toJava(JSValueConst) const = 0;
+  virtual JValue toJavaArray(JSValueConst) const;
 
-  virtual JSValue fromJava(const JValue &value, bool inScript) const = 0;
-  virtual JSValue fromJavaArray(const JniLocalRef<jarray> &values, bool inScript) const;
+  virtual JSValue fromJava(const JValue &value) const = 0;
+  virtual JSValue fromJavaArray(const JniLocalRef<jarray> &values) const;
 #endif
 
   virtual JValue callMethod(jmethodID, const JniRef<jobject> &javaThis, const std::vector<JValue> &args) const;
@@ -68,6 +72,7 @@ protected:
 
   const JniRef<jclass> &getJavaClass() const;
   const JniCache *getJniCache() const { return m_jsBridgeContext->getJniCache(); }
+  const ExceptionHandler *getExceptionHandler() const { return m_jsBridgeContext->getExceptionHandler(); }
 
   const JsBridgeContext * const m_jsBridgeContext;
   const JniContext * const m_jniContext;

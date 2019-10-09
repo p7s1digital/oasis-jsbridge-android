@@ -15,9 +15,12 @@
  */
 #include "java-types/Deferred.h"
 
+#include "ExceptionHandler.h"
 #include "JniCache.h"
 #include "JsBridgeContext.h"
 #include "StackChecker.h"
+#include "exceptions/JniException.h"
+#include "exceptions/JsException.h"
 #include "jni-helpers/JniContext.h"
 
 namespace {
@@ -32,9 +35,10 @@ namespace {
 
   extern "C" {
     duk_ret_t onPromiseFulfilled(duk_context *ctx) {
-      int argCount = duk_get_top(ctx);
-      assert(argCount <= 1);
-      CHECK_STACK_OFFSET(ctx, 0 - argCount);
+      int hasValue = duk_get_top(ctx);
+      assert(hasValue <= 1);
+
+      CHECK_STACK_OFFSET(ctx, hasValue ? -1 : 0);
 
       JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
       assert(jsBridgeContext != nullptr);
@@ -43,31 +47,41 @@ namespace {
       duk_push_current_function(ctx);
 
       if (!duk_get_prop_string(ctx, -1, PAYLOAD_PROP_NAME)) {
-        duk_pop_n(ctx, 2 + argCount);  // (undefined) OnPromiseFulfilledPayload + current function + function args
+        duk_pop_n(ctx, 2 + hasValue);  // (undefined) OnPromiseFulfilledPayload + current function + value
         return DUK_RET_ERROR;
       }
 
       auto payload = reinterpret_cast<const OnPromisePayload *>(duk_get_pointer(ctx, -1));
       duk_pop_2(ctx);  // OnPromiseFulfilledPayload + current function
 
-      // Pop promise value
-      JValue value;
-      if (argCount == 1) {
-        value = payload->componentType->pop(true /*inScript*/);
-      } else if (argCount > 1) {
-        duk_pop_n(ctx, argCount);
-      }
+      try {
+        // Pop promise value
+        JValue value;
+        if (hasValue) {
+          value = payload->componentType->pop();
+        }
 
-      // Complete the native Deferred
-      jsBridgeContext->getJniCache()->getJsBridgeInterface().resolveDeferred(payload->javaDeferred, value);
+        const JniContext *jniContext = jsBridgeContext->getJniContext();
+        const JniCache *jniCache = jsBridgeContext->getJniCache();
+
+        // Complete the native Deferred
+        jniCache->getJsBridgeInterface().resolveDeferred(payload->javaDeferred, value);
+        if (jniContext->exceptionCheck()) {
+          throw JniException(jniContext);
+        }
+      } catch (const std::exception &e) {
+        jsBridgeContext->getExceptionHandler()->jsThrow(e);
+        return DUK_ERR_ERROR;  // unreached
+      }
 
       return 0;
     }
 
     duk_ret_t onPromiseRejected(duk_context *ctx) {
-      int argCount = duk_get_top(ctx);
-      assert(argCount <= 1);
-      CHECK_STACK_OFFSET(ctx, 0 - argCount);
+      int hasValue = duk_get_top(ctx);
+      assert(hasValue <= 1);
+
+      CHECK_STACK_OFFSET(ctx, hasValue ? -1 : 0);
 
       JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
       assert(jsBridgeContext != nullptr);
@@ -76,22 +90,35 @@ namespace {
       duk_push_current_function(ctx);
 
       if (!duk_get_prop_string(ctx, -1, PAYLOAD_PROP_NAME)) {
-        duk_pop_n(ctx, 2 + argCount);  // (undefined) OnPromiseRejectedPayload + current function + function args
+        duk_pop_n(ctx, 2 + hasValue);  // (undefined) OnPromiseRejectedPayload + current function + value
         return DUK_RET_ERROR;
       }
       auto payload = reinterpret_cast<const OnPromisePayload *>(duk_require_pointer(ctx, -1));
 
       duk_pop_2(ctx);  // OnPromiseRejectedPayload + current function
 
-      JValue value;
-      if (argCount == 1) {
-        value = JValue(jsBridgeContext->getJavaExceptionForJsError());
-      }
-      duk_pop_n(ctx, argCount);  // function args
+      const JniContext *jniContext = jsBridgeContext->getJniContext();
+      const JniCache *jniCache = jsBridgeContext->getJniCache();
+      const ExceptionHandler *exceptionHandler = jsBridgeContext->getExceptionHandler();
 
-      // Reject the native Deferred
-      jsBridgeContext->getJniCache()->getJsBridgeInterface().rejectDeferred(payload->javaDeferred, value);
-      jsBridgeContext->rethrowJniException();
+      try {
+        // Pop rejected value
+        JValue value;
+        if (hasValue) {
+          JsException jsException(jsBridgeContext, 0);
+          value = JValue(exceptionHandler->getJavaException(jsException));
+          duk_pop(ctx);  // value
+        }
+
+        // Reject the native Deferred
+        jniCache->getJsBridgeInterface().rejectDeferred(payload->javaDeferred, value);
+        if (jniContext->exceptionCheck()) {
+          throw JniException(jniContext);
+        }
+      } catch (const std::exception &e) {
+        jsBridgeContext->getExceptionHandler()->jsThrow(e);
+        return DUK_ERR_ERROR;  // unreached
+      }
 
       return 0;
     }
@@ -165,22 +192,23 @@ Deferred::Deferred(const JsBridgeContext *jsBridgeContext, std::unique_ptr<const
 }
 
 // JS Promise to native Deferred
-JValue Deferred::pop(bool inScript) const {
+JValue Deferred::pop() const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
   // Create a native Deferred instance
   JniLocalRef<jobject> javaDeferred = getJniCache()->getJsBridgeInterface().createCompletableDeferred();
-  if (m_jsBridgeContext->hasPendingJniException()) {
-    duk_pop(m_ctx);
-    m_jsBridgeContext->rethrowJniException();
+  if (m_jniContext->exceptionCheck()) {
+    throw JniException(m_jniContext);
   }
 
   if (!duk_is_object(m_ctx, -1) || !duk_has_prop_string(m_ctx, -1, "then")) {
     // Not a Promise => directly resolve the native Deferred with the value
-    JValue value = m_componentType->pop(inScript);
+    JValue value = m_componentType->pop();
 
     getJniCache()->getJsBridgeInterface().resolveDeferred(javaDeferred, value);
-    m_jsBridgeContext->rethrowJniException();
+    if (m_jniContext->exceptionCheck()) {
+      throw JniException(m_jniContext);
+    }
 
     return JValue(javaDeferred);
   }
@@ -194,10 +222,13 @@ JValue Deferred::pop(bool inScript) const {
   duk_dup(m_ctx, onPromiseFulfilledIdx);
   duk_dup(m_ctx, onPromiseRejectedIdx);
   if (duk_pcall_prop(m_ctx, jsPromiseObjectIdx, 2) != DUK_EXEC_SUCCESS) {
-    JniLocalRef<jthrowable> javaException = m_jsBridgeContext->getJavaExceptionForJsError();
+    auto jsException = getExceptionHandler()->getCurrentJsException();
+    JniLocalRef<jthrowable> javaException = getExceptionHandler()->getJavaException(std::move(jsException));
     getJniCache()->getJsBridgeInterface().rejectDeferred(javaDeferred, JValue(javaException));
     duk_pop_2(m_ctx);  // (undefined) ret val + JsPromiseObject
-    m_jsBridgeContext->rethrowJniException();
+    if (m_jniContext->exceptionCheck()) {
+      throw JniException(m_jniContext);
+    }
     return JValue(javaDeferred);
   }
   duk_pop(m_ctx);  // ignored ret val
@@ -223,7 +254,7 @@ JValue Deferred::pop(bool inScript) const {
 }
 
 // Native Deferred to JS Promise
-duk_ret_t Deferred::push(const JValue &value, bool inScript) const {
+duk_ret_t Deferred::push(const JValue &value) const {
   CHECK_STACK_OFFSET(m_ctx, 1);
 
   const JniLocalRef<jobject> &jDeferred = value.getLocalRef();
@@ -262,8 +293,7 @@ duk_ret_t Deferred::push(const JValue &value, bool inScript) const {
   // new Promise(promiseFunction)
   if (!duk_get_global_string(m_ctx, "Promise")) {
     duk_pop_2(m_ctx);  // (undefined) "Promise" + promiseFunction
-    m_jsBridgeContext->throwTypeException("Cannot push Deferred: global.Promise is undefined", inScript);
-    return DUK_RET_ERROR;  // unreachable
+    throw std::invalid_argument("Cannot push Deferred: global.Promise is undefined");
   }
   duk_dup(m_ctx, -2 /*promiseFunction*/);
   duk_new(m_ctx, 1);  // [... "Promise" promiseFunction] => [... Promise]
@@ -273,9 +303,11 @@ duk_ret_t Deferred::push(const JValue &value, bool inScript) const {
   // => STASH: [... Promise]
 
   // Call Java setUpJsPromise()
-    getJniCache()->getJsBridgeInterface().setUpJsPromise(
+  getJniCache()->getJsBridgeInterface().setUpJsPromise(
     JStringLocalRef(m_jniContext, promiseObjectGlobalName.c_str()), jDeferred);
-  m_jsBridgeContext->rethrowJniException();
+  if (m_jniContext->exceptionCheck()) {
+    throw JniException(m_jniContext);
+  }
 
   return 1;
 }
@@ -306,7 +338,7 @@ void Deferred::completeJsPromise(const JsBridgeContext *jsBridgeContext, const s
   duk_get_prop_string(ctx, -1, isFulfilled ? "resolve" : "reject");
 
   // Call it with the Promise value
-  componentType->push(JValue(value), false /*inScript*/);
+  componentType->push(JValue(value));
   if (duk_pcall(ctx, 1) != DUK_EXEC_SUCCESS) {
     alog("Could not complete Promise with id %s", strId.c_str());
   }

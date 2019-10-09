@@ -44,7 +44,7 @@ Array::Array(const JsBridgeContext *jsBridgeContext, std::unique_ptr<const JavaT
 
 #include "StackChecker.h"
 
-JValue Array::pop(bool inScript) const {
+JValue Array::pop() const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
   if (duk_is_null_or_undefined(m_ctx, -1)) {
@@ -55,14 +55,13 @@ JValue Array::pop(bool inScript) const {
   if (!duk_is_array(m_ctx, -1)) {
     const auto message = std::string("Cannot convert ") + duk_safe_to_string(m_ctx, -1) + " to array";
     duk_pop(m_ctx);
-    CHECK_STACK_NOW();
-    m_jsBridgeContext->throwTypeException(message, inScript);
+    throw std::invalid_argument(message);
   }
 
-  return m_componentType->popArray(1, false, inScript);
+  return m_componentType->popArray(1, false);
 }
 
-duk_ret_t Array::push(const JValue &value, bool inScript) const {
+duk_ret_t Array::push(const JValue &value) const {
   CHECK_STACK_OFFSET(m_ctx, 1);
 
   JniLocalRef<jarray> jArray(value.getLocalRef().staticCast<jarray>());
@@ -72,33 +71,31 @@ duk_ret_t Array::push(const JValue &value, bool inScript) const {
     return 1;
   }
 
-  return m_componentType->pushArray(jArray, false, inScript);
+  return m_componentType->pushArray(jArray, false);
 }
 
 #elif defined(QUICKJS)
 
-JValue Array::toJava(JSValueConst v, bool inScript) const {
+JValue Array::toJava(JSValueConst v) const {
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
     return JValue();
   }
 
   if (!JS_IsArray(m_ctx, v)) {
-    const char *message = "Cannot convert value to array";
-    m_jsBridgeContext->throwTypeException(message, inScript);
-    return JValue();
+    throw std::invalid_argument("Cannot convert value to array");
   }
 
-  return m_componentType->toJavaArray(v, inScript);
+  return m_componentType->toJavaArray(v);
 }
 
-JSValue Array::fromJava(const JValue &value, bool inScript) const {
+JSValue Array::fromJava(const JValue &value) const {
   JniLocalRef<jarray> jArray(value.getLocalRef().staticCast<jarray>());
 
   if (jArray.isNull()) {
     return JS_NULL;
   }
 
-  return m_componentType->fromJavaArray(jArray, inScript);
+  return m_componentType->fromJavaArray(jArray);
 }
 
 #endif

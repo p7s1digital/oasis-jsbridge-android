@@ -17,6 +17,7 @@
  * limitations under the License.
  */
 #include "de_prosiebensat1digital_oasisjsbridge_JsBridge.h"
+#include "ExceptionHandler.h"
 #include "JniCache.h"
 #include "JsBridgeContext.h"
 #include "log.h"
@@ -66,7 +67,7 @@ JNIEXPORT jlong JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniC
     if (doDebug) {
       jsBridgeContext->initDebugger();
     }
-  } catch (std::bad_alloc &) {
+  } catch (const std::bad_alloc &) {
     return 0L;
   }
 
@@ -103,11 +104,8 @@ JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jn
   JValue returnValue;
   try {
     returnValue = jsBridgeContext->evaluateString(JStringLocalRef(jniContext, code, JniLocalRefMode::Borrowed), JniLocalRef<jsBridgeParameter >(jniContext, returnParameter, JniLocalRefMode::Borrowed), awaitJsPromise);
-  } catch (const std::invalid_argument &e) {
-    jsBridgeContext->queueIllegalArgumentException(e.what());
-    return nullptr;
-  } catch (const std::runtime_error &e) {
-    jsBridgeContext->queueJsException(e.what());
+  } catch (const std::exception &e) {
+    jsBridgeContext->getExceptionHandler()->jniThrow(e);
     return nullptr;
   }
 
@@ -129,10 +127,8 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniEv
 
   try {
     jsBridgeContext->evaluateFileContent(JStringLocalRef(jniContext, code, JniLocalRefMode::Borrowed), strFilename);
-  } catch (const std::invalid_argument &e) {
-    jsBridgeContext->queueIllegalArgumentException(e.what());
-  } catch (const std::runtime_error &e) {
-    jsBridgeContext->queueJsException(e.what());
+  } catch (const std::exception &e) {
+    jsBridgeContext->getExceptionHandler()->jniThrow(e);
   }
 }
 
@@ -149,10 +145,8 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
   try {
     jsBridgeContext->registerJavaObject(strName, JniLocalRef<jobject>(jniContext, javaObject, JniLocalRefMode::Borrowed),
                                        JObjectArrayLocalRef(jniContext, javaMethods, JniLocalRefMode::Borrowed));
-  } catch (const std::invalid_argument &e) {
-    jsBridgeContext->queueIllegalArgumentException(e.what());
-  } catch (const std::runtime_error &e) {
-    jsBridgeContext->queueJsException(e.what());
+  } catch (const std::exception &e) {
+    jsBridgeContext->getExceptionHandler()->jniThrow(e);
   }
 }
 
@@ -169,10 +163,8 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
   try {
     jsBridgeContext->registerJavaLambda(strName, JniLocalRef<jobject>(jniContext, javaObject, JniLocalRefMode::Borrowed),
                                        JniLocalRef<jsBridgeMethod>(jniContext, javaMethod, JniLocalRefMode::Borrowed));
-  } catch (const std::invalid_argument &e) {
-    jsBridgeContext->queueIllegalArgumentException(e.what());
-  } catch (const std::runtime_error &e) {
-    jsBridgeContext->queueJsException(e.what());
+  } catch (const std::exception &e) {
+    jsBridgeContext->getExceptionHandler()->jniThrow(e);
   }
 }
 
@@ -188,10 +180,8 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
 
   try {
     jsBridgeContext->registerJsObject(strName, JObjectArrayLocalRef(jniContext, methods, JniLocalRefMode::Borrowed));
-  } catch (const std::invalid_argument &e) {
-    jsBridgeContext->queueIllegalArgumentException(e.what());
-  } catch (const std::runtime_error &e) {
-    jsBridgeContext->queueJsException(e.what());
+  } catch (const std::exception &e) {
+    jsBridgeContext->getExceptionHandler()->jniThrow(e);
   }
 }
 
@@ -207,10 +197,8 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
 
   try {
     jsBridgeContext->registerJsLambda(strName, JniLocalRef<jsBridgeMethod>(jniContext, method, JniLocalRefMode::Borrowed));
-  } catch (const std::invalid_argument &e) {
-    jsBridgeContext->queueIllegalArgumentException(e.what());
-  } catch (const std::runtime_error &e) {
-    jsBridgeContext->queueJsException(e.what());
+  } catch (const std::exception &e) {
+    jsBridgeContext->getExceptionHandler()->jniThrow(e);
   }
 }
 
@@ -230,10 +218,8 @@ JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jn
     value = jsBridgeContext->callJsMethod(strObjectName,
                                           JniLocalRef<jobject>(jniContext, javaMethod, JniLocalRefMode::Borrowed),
                                           JObjectArrayLocalRef(jniContext, args, JniLocalRefMode::Borrowed));
-  } catch (const std::invalid_argument &e) {
-      jsBridgeContext->queueIllegalArgumentException(e.what());
-  } catch (const std::runtime_error &e) {
-    jsBridgeContext->queueJsException(e.what());
+  } catch (const std::exception &e) {
+    jsBridgeContext->getExceptionHandler()->jniThrow(e);
   }
 
   // Prevent auto-releasing the localref returned to Java
@@ -258,13 +244,11 @@ JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jn
     value = jsBridgeContext->callJsLambda(strObjectName,
                                           JObjectArrayLocalRef(jniContext, args, JniLocalRefMode::Borrowed),
                                           awaitJsPromise);
-  } catch (const std::invalid_argument &e) {
-    jsBridgeContext->queueIllegalArgumentException(e.what());
-  } catch (const std::runtime_error &e) {
-    jsBridgeContext->queueJsException(e.what());
+  } catch (const std::exception &e) {
+    jsBridgeContext->getExceptionHandler()->jniThrow(e);
   }
 
-  // Prevent auto-releasing the localref returned to Java
+// Prevent auto-releasing the localref returned to Java
   value.detachLocalRef();
 
   return value.get().l;
@@ -280,7 +264,11 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniAs
 
   std::string strGlobalName = JStringLocalRef(jniContext, globalName, JniLocalRefMode::Borrowed).toUtf8Chars();
 
-  jsBridgeContext->assignJsValue(strGlobalName, JStringLocalRef(jniContext, jsCode, JniLocalRefMode::Borrowed));
+  try {
+    jsBridgeContext->assignJsValue(strGlobalName, JStringLocalRef(jniContext, jsCode, JniLocalRefMode::Borrowed));
+  } catch (const std::exception &e) {
+    jsBridgeContext->getExceptionHandler()->jniThrow(e);
+  }
 }
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniNewJsFunction
@@ -295,7 +283,11 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniNe
   JObjectArrayLocalRef objectArgs(jniContext, args, JniLocalRefMode::Borrowed);
   JStringLocalRef strCode(jniContext, jsCode, JniLocalRefMode::Borrowed);
 
-  jsBridgeContext->newJsFunction(strGlobalName, objectArgs, strCode);
+  try {
+    jsBridgeContext->newJsFunction(strGlobalName, objectArgs, strCode);
+  } catch (const std::exception &e) {
+    jsBridgeContext->getExceptionHandler()->jniThrow(e);
+  }
 }
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCompleteJsPromise
@@ -311,10 +303,8 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCo
 
   try {
     JavaTypes::Deferred::completeJsPromise(jsBridgeContext, strId, isFulfilled, valueRef);
-  } catch (const std::invalid_argument &e) {
-    jsBridgeContext->queueIllegalArgumentException(e.what());
-  } catch (const std::runtime_error &e) {
-    jsBridgeContext->queueJsException(e.what());
+  } catch (const std::exception &e) {
+    jsBridgeContext->getExceptionHandler()->jniThrow(e);
   }
 }
 

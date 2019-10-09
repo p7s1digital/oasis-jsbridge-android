@@ -17,7 +17,9 @@
  * limitations under the License.
  */
 #include "Void.h"
-#include "../JsBridgeContext.h"
+
+#include "JsBridgeContext.h"
+#include "exceptions/JniException.h"
 
 namespace JavaTypes {
 
@@ -28,7 +30,7 @@ Void::Void(const JsBridgeContext *jsBridgeContext, JavaTypeId id, bool boxed)
 
 #if defined(DUKTAPE)
 
-JValue Void::pop(bool) const {
+JValue Void::pop() const {
   duk_pop(m_ctx);
 
   if (m_boxed) {
@@ -42,17 +44,13 @@ JValue Void::pop(bool) const {
   return JValue();
 }
 
-JValue Void::popArray(uint32_t count, bool expanded, bool inScript) const {
+JValue Void::popArray(uint32_t count, bool expanded) const {
   expanded ? duk_pop_n(m_ctx, count) : duk_pop(m_ctx);
 
-  const char *message = "Cannot pop an array of Void values!";
-  m_jsBridgeContext->throwTypeException(message, inScript);
-
-  // Unreachable
-  return JValue();
+  throw std::invalid_argument("Cannot pop an array of Void values!");
 }
 
-duk_ret_t Void::push(const JValue &, bool /*inScript*/) const {
+duk_ret_t Void::push(const JValue &) const {
   if (m_boxed) {
     // If void is boxed, it is actually a value which must be pushed
     duk_push_undefined(m_ctx);
@@ -62,17 +60,13 @@ duk_ret_t Void::push(const JValue &, bool /*inScript*/) const {
   return 0;
 }
 
-duk_ret_t Void::pushArray(const JniLocalRef<jarray> &, bool /*expand*/, bool inScript) const {
-  const char *message = "Cannot push an array of Void values!";
-  m_jsBridgeContext->throwTypeException(message, inScript);
-
-  // Unreachable
-  return DUK_RET_ERROR;
+duk_ret_t Void::pushArray(const JniLocalRef<jarray> &, bool /*expand*/) const {
+  throw std::invalid_argument("Cannot push an array of Void values!");
 }
 
 #elif defined(QUICKJS)
 
-JValue Void::toJava(JSValueConst, bool) const {
+JValue Void::toJava(JSValueConst) const {
   if (m_boxed) {
     // Create and return a new Void or Unit instance
     const auto &javaClass = getJavaClass();
@@ -84,23 +78,16 @@ JValue Void::toJava(JSValueConst, bool) const {
   return JValue();
 }
 
-JValue Void::toJavaArray(JSValueConst, bool inScript) const {
-  const char *message = "Cannot transfer from JS to Java an array of Void values";
-  m_jsBridgeContext->throwTypeException(message, inScript);
-
-  // Unreachable
-  return JValue();
+JValue Void::toJavaArray(JSValueConst) const {
+  throw std::invalid_argument("Cannot transfer from JS to Java an array of Void values");
 }
 
-JSValue Void::fromJava(const JValue &, bool inScript) const {
+JSValue Void::fromJava(const JValue &) const {
   return JS_UNDEFINED;
 }
 
-JSValue Void::fromJavaArray(const JniLocalRef<jarray> &, bool inScript) const {
-  const char *message = "Cannot transfer from Java to JS an array of Void values!";
-  m_jsBridgeContext->throwTypeException(message, inScript);
-
-  return JS_EXCEPTION;
+JSValue Void::fromJavaArray(const JniLocalRef<jarray> &) const {
+  throw std::invalid_argument("Cannot transfer from Java to JS an array of Void values!");
 }
 
 #endif
@@ -116,8 +103,8 @@ JValue Void::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
   // Explicitly release all values now because they won't be used afterwards
   JValue::releaseAll(args);
 
-  if (m_jsBridgeContext->hasPendingJniException()) {
-    m_jsBridgeContext->rethrowJniException();
+  if (m_jniContext->exceptionCheck()) {
+    throw JniException(m_jniContext);
   }
 
   return JValue();

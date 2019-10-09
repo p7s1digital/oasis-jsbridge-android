@@ -36,7 +36,7 @@ BoxedPrimitive::BoxedPrimitive(const JsBridgeContext *jsBridgeContext, std::uniq
 
 #if defined(DUKTAPE)
 
-JValue BoxedPrimitive::pop(bool inScript) const {
+JValue BoxedPrimitive::pop() const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
   if (duk_is_null_or_undefined(m_ctx, -1)) {
@@ -44,11 +44,11 @@ JValue BoxedPrimitive::pop(bool inScript) const {
     return JValue();
   }
 
-  JValue primitiveValue = m_primitive->pop(inScript);
+  JValue primitiveValue = m_primitive->pop();
   return m_primitive->box(primitiveValue);
 }
 
-duk_ret_t BoxedPrimitive::push(const JValue &value, bool inScript) const {
+duk_ret_t BoxedPrimitive::push(const JValue &value) const {
   CHECK_STACK_OFFSET(m_ctx, 1);
 
   const JniLocalRef<jobject> &jObject = value.getLocalRef();
@@ -57,28 +57,28 @@ duk_ret_t BoxedPrimitive::push(const JValue &value, bool inScript) const {
     return 1;
   }
 
-  return m_primitive->push(m_primitive->unbox(value), inScript);
+  return m_primitive->push(m_primitive->unbox(value));
 }
 
 #elif defined(QUICKJS)
 
-JValue BoxedPrimitive::toJava(JSValueConst v, bool inScript) const {
+JValue BoxedPrimitive::toJava(JSValueConst v) const {
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
     return JValue();
   }
 
-  JValue primitiveValue = m_primitive->toJava(v, inScript);
+  JValue primitiveValue = m_primitive->toJava(v);
   return JValue(m_primitive->box(primitiveValue));
 }
 
-JSValue BoxedPrimitive::fromJava(const JValue &value, bool inScript) const {
+JSValue BoxedPrimitive::fromJava(const JValue &value) const {
   const JniLocalRef<jobject> &jObject = value.getLocalRef();
   if (jObject.isNull()) {
     return JS_NULL;
   }
 
   JValue unboxedValue = m_primitive->unbox(value);
-  return m_primitive->fromJava(unboxedValue, inScript);
+  return m_primitive->fromJava(unboxedValue);
 }
 
 #endif

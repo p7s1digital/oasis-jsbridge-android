@@ -18,6 +18,7 @@
  */
 #include "JavaObject.h"
 
+#include "ExceptionHandler.h"
 #include "JavaMethod.h"
 #include "JavaType.h"
 #include "JniCache.h"
@@ -25,9 +26,9 @@
 
 #if defined(DUKTAPE)
 # include "StackChecker.h"
-#include "JniCache.h"
-
+# include "JniCache.h"
 #elif defined(QUICKJS)
+# include "AutoReleasedJSValue.h"
 # include "QuickJsUtils.h"
 #endif
 
@@ -44,10 +45,10 @@ namespace {
   duk_ret_t javaMethodHandler(duk_context *ctx) {
     CHECK_STACK(ctx);
 
-    JsBridgeContext *duktapeContext = JsBridgeContext::getInstance(ctx);
-    assert(duktapeContext != nullptr);
+    JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
+    assert(jsBridgeContext != nullptr);
 
-    JniContext *jniContext = duktapeContext->getJniContext();
+    JniContext *jniContext = jsBridgeContext->getJniContext();
     JNIEnv *env = jniContext->getJNIEnv();
     assert(env != nullptr);
 
@@ -75,7 +76,13 @@ namespace {
     duk_pop_2(ctx);
 
     CHECK_STACK_NOW();
-    return method->invoke(duktapeContext, thisObject);
+
+    try {
+      return method->invoke(jsBridgeContext, thisObject);
+    } catch (const std::exception &e) {
+      jsBridgeContext->getExceptionHandler()->jsThrow(e);
+      return DUK_RET_TYPE_ERROR;  // unreached
+    }
   }
 
   // Called by Duktape to handle finalization of bound Java objects
@@ -116,10 +123,10 @@ namespace {
   duk_ret_t javaLambdaHandler(duk_context *ctx) {
     CHECK_STACK(ctx);
 
-    JsBridgeContext *duktapeContext = JsBridgeContext::getInstance(ctx);
-    assert(duktapeContext != nullptr);
+    JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
+    assert(jsBridgeContext != nullptr);
 
-    JniContext *jniContext = duktapeContext->getJniContext();
+    JniContext *jniContext = jsBridgeContext->getJniContext();
     JNIEnv *env = jniContext->getJNIEnv();
     assert(env != nullptr);
 
@@ -137,7 +144,12 @@ namespace {
     duk_pop_2(ctx);  // Java this + current function
 
     CHECK_STACK_NOW();
-    return method->invoke(duktapeContext, thisObject);
+    try {
+      return method->invoke(jsBridgeContext, thisObject);
+    } catch (const std::exception &e) {
+      jsBridgeContext->getExceptionHandler()->jsThrow(e);
+      return DUK_RET_TYPE_ERROR;  // unreached
+    }
   }
 
   // Called by Duktape to handle finalization of bound Java lambdas
@@ -191,10 +203,9 @@ duk_ret_t JavaObject::push(const JsBridgeContext *jsBridgeContext, const std::st
     try {
       javaMethod = std::make_unique<JavaMethod>(jsBridgeContext, method, qualifiedMethodName, false /*isLambda*/);
     } catch (const std::invalid_argument &e) {
-      jsBridgeContext->queueIllegalArgumentException(std::string() + "In bound method \"" + qualifiedMethodName + "\": " + e.what());
       duk_pop(ctx);  // object being bound
       duk_push_undefined(ctx);
-      return DUK_RET_ERROR;
+      throw std::invalid_argument(std::string() + "In bound method \"" + qualifiedMethodName + "\": " + e.what());
     }
 
     // Use VARARGS here to allow us to manually validate that the proper number of arguments are
@@ -213,7 +224,7 @@ duk_ret_t JavaObject::push(const JsBridgeContext *jsBridgeContext, const std::st
   assert(env != nullptr);
 
   // Keep a reference in JavaScript to the object being bound.
-  duk_push_pointer(ctx, JniGlobalRef(object, JniRefReleaseMode::Never).get());  // JNI global ref will be deleted via JS finalizer
+  duk_push_pointer(ctx, JniGlobalRef(object, JniGlobalRefMode::Leaked).get());  // JNI global ref will be deleted via JS finalizer
   duk_put_prop_string(ctx, objIndex, JAVA_THIS_PROP_NAME);
 
   return 1;
@@ -223,6 +234,7 @@ duk_ret_t JavaObject::push(const JsBridgeContext *jsBridgeContext, const std::st
 duk_ret_t JavaObject::pushLambda(const JsBridgeContext *jsBridgeContext, const std::string &strName, const JniLocalRef<jobject> &object, const JniLocalRef<jsBridgeMethod> &method) {
   duk_context *ctx = jsBridgeContext->getDuktapeContext();
   const JniContext *jniContext = jsBridgeContext->getJniContext();
+  const ExceptionHandler *exceptionHandler = jsBridgeContext->getExceptionHandler();
 
   CHECK_STACK_OFFSET(ctx, 1);
 
@@ -235,10 +247,9 @@ duk_ret_t JavaObject::pushLambda(const JsBridgeContext *jsBridgeContext, const s
   try {
     javaMethod = std::make_unique<JavaMethod>(jsBridgeContext, method, qualifiedMethodName, true /*isLambda*/);
   } catch (const std::invalid_argument &e) {
-    jsBridgeContext->queueIllegalArgumentException(std::string() + "In bound method \"" + qualifiedMethodName + "\": " + e.what());
     // Pop the object being bound
     duk_pop(ctx);
-    return 1;
+    throw std::invalid_argument(std::string() + "In bound method \"" + qualifiedMethodName + "\": " + e.what());
   }
 
   // Use VARARGS here to allow us to manually validate that the proper number of arguments are
@@ -251,7 +262,7 @@ duk_ret_t JavaObject::pushLambda(const JsBridgeContext *jsBridgeContext, const s
   duk_put_prop_string(ctx, funcIndex, JAVA_METHOD_PROP_NAME);
 
   // Keep a reference in JavaScript to the lambda being bound.
-  duk_push_pointer(ctx, JniGlobalRef(object, JniRefReleaseMode::Never).get());  // JNI global ref will be deleted via JS finalizer
+  duk_push_pointer(ctx, JniGlobalRef(object, JniGlobalRefMode::Leaked).get());  // JNI global ref will be deleted via JS finalizer
   duk_put_prop_string(ctx, funcIndex, JAVA_THIS_PROP_NAME);
 
   // Set a finalizer
@@ -266,33 +277,37 @@ duk_ret_t JavaObject::pushLambda(const JsBridgeContext *jsBridgeContext, const s
 namespace {
   // Called by QuickJS when JS invokes a method on our bound Java object
   JSValue javaMethodHandler(JSContext *ctx, JSValueConst /*this_val*/, int argc, JSValueConst *argv, int /*magic*/, JSValueConst *datav) {
-    JsBridgeContext *quickJsContext = JsBridgeContext::getInstance(ctx);
-    assert(quickJsContext != nullptr);
+    JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
+    assert(jsBridgeContext != nullptr);
 
-    // Get JavaMethod instance bound to the function itself
-    auto javaMethod = QuickJsUtils::getCppPtr<JavaMethod>(datav[0]);
+    try {
+      // Get JavaMethod instance bound to the function itself
+      auto javaMethod = QuickJsUtils::getCppPtr<JavaMethod>(datav[0]);
 
-    // Java this is a property of the JS method
-    JniLocalRef<jobject> javaThis = quickJsContext->getUtils()->getJavaRef<jobject>(datav[1]);
+      // Java this is a property of the JS method
+      JniLocalRef<jobject> javaThis = jsBridgeContext->getUtils()->getJavaRef<jobject>(datav[1]);
 
-    JSValue ret = javaMethod->invoke(quickJsContext, javaThis, argc, argv);
+      JSValue ret = javaMethod->invoke(jsBridgeContext, javaThis, argc, argv);
 
-    // Manually check for pending exceptions
-    JSValue pendingException = JS_GetException(ctx);
-    if (!JS_IsNull(pendingException)) {
-      JS_FreeValue(ctx, ret);
-      JS_Throw(ctx, pendingException);
+      // Also check for pending JS exceptions
+      JSValue pendingException = JS_GetException(ctx);
+      if (!JS_IsNull(pendingException)) {
+        JS_FreeValue(ctx, ret);
+        JS_Throw(ctx, pendingException);
+        return JS_EXCEPTION;
+      }
+
+      return ret;
+    } catch (const std::exception &e) {
+      jsBridgeContext->getExceptionHandler()->jsThrow(e);
       return JS_EXCEPTION;
     }
-
-    return ret;
   }
 }
 
 // static
 JSValue JavaObject::create(const JsBridgeContext *jsBridgeContext, const std::string &strName, const JniLocalRef<jobject> &object, const JObjectArrayLocalRef &methods) {
   JSContext *ctx = jsBridgeContext->getQuickJsContext();
-  const JniContext *jniContext = jsBridgeContext->getJniContext();
   const QuickJsUtils *utils = jsBridgeContext->getUtils();
 
   JSValue javaObjectValue = JS_NewObject(ctx);
@@ -310,10 +325,9 @@ JSValue JavaObject::create(const JsBridgeContext *jsBridgeContext, const std::st
     std::unique_ptr<JavaMethod> javaMethod;
     try {
       javaMethod = std::make_unique<JavaMethod>(jsBridgeContext, method, qualifiedMethodName, false /*isLambda*/);
-    } catch (const std::invalid_argument &e) {
-      jsBridgeContext->queueIllegalArgumentException(std::string() + "In bound method \"" + qualifiedMethodName + "\": " + e.what());
+    } catch (const std::exception &e) {
       JS_FreeValue(ctx, javaObjectValue);
-      return JS_UNDEFINED;
+      throw std::invalid_argument(std::string() + "In bound method \"" + qualifiedMethodName + "\": " + e.what());
     }
 
     JSValue javaMethodValue = utils->createCppPtrValue(javaMethod.release(), true);
@@ -344,7 +358,6 @@ JSValue JavaObject::create(const JsBridgeContext *jsBridgeContext, const std::st
 // static
 JSValue JavaObject::createLambda(const JsBridgeContext *jsBridgeContext, const std::string &strName, const JniLocalRef<jobject> &object, const JniLocalRef<jsBridgeMethod> &method) {
   JSContext *ctx = jsBridgeContext->getQuickJsContext();
-  const JniContext *jniContext = jsBridgeContext->getJniContext();
   const QuickJsUtils *utils = jsBridgeContext->getUtils();
 
   MethodInterface methodInterface = jsBridgeContext->getJniCache()->getMethodInterface(method);
@@ -356,9 +369,7 @@ JSValue JavaObject::createLambda(const JsBridgeContext *jsBridgeContext, const s
   try {
     javaMethod = std::make_unique<JavaMethod>(jsBridgeContext, method, qualifiedMethodName, true /*isLambda*/);
   } catch (const std::invalid_argument &e) {
-    jsBridgeContext->queueIllegalArgumentException(
-        std::string() + "In bound method \"" + qualifiedMethodName + "\": " + e.what());
-    return JS_UNDEFINED;
+    throw std::invalid_argument(std::string() + "In bound method \"" + qualifiedMethodName + "\": " + e.what());
   }
 
   JSValue javaLambdaValue = utils->createCppPtrValue(javaMethod.release(), true /*deleteOnFinalize*/);  // wrap the C++ instance

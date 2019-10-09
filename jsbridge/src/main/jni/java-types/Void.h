@@ -30,15 +30,15 @@ public:
   Void(const JsBridgeContext *, JavaTypeId, bool boxed);
 
 #if defined(DUKTAPE)
-  JValue pop(bool) const override;
-  JValue popArray(uint32_t count, bool expanded, bool inScript) const override;
-  duk_ret_t push(const JValue &, bool inScript) const override;
-  duk_ret_t pushArray(const JniLocalRef<jarray> &values, bool expand, bool inScript) const override;
+  JValue pop() const override;
+  JValue popArray(uint32_t count, bool expanded) const override;
+  duk_ret_t push(const JValue &) const override;
+  duk_ret_t pushArray(const JniLocalRef<jarray> &values, bool expand) const override;
 #elif defined(QUICKJS)
-  JValue toJava(JSValueConst, bool) const override;
-  JValue toJavaArray(JSValueConst, bool inScript) const override;
-  JSValue fromJava(const JValue &, bool inScript) const override;
-  JSValue fromJavaArray(const JniLocalRef<jarray> &values, bool inScript) const override;
+  JValue toJava(JSValueConst) const override;
+  JValue toJavaArray(JSValueConst) const override;
+  JSValue fromJava(const JValue &) const override;
+  JSValue fromJavaArray(const JniLocalRef<jarray> &values) const override;
 #endif
 
   JValue callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,

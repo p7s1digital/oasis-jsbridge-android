@@ -17,6 +17,7 @@ add_library(
     src/main/jni/custom_stringify.cpp
     src/main/jni/de_prosiebensat1digital_oasisjsbridge_JsBridge.cpp
     src/main/jni/log.cpp
+    src/main/jni/ExceptionHandler.cpp
     src/main/jni/JavaMethod.cpp
     src/main/jni/JavaObject.cpp
     src/main/jni/JavaScriptLambda.cpp
@@ -27,6 +28,8 @@ add_library(
     src/main/jni/JavaTypeId.cpp
     src/main/jni/JniCache.cpp
     src/main/jni/JniInterfaces.cpp
+    src/main/jni/exceptions/JniException.cpp
+    src/main/jni/exceptions/JsException.cpp
     src/main/jni/java-types/Array.cpp
     src/main/jni/java-types/Boolean.cpp
     src/main/jni/java-types/BoxedPrimitive.cpp

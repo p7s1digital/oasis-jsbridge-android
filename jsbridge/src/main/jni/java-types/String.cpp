@@ -33,7 +33,7 @@ String::String(const JsBridgeContext *jsBridgeContext)
 
 #if defined(DUKTAPE)
 
-JValue String::pop(bool inScript) const {
+JValue String::pop() const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
   // Check if the caller passed in a null string.
@@ -47,7 +47,7 @@ JValue String::pop(bool inScript) const {
   return JValue(stringLocalRef);
 }
 
-duk_ret_t String::push(const JValue &value, bool inScript) const {
+duk_ret_t String::push(const JValue &value) const {
   CHECK_STACK_OFFSET(m_ctx, 1);
 
   if (value.isNull()) {
@@ -67,7 +67,7 @@ duk_ret_t String::push(const JValue &value, bool inScript) const {
 
 #elif defined(QUICKJS)
 
-JValue String::toJava(JSValueConst v, bool inScript) const {
+JValue String::toJava(JSValueConst v) const {
   // Check if the caller passed in a null string.
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
     return JValue();
@@ -77,7 +77,7 @@ JValue String::toJava(JSValueConst v, bool inScript) const {
   return JValue(stringLocalRef);
 }
 
-JSValue String::fromJava(const JValue &value, bool inScript) const {
+JSValue String::fromJava(const JValue &value) const {
   if (value.isNull()) {
     return JS_NULL;
   }

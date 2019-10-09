@@ -19,13 +19,13 @@
 #include "Long.h"
 
 #include "JsBridgeContext.h"
+#include "exceptions/JniException.h"
 #include "jni-helpers/JArrayLocalRef.h"
 #include "log.h"
 
 #ifdef DUKTAPE
 # include "JsBridgeContext.h"
 # include "StackChecker.h"
-# include "StackUnwinder.h"
 #endif
 
 namespace JavaTypes {
@@ -36,14 +36,13 @@ Long::Long(const JsBridgeContext *jsBridgeContext)
 
 #if defined(DUKTAPE)
 
-JValue Long::pop(bool inScript) const {
+JValue Long::pop() const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
   if (!duk_is_number(m_ctx, -1)) {
     const auto message = std::string("Cannot convert return value ") + duk_safe_to_string(m_ctx, -1) + " to long";
     duk_pop(m_ctx);
-    CHECK_STACK_NOW();
-    m_jsBridgeContext->throwTypeException(message, inScript);
+    throw std::invalid_argument(message);
   }
   if (duk_is_null_or_undefined(m_ctx, -1)) {
     duk_pop(m_ctx);
@@ -54,55 +53,56 @@ JValue Long::pop(bool inScript) const {
   return JValue(l);
 }
 
-JValue Long::popArray(uint32_t count, bool expanded, bool inScript) const {
-  // If we're not expanded, pop the array off the stack no matter what.
-  const StackUnwinder _(m_ctx, expanded ? 0 : 1);
-
+JValue Long::popArray(uint32_t count, bool expanded) const {
   if (!expanded) {
     count = static_cast<uint32_t>(duk_get_length(m_ctx, -1));
     if (!duk_is_array(m_ctx, -1)) {
       const auto message = std::string("Cannot convert JS value ") + duk_safe_to_string(m_ctx, -1) + " to Array<Boolean>";
-      m_jsBridgeContext->throwTypeException(message, inScript);
+      duk_pop(m_ctx);  // pop the array
+      throw std::invalid_argument(message);
     }
   }
 
   JArrayLocalRef<jlong> longArray(m_jniContext, count);
   jlong *elements = longArray.isNull() ? nullptr : longArray.getMutableElements();
   if (elements == nullptr) {
-    if (expanded) {
-      duk_pop_n(m_ctx, count);
-    }
-    m_jsBridgeContext->rethrowJniException();
-    return JValue();
+    duk_pop_n(m_ctx, expanded ? count : 1);  // pop the expanded elements or the array
+    throw JniException(m_jniContext);
   }
 
   for (int i = count - 1; i >= 0; --i) {
     if (!expanded) {
       duk_get_prop_index(m_ctx, -1, static_cast<duk_uarridx_t>(i));
     }
-    JValue value = pop(inScript);
+    JValue value = pop();
     elements[i] = value.getLong();
   }
+
+  if (!expanded) {
+    duk_pop(m_ctx);  // pop the array
+  }
+
   return JValue(longArray);
 }
 
-duk_ret_t Long::push(const JValue &value, bool inScript) const {
+duk_ret_t Long::push(const JValue &value) const {
   duk_push_number(m_ctx, static_cast<duk_double_t>(value.getLong()));  // no real Duktape for int64 so needing a cast to double
   return 1;
 }
 
-duk_ret_t Long::pushArray(const JniLocalRef<jarray> &values, bool expand, bool inScript) const {
+duk_ret_t Long::pushArray(const JniLocalRef<jarray> &values, bool expand) const {
   JArrayLocalRef<jlong> longArray(values);
   const auto count = longArray.getLength();
 
-  if (!expand) {
-    duk_push_array(m_ctx);
-  }
-
   const jlong *elements = longArray.getElements();
   if (elements == nullptr) {
-    m_jsBridgeContext->rethrowJniException();
-    return DUK_RET_ERROR;
+    throw JniException(m_jniContext);
+  }
+
+  CHECK_STACK_OFFSET(m_ctx, expand ? count : 1);
+
+  if (!expand) {
+    duk_push_array(m_ctx);
   }
 
   for (jsize i = 0; i < count; ++i) {
@@ -111,6 +111,7 @@ duk_ret_t Long::pushArray(const JniLocalRef<jarray> &values, bool expand, bool i
       duk_put_prop_index(m_ctx, -2, static_cast<duk_uarridx_t>(i));
     }
   }
+
   return expand ? count : 1;
 }
 
@@ -133,12 +134,11 @@ namespace {
   }
 }
 
-JValue Long::toJava(JSValueConst v, bool inScript) const {
+JValue Long::toJava(JSValueConst v) const {
   if (!JS_IsNumber(v)) {
-    const char *message = "Cannot convert return value to long";
-    m_jsBridgeContext->throwTypeException(message, inScript);
-    return JValue();
+    throw std::invalid_argument("Cannot convert return value to long");
   }
+
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
     return JValue();
   }
@@ -146,14 +146,13 @@ JValue Long::toJava(JSValueConst v, bool inScript) const {
   return JValue(getLong(m_ctx, v));
 }
 
-JValue Long::toJavaArray(JSValueConst v, bool inScript) const {
+JValue Long::toJavaArray(JSValueConst v) const {
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
     return JValue();
   }
 
   if (!JS_IsArray(m_ctx, v)) {
-    m_jsBridgeContext->throwTypeException("Cannot convert JS value to Java array", inScript);
-    return JValue();
+    throw std::invalid_argument("Cannot convert JS value to Java array");
   }
 
   JSValue lengthValue = JS_GetPropertyStr(m_ctx, v, "length");
@@ -163,14 +162,12 @@ JValue Long::toJavaArray(JSValueConst v, bool inScript) const {
 
   JArrayLocalRef<jlong> longArray(m_jniContext, count);
   if (longArray.isNull()) {
-    m_jsBridgeContext->rethrowJniException();
-    return JValue();
+    throw JniException(m_jniContext);
   }
 
   jlong *elements = longArray.getMutableElements();
   if (elements == nullptr) {
-    m_jsBridgeContext->rethrowJniException();
-    return JValue();
+    throw JniException(m_jniContext);
   }
 
   for (uint32_t i = 0; i < count; ++i) {
@@ -182,11 +179,11 @@ JValue Long::toJavaArray(JSValueConst v, bool inScript) const {
   return JValue(longArray);
 }
 
-JSValue Long::fromJava(const JValue &value, bool inScript) const {
+JSValue Long::fromJava(const JValue &value) const {
   return JS_NewInt64(m_ctx, value.getLong());
 }
 
-JSValue Long::fromJavaArray(const JniLocalRef<jarray> &values, bool inScript) const {
+JSValue Long::fromJavaArray(const JniLocalRef<jarray> &values) const {
   JArrayLocalRef<jlong> longArray(values);
   const auto count = longArray.getLength();
 
@@ -195,8 +192,7 @@ JSValue Long::fromJavaArray(const JniLocalRef<jarray> &values, bool inScript) co
   const jlong *elements = longArray.getElements();
   if (elements == nullptr) {
     JS_FreeValue(m_ctx, jsArray);
-    m_jsBridgeContext->rethrowJniException();
-    return JS_EXCEPTION;
+    throw JniException(m_jniContext);
   }
 
   for (jsize i = 0; i < count; ++i) {
@@ -216,9 +212,8 @@ JValue Long::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
   // Explicitly release all values now because they won't be used afterwards
   JValue::releaseAll(args);
 
-  if (m_jsBridgeContext->hasPendingJniException()) {
-    m_jsBridgeContext->rethrowJniException();
-    return JValue();
+  if (m_jniContext->exceptionCheck()) {
+    throw JniException(m_jniContext);
   }
 
   return JValue(l);

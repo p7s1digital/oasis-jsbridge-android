@@ -29,11 +29,11 @@ public:
   Object(const JsBridgeContext *);
 
 #if defined(DUKTAPE)
-  JValue pop(bool inScript) const override;
-  duk_ret_t push(const JValue &value, bool inScript) const override;
+  JValue pop() const override;
+  duk_ret_t push(const JValue &value) const override;
 #elif defined(QUICKJS)
-  JValue toJava(JSValueConst v, bool inScript) const override;
-  JSValue fromJava(const JValue &value, bool inScript) const override;
+  JValue toJava(JSValueConst v) const override;
+  JSValue fromJava(const JValue &value) const override;
 #endif
 
 private:

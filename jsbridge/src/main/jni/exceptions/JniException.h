@@ -1,9 +1,6 @@
 /*
  * Copyright (C) 2019 ProSiebenSat1.Digital GmbH.
  *
- * Originally based on Duktape Android:
- * Copyright (C) 2015 Square, Inc.
- *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -16,29 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef _JSBRIDGE_STACK_UNWINDER_H
-#define _JSBRIDGE_STACK_UNWINDER_H
+#ifndef _JSBRIDGE_JNIEXCEPTION_H
+#define _JSBRIDGE_JNIEXCEPTION_H
 
-#include "duktape/duktape.h"
+#include "jni-helpers/JniLocalRef.h"
+#include <exception>
+#include <jni.h>
+#include <string>
 
-// Use RAII to unwind the JS stack when a function returns.
-class StackUnwinder {
+class JniContext;
+
+class JniException : public std::exception {
 public:
-  StackUnwinder(duk_context* ctx, int count)
-      : m_context(ctx)
-      , m_count(count) {}
+  explicit JniException(const JniContext *);
 
-  StackUnwinder(const StackUnwinder &) = delete;
-  StackUnwinder& operator=(const StackUnwinder &) = delete;
-
-  ~StackUnwinder() {
-    duk_pop_n(m_context, m_count);
+  const char *what() const throw() override {
+    return m_what.c_str();
   }
 
+  const JniLocalRef<jthrowable> &getThrowable() const { return m_throwable; }
+
 private:
-  duk_context *m_context;
-  const int m_count;
+  static std::string createMessage(const JniContext *, const JniLocalRef<jthrowable> &);
+
+  JniLocalRef<jthrowable> m_throwable;
+  std::string m_what;
 };
 
 #endif
-

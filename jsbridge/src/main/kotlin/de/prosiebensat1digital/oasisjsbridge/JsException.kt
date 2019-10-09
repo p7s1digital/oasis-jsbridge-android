@@ -46,9 +46,9 @@ class JsException(val jsonValue: String? = null, detailedMessage: String, jsStac
 
         init {
             STACK_TRACE_PATTERN = if (BuildConfig.FLAVOR == "duktape")
-                Pattern.compile("\\s*at ([^\\s^\\[]+ ) ?\\(?([^\\s:]+):?(\\d+)?\\).*$")
+                Pattern.compile("\\s*at ([^\\s^\\[]+) *\\(?([^\\s:]+):?(\\d+)?\\).*$")
             else if (BuildConfig.FLAVOR == "quickjs")
-                Pattern.compile("\\s*at ([^\\s^\\[]+) \\(([^\\s]+):(\\d+)\\).*$");
+                Pattern.compile("\\s*at ([^\\s^\\[]+) *\\(([^\\s]+):(\\d+)\\).*$");
             else
                 throw JsBridgeError.InternalError(customMessage = "Unsupported flavor: ${BuildConfig.FLAVOR}")
         }

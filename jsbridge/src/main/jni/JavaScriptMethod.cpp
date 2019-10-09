@@ -18,10 +18,13 @@
  */
 #include "JavaScriptMethod.h"
 
+#include "AutoReleasedJSValue.h"
+#include "ExceptionHandler.h"
+#include "JavaType.h"
 #include "JniCache.h"
 #include "JniTypes.h"
 #include "JsBridgeContext.h"
-#include "JavaType.h"
+#include "exceptions/JsException.h"
 #include "jni-helpers/JniContext.h"
 #include "jni-helpers/JObjectArrayLocalRef.h"
 #include <stdexcept>
@@ -118,13 +121,13 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, void *js
     const auto &argumentType = m_argumentTypes[i];
     try {
       if (m_isVarArgs && i == numArguments - 1) {
-        numArguments = i + argumentType->pushArray(arg.getLocalRef().staticCast<jarray>(), true /*expand*/, false /*inScript*/);
+        numArguments = i + argumentType->pushArray(arg.getLocalRef().staticCast<jarray>(), true /*expand*/);
         break;
       }
-      argumentType->push(arg, false /*inScript*/);
-    } catch (const std::invalid_argument &e) {
-      duk_pop_n(ctx, (m_isLambda ? 1 : 2) + i);  // lambda: func + args, method: obj + methodName + args
-      throw e;
+      argumentType->push(arg);
+    } catch (const std::exception &) {
+      duk_pop_n(ctx, (m_isLambda ? 1 : 2) + i);  // lambda: func + previous args, method: obj + methodName + previous args
+      throw;
     }
   }
 
@@ -139,17 +142,15 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, void *js
     try {
       bool isDeferred = awaitJsPromise && duk_is_object(ctx, -1) && duk_has_prop_string(ctx, -1, "then");
       if (isDeferred && !m_returnValueType->isDeferred()) {
-        result = jsBridgeContext->getJavaTypeProvider().getDeferredType(m_returnValueParameter)->pop(false /*inScript*/);
+        result = jsBridgeContext->getJavaTypeProvider().getDeferredType(m_returnValueParameter)->pop();
       } else {
-        result = m_returnValueType->pop(false /*inScript*/);
+        result = m_returnValueType->pop();
       }
-    } catch (const std::invalid_argument &e) {
-      throw e;
+    } catch (const std::exception &) {
+      throw;
     }
   } else {
-    jsBridgeContext->queueJavaExceptionForJsError();
-    duk_pop(ctx);
-    return JValue();
+    throw jsBridgeContext->getExceptionHandler()->getCurrentJsException();
   }
 
   return result;
@@ -160,7 +161,6 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, void *js
 #include "QuickJsUtils.h"
 
 JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, JSValueConst jsMethod, JSValueConst jsThis, const JObjectArrayLocalRef &javaArgs, bool awaitJsPromise) const {
-  JValue result;
   JSContext *ctx = jsBridgeContext->getQuickJsContext();
 
   int numArguments = javaArgs.isNull() ? 0 : (int) javaArgs.getLength();
@@ -175,43 +175,33 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, JSValueC
         //numArguments = i + argumentLoader->pushArray(arg.getLocalRef().staticCast<jarray>(), true);
         break;
       }
-      jsArgs[i] = argumentType->fromJava(javaArg, false /*inScript*/);
-    } catch (const std::invalid_argument &e) {
+      jsArgs[i] = argumentType->fromJava(javaArg);
+    } catch (const std::exception &) {
       // Free all the JSValue instances which had been added until now
       for (int j = 0; j < i; ++j) {
         JS_FreeValue(ctx, jsArgs[j]);
       }
-      jsBridgeContext->queueIllegalArgumentException(e.what());
-      return result;
+      throw;
     }
   }
 
   JSValue ret = JS_Call(ctx, jsMethod, jsThis, numArguments, jsArgs);
+  JS_AUTORELEASE_VALUE(ctx, ret);
 
   for (jsize i = 0; i < numArguments; ++i) {
     JS_FreeValue(ctx, jsArgs[i]);
   }
 
   if (JS_IsException(ret)) {
-    JS_FreeValue(ctx, ret);
-    jsBridgeContext->queueJavaExceptionForJsError();
-    return JValue();
+    throw jsBridgeContext->getExceptionHandler()->getCurrentJsException();
   }
 
-  try {
-    bool isDeferred = awaitJsPromise && JS_IsObject(ret) && jsBridgeContext->getUtils()->hasPropertyStr(ret, "then");
-    if (isDeferred && !m_returnValueType->isDeferred()) {
-      result = jsBridgeContext->getJavaTypeProvider().getDeferredType(m_returnValueParameter)->toJava(ret, false /*inScript*/);
-    } else {
-      result = m_returnValueType->toJava(ret, false /*inScript*/);
-    }
-    JS_FreeValue(ctx, ret);
-  } catch (std::runtime_error& e) {
-    JS_FreeValue(ctx, ret);
-    throw e;
+  bool isDeferred = awaitJsPromise && JS_IsObject(ret) && jsBridgeContext->getUtils()->hasPropertyStr(ret, "then");
+  if (isDeferred && !m_returnValueType->isDeferred()) {
+    return jsBridgeContext->getJavaTypeProvider().getDeferredType(m_returnValueParameter)->toJava(ret);
   }
 
-  return result;
+  return m_returnValueType->toJava(ret);
 };
 
 #endif

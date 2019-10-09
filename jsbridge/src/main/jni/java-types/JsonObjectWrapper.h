@@ -26,11 +26,11 @@ public:
   explicit JsonObjectWrapper(const JsBridgeContext *);
 
 #if defined(DUKTAPE)
-    JValue pop(bool inScript) const override;
-    duk_ret_t push(const JValue &value, bool inScript) const override;
+    JValue pop() const override;
+    duk_ret_t push(const JValue &value) const override;
 #elif defined(QUICKJS)
-    JValue toJava(JSValueConst, bool inScript) const override;
-    JSValue fromJava(const JValue &value, bool inScript) const override;
+    JValue toJava(JSValueConst) const override;
+    JSValue fromJava(const JValue &value) const override;
 #endif
 };
 
