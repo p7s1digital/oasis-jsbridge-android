@@ -114,9 +114,6 @@ duk_ret_t JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRe
     throw std::invalid_argument("wrong number of arguments when calling Java method " + m_methodName);
   }
 
-  // Release any local objects allocated in this frame when we leave this scope.
-  const JniLocalFrame localFrame(jniContext, m_argumentTypes.size());
-
   std::vector<JValue> args(m_argumentTypes.size());
 
   // Load the arguments off the stack and convert to Java types.
@@ -156,9 +153,6 @@ JSValue JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRef<
     JS_ThrowRangeError(ctx, "Too many parameters when calling Java method %s (got %d, expected %d)", m_methodName.c_str(), argc, minArgs);
     return JS_UNDEFINED;
   }
-
-  // Release any local objects allocated in this frame when we leave this scope.
-  //const JniLocalFrame localFrame(jniContext, m_argumentTypes.size());
 
   std::vector<JValue> args(m_argumentTypes.size());
 
