@@ -27,8 +27,8 @@ class PromisePolyfillExtension(private val jsBridge: JsBridge) {
     private var isReady = false
 
     init {
-        onUnhandledPromiseRejectedJsValue = JsValue.fromNativeFunction1(jsBridge) { reason: String ->
-            val e = JsBridgeError.UnhandledJsPromiseError(reason, Throwable("Unhandled promise error"))
+        onUnhandledPromiseRejectedJsValue = JsValue.fromNativeFunction3(jsBridge) { json: JsonObjectWrapper, message: String, stacktrace: String ->
+            val e = JsBridgeError.UnhandledJsPromiseError(JsException(json.jsonString, message, stacktrace, null))
             jsBridge.notifyErrorListeners(e)
         }
 
@@ -37,11 +37,25 @@ class PromisePolyfillExtension(private val jsBridge: JsBridge) {
         // Detect unhandled Promise rejections
         jsBridge.evaluateNoRetVal("""
             Promise.unhandledRejection = function (args) {
-                if (args.event === 'reject') {
-                    $onUnhandledPromiseRejectedJsValue(args.reason);
-                } else if (args.event === 'handle') {
-                    //console.log('Previous unhandled rejection got handled:', args.reason);
+              if (args.event === 'reject') {
+                var value = args.reason;
+                var msg;
+                var stack;
+                if (value instanceof Error) {
+                  msg = value.message;
+                  json = Object.getOwnPropertyNames(value).reduce(function(acc, key) {
+                    acc[key] = value[key];
+                    return acc;
+                  }, {});
+                  stack = value.stack;
+                } else {
+                  msg = value;
+                  json = JSON.stringify(value);
                 }
+                $onUnhandledPromiseRejectedJsValue(json, msg, stack);
+              } else if (args.event === 'handle') {
+                //console.log('Previous unhandled rejection got handled:', args.reason);
+              }
             };""".trimIndent()
         )
 
@@ -67,7 +81,8 @@ class PromisePolyfillExtension(private val jsBridge: JsBridge) {
             jsBridge.callJsLambdaUnsafe(processQueueJsValue, arrayOf(), false)
         } catch (t: Throwable) {
             val errorMessage = "Error while processing promise queue: ${t.message}"
-            jsBridge.notifyErrorListeners(JsBridgeError.UnhandledJsPromiseError(errorMessage, t))
+            val jsException = JsException(detailedMessage = errorMessage, jsStackTrace = null, cause = t)
+            jsBridge.notifyErrorListeners(JsBridgeError.UnhandledJsPromiseError(jsException))
         }
     }
 }

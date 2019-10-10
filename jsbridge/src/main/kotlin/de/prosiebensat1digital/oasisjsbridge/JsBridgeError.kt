@@ -19,7 +19,7 @@ import kotlin.reflect.KClass
 
 sealed class JsBridgeError(message: String? = null, cause: Throwable?): Exception(message, cause) {
 
-    val jsException: JsException? get() {
+    open val jsException: JsException? get() {
         var nextCause = this.cause
         while (nextCause != null) {
             if (nextCause is JsException) return nextCause
@@ -74,7 +74,7 @@ sealed class JsBridgeError(message: String? = null, cause: Throwable?): Exceptio
         : JsBridgeError(customMessage ?: "Error while calling JS method $jsCall", cause)
 
     class JsCallbackError(cause: Throwable? = null): JsBridgeError(cause = cause)
-    class UnhandledJsPromiseError(val reason: String, cause: Throwable? = null): JsBridgeError("Unhandled promise error: $reason", cause = cause)
+    class UnhandledJsPromiseError(jsException: JsException): JsBridgeError("Unhandled Promise error", cause = jsException)
     class XhrError(val query: String, cause: Throwable? = null): JsBridgeError(cause = cause)
 
     class InternalError(cause: Throwable? = null, customMessage: String? = null)

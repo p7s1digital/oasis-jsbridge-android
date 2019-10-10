@@ -398,24 +398,29 @@ class JsBridgeTest {
     }
 
     @Test
-    @Ignore("Not supported (yet) with QuickJS")
     fun testUnhandledPromiseRejection() {
+        if (BuildConfig.FLAVOR == "quickjs") {
+            // Not supported (yet) on QuickJS
+            return
+        }
+
         // GIVEN
         val subject = createAndSetUpJsBridge()
 
         // WHEN
         subject.evaluateNoRetVal("""
             new Promise(function(resolve, reject) {
-              throw("Test unhandled promise rejection");
+              throw Error("Test unhandled promise rejection");
             });
         """.trimIndent())
 
         runBlocking { waitForDone(subject) }
 
         // THEN
-        val unhandledJsPromiseError = errors.firstOrNull() as? UnhandledJsPromiseError
-        assertNotNull(unhandledJsPromiseError)
-        assertEquals(unhandledJsPromiseError.reason, "Test unhandled promise rejection")
+        val unhandledJsPromiseError = unhandledPromiseErrors.firstOrNull()
+        assertNotNull(unhandledJsPromiseError?.jsException)
+        assertEquals(unhandledJsPromiseError?.jsException?.message, "Test unhandled promise rejection")
+        assertEquals(unhandledJsPromiseError?.jsException?.jsonValue?.toPayloadObject()?.getString("message"), "Test unhandled promise rejection")
     }
 
     @Test
