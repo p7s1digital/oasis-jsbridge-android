@@ -19,7 +19,7 @@ import kotlin.reflect.KClass
 
 sealed class JsBridgeError(message: String? = null, cause: Throwable?): Exception(message, cause) {
 
-    open val jsException: JsException? get() {
+    val jsException: JsException? get() {
         var nextCause = this.cause
         while (nextCause != null) {
             if (nextCause is JsException) return nextCause

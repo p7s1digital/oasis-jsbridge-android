@@ -103,6 +103,7 @@ namespace {
       return payload->javaMethodPtr->invoke(jsBridgeContext, payload->javaThis, argc, argv);
     } catch (const std::exception &e) {
       jsBridgeContext->getExceptionHandler()->jsThrow(e);
+      return JS_EXCEPTION;
     }
   }
 #endif

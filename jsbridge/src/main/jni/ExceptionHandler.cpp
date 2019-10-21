@@ -105,7 +105,6 @@ void ExceptionHandler::jniThrow(const std::exception &e) const {
   if (auto jniException = dynamic_cast<const JniException *>(&e)) {
     jniContext->throw_(jniException->getThrowable());
   } else if (auto jsException = dynamic_cast<const JsException *>(&e)) {
-    alog("BW - JNI throwing JsException %d with message %s", jsException, e.what());
     jniContext->throw_(getJavaException(*jsException));
   } else if (dynamic_cast<const std::invalid_argument *>(&e)) {
     const JniCache *jniCache = m_jsBridgeContext->getJniCache();

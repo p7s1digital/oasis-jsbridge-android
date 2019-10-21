@@ -920,7 +920,7 @@ class JsBridge(context: Context): CoroutineScope {
         private fun callJsMethodWithoutRetVal(method: JavaMethod, args: Array<Any?>?) {
             runInJsThread {
                 try {
-                    Timber.v("Calling (deferred) JS method ${type.canonicalName}/$jsValue.${method.name}...")
+                    Timber.v("Calling (void) JS method ${type.canonicalName}/$jsValue.${method.name}...")
                     callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf())
                 } catch (t: Throwable) {
                     throw NativeToJsCallError("${type.canonicalName}/$jsValue.${method.name}", t)
