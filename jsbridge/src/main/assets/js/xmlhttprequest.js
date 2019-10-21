@@ -111,7 +111,7 @@ XMLHttpRequest.prototype._send_native_callback = function(responseInfo, response
   this.responseURL = this._url;
   this.status = responseInfo.statusCode;
   this.statusText = responseInfo.statusText;
-  this._responseHeaders = responseInfo.responseHeaders;
+  this._responseHeaders = responseInfo.responseHeaders || [];
 
   this.readyState = XMLHttpRequest.DONE;
 
