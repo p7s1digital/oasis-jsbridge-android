@@ -15,10 +15,13 @@
  */
 #include "JsonObjectWrapper.h"
 
+#include "ExceptionHandler.h"
 #include "JniCache.h"
 #include "JsBridgeContext.h"
 #include "custom_stringify.h"
 #include "log.h"
+#include "exceptions/JniException.h"
+#include "exceptions/JsException.h"
 #include "jni-helpers/JniContext.h"
 
 namespace JavaTypes {
@@ -39,7 +42,7 @@ namespace {
   }
 }
 
-JValue JsonObjectWrapper::pop(bool inScript) const {
+JValue JsonObjectWrapper::pop() const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
   // Check if the caller passed in a null string.
@@ -52,9 +55,7 @@ JValue JsonObjectWrapper::pop(bool inScript) const {
 
   if (custom_stringify(m_ctx, -1) != DUK_EXEC_SUCCESS) {
     alog_warn("Could not stringify object!");
-    m_jsBridgeContext->queueJavaExceptionForJsError();
-    duk_pop(m_ctx);
-    return JValue();
+    throw getExceptionHandler()->getCurrentJsException();
   }
 
   JStringLocalRef str(m_jniContext, duk_require_string(m_ctx, -1));
@@ -66,7 +67,7 @@ JValue JsonObjectWrapper::pop(bool inScript) const {
   return JValue(localRef);
 }
 
-duk_ret_t JsonObjectWrapper::push(const JValue &value, bool inScript) const {
+duk_ret_t JsonObjectWrapper::push(const JValue &value) const {
   CHECK_STACK_OFFSET(m_ctx, 1);
 
   const JniLocalRef<jobject> &jWrapper = value.getLocalRef();
@@ -78,9 +79,8 @@ duk_ret_t JsonObjectWrapper::push(const JValue &value, bool inScript) const {
   JStringLocalRef strRef = getJniCache()->getJsonObjectWrapperString(jWrapper);
   const char *str = strRef.toUtf8Chars();
 
-  if (m_jsBridgeContext->hasPendingJniException()) {
-    duk_push_undefined(m_ctx);
-    m_jsBridgeContext->rethrowJniException();
+  if (m_jniContext->exceptionCheck()) {
+    throw JniException(m_jniContext);
   }
 
   // Undefined values are returned as an empty string
@@ -96,8 +96,8 @@ duk_ret_t JsonObjectWrapper::push(const JValue &value, bool inScript) const {
     const char *err = duk_safe_to_string(m_ctx, -1);
     const auto message = std::string("Error while pushing JsonObjectWrapper value: ") + err;
     duk_pop(m_ctx);
-    CHECK_STACK_NOW();
-    m_jsBridgeContext->throwTypeException(message, inScript);
+
+    throw std::invalid_argument(message);
   }
 
   return 1;
@@ -105,11 +105,9 @@ duk_ret_t JsonObjectWrapper::push(const JValue &value, bool inScript) const {
 
 #elif defined(QUICKJS)
 
-JValue JsonObjectWrapper::toJava(JSValueConst v, bool inScript) const {
+JValue JsonObjectWrapper::toJava(JSValueConst v) const {
   if (!JS_IsObject(v) && !JS_IsNull(v)) {
-    const char *message = "Cannot convert return value to Object";
-    m_jsBridgeContext->throwTypeException(message, inScript);
-    return JValue();
+    throw std::invalid_argument("Cannot convert return value to Object");
   }
 
   // Check if the caller passed in a null string.
@@ -132,7 +130,7 @@ JValue JsonObjectWrapper::toJava(JSValueConst v, bool inScript) const {
   return JValue(localRef);
 }
 
-JSValue JsonObjectWrapper::fromJava(const JValue &value, bool inScript) const {
+JSValue JsonObjectWrapper::fromJava(const JValue &value) const {
 
   const JniLocalRef<jobject> &jWrapper = value.getLocalRef();
   if (jWrapper.isNull()) {
@@ -142,9 +140,8 @@ JSValue JsonObjectWrapper::fromJava(const JValue &value, bool inScript) const {
   JStringLocalRef strRef = getJniCache()->getJsonObjectWrapperString(jWrapper);
   const char *str = strRef.toUtf8Chars();
 
-  if (m_jsBridgeContext->hasPendingJniException()) {
-    m_jsBridgeContext->rethrowJniException();
-    return JS_EXCEPTION;
+  if (m_jniContext->exceptionCheck()) {
+    throw JniException(m_jniContext);
   }
 
   // Undefined values are returned as an empty string
@@ -156,10 +153,7 @@ JSValue JsonObjectWrapper::fromJava(const JValue &value, bool inScript) const {
   strRef.release();
 
   if (JS_IsException(decodedValue)) {
-    const char *message = "Error while reading JsonObjectWrapper value";
-    JS_FreeValue(m_ctx, decodedValue);
-    m_jsBridgeContext->throwTypeException(message, inScript);
-    return JS_EXCEPTION;
+    throw std::invalid_argument("Error while reading JsonObjectWrapper value");
   }
 
   return decodedValue;

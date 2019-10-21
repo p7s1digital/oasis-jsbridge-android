@@ -15,6 +15,7 @@
  */
 #include "JavaScriptLambda.h"
 
+#include "AutoReleasedJSValue.h"
 #include "JavaType.h"
 #include "JsBridgeContext.h"
 #include "JavaScriptMethod.h"
@@ -70,22 +71,14 @@ JValue JavaScriptLambda::call(const JsBridgeContext *jsBridgeContext, const JObj
   JSValue jsLambdaValue = JS_GetPropertyStr(m_ctx, globalObj, m_name.c_str());
   JS_FreeValue(m_ctx, globalObj);
 
-  try {
-    if (!JS_IsFunction(m_ctx, jsLambdaValue) || JS_IsNull(jsLambdaValue)) {
-      throw std::invalid_argument(
-          "Cannot call " + m_name + " lambda. It does not exist or is not a valid function.");
-    }
-    JValue ret = m_method->invoke(jsBridgeContext, jsLambdaValue, JS_UNDEFINED, args,
-                                  awaitJsPromise);
-    JS_FreeValue(m_ctx, jsLambdaValue);
-    return std::move(ret);
-  } catch (const std::invalid_argument &e) {
-    JS_FreeValue(m_ctx, jsLambdaValue);
-    throw e;
-  } catch (const std::runtime_error &e) {
-    JS_FreeValue(m_ctx, jsLambdaValue);
-    throw e;
+  JS_AUTORELEASE_VALUE(m_ctx, jsLambdaValue);
+
+  if (!JS_IsFunction(m_ctx, jsLambdaValue) || JS_IsNull(jsLambdaValue)) {
+    throw std::invalid_argument(
+        "Cannot call " + m_name + " lambda. It does not exist or is not a valid function.");
   }
+
+  return m_method->invoke(jsBridgeContext, jsLambdaValue, JS_UNDEFINED, args, awaitJsPromise);
 }
 
 #endif

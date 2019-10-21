@@ -15,6 +15,8 @@
  */
 #include "JsBridgeContext.h"
 
+#include "AutoReleasedJSValue.h"
+#include "ExceptionHandler.h"
 #include "JavaObject.h"
 #include "JavaScriptLambda.h"
 #include "JavaScriptObject.h"
@@ -22,11 +24,12 @@
 #include "JavaTypeProvider.h"
 #include "JniCache.h"
 #include "QuickJsUtils.h"
-#include "java-types/Deferred.h"
-#include "java-types/Object.h"
 #include "custom_stringify.h"
 #include "log.h"
 #include "quickjs_console.h"
+#include "exceptions/JsException.h"
+#include "java-types/Deferred.h"
+#include "java-types/Object.h"
 #include <functional>
 
 
@@ -34,9 +37,7 @@
 // ---
 
 namespace {
-  // Internal names used for properties in the QuickJS context's global stash and bound variables
   const char *JSBRIDGE_CPP_CLASS_PROP_NAME = "__jsbridge_cpp";
-  const char *JAVA_EXCEPTION_PROP_NAME = "__java_exception";
 
   //int interrupt_handler(JSRuntime *rt, void *opaque) {
   //  return 0;
@@ -54,6 +55,10 @@ JsBridgeContext::JsBridgeContext()
 JsBridgeContext::~JsBridgeContext() {
   JS_FreeContext(m_ctx);
   JS_FreeRuntime(m_runtime);
+
+  delete m_exceptionHandler;
+  delete m_utils;
+  delete m_jniCache;
 }
 
 void JsBridgeContext::init(JniContext *jniContext, const JniLocalRef<jobject> &jsBridgeObject) {
@@ -68,6 +73,7 @@ void JsBridgeContext::init(JniContext *jniContext, const JniLocalRef<jobject> &j
 
   m_jniCache = new JniCache(this, jsBridgeObject);
   m_utils = new QuickJsUtils(jniContext, m_ctx);
+  m_exceptionHandler = new ExceptionHandler(this);
 
   // Store the JsBridgeContext instance in the global object so we can find our way back from a C callback
   JSValue cppWrapperObj = m_utils->createCppPtrValue(this, false);
@@ -95,14 +101,14 @@ void JsBridgeContext::cancelDebug() {
 
 JValue JsBridgeContext::evaluateString(const JStringLocalRef &strCode, const JniLocalRef<jsBridgeParameter> &returnParameter,
                                        bool awaitJsPromise) const {
-  JSValue v = JS_Eval(m_ctx, strCode.toUtf8Chars(), strCode.utf8Length(), "JsBridgeContext/evaluateString", 0);
+  JSValue v = JS_Eval(m_ctx, strCode.toUtf8Chars(), strCode.utf8Length(), "eval", 0);
+  JS_AUTORELEASE_VALUE(m_ctx, v);
+
   strCode.releaseChars();  // release chars now as we don't need them anymore
 
   if (JS_IsException(v)) {
     alog("Could not evaluate string");
-    JS_FreeValue(m_ctx, v);
-    queueJavaExceptionForJsError();
-    return JValue();
+    throw m_exceptionHandler->getCurrentJsException();
   }
 
   bool isDeferred = awaitJsPromise && JS_IsObject(v) && m_utils->hasPropertyStr(v, "then");
@@ -111,19 +117,14 @@ JValue JsBridgeContext::evaluateString(const JStringLocalRef &strCode, const Jni
     // No return type given: try to guess it out of the JS value
     if (JS_IsBool(v) || JS_IsNumber(v) || JS_IsString(v)) {
       // The result is a supported scalar type - return it.
-      JValue ret = m_javaTypeProvider.getObjectType()->toJava(v, false);
-      JS_FreeValue(m_ctx, v);
-      return ret;
+      return m_javaTypeProvider.getObjectType()->toJava(v);
     }
 
     if (JS_IsArray(m_ctx, v)) {
-      JValue ret = m_javaTypeProvider.getObjectType()->toJavaArray(v, false);
-      JS_FreeValue(m_ctx, v);
-      return ret;
+      return m_javaTypeProvider.getObjectType()->toJavaArray(v);
     }
 
     // The result is an unsupported type, undefined, or null.
-    JS_FreeValue(m_ctx, v);
     return JValue();
   }
 
@@ -131,12 +132,11 @@ JValue JsBridgeContext::evaluateString(const JStringLocalRef &strCode, const Jni
 
   JValue value;
   if (isDeferred && !returnType->isDeferred()) {
-    value = m_javaTypeProvider.getDeferredType(returnParameter)->toJava(v, false /*inScript*/);
+    value = m_javaTypeProvider.getDeferredType(returnParameter)->toJava(v);
   } else {
-    value = returnType->toJava(v, false);
+    value = returnType->toJava(v);
   }
 
-  JS_FreeValue(m_ctx, v);
   return value;
 }
 
@@ -144,10 +144,10 @@ void JsBridgeContext::evaluateFileContent(const JStringLocalRef &strCode, const 
   JSValue v = JS_Eval(m_ctx, strCode.toUtf8Chars(), strCode.utf8Length(), strFileName.c_str(), 0);
   strCode.releaseChars();  // release chars now as we don't need them anymore
 
-  JS_FreeValue(m_ctx, v);
+  JS_AUTORELEASE_VALUE(m_ctx, v);
 
   if (JS_IsException(v)) {
-    queueJavaExceptionForJsError();
+    throw m_exceptionHandler->getCurrentJsException();
   }
 }
 
@@ -155,45 +155,33 @@ void JsBridgeContext::registerJavaObject(const std::string &strName, const JniLo
                                          const JObjectArrayLocalRef &methods) {
 
   JSValue globalObj = JS_GetGlobalObject(m_ctx);
+  JS_AUTORELEASE_VALUE(m_ctx, globalObj);
+
   if (m_utils->hasPropertyStr(globalObj, strName.c_str())) {
-    queueIllegalArgumentException("Cannot register Java object: global object called " + strName + " already exists");
-    JS_FreeValue(m_ctx, globalObj);
-    return;
+    throw std::invalid_argument("Cannot register Java object: global object called " + strName + " already exists");
   }
 
   JSValue javaObjectValue = JavaObject::create(this, strName.c_str(), object, methods);
-  if (JS_IsUndefined(javaObjectValue)) {
-    JS_FreeValue(m_ctx, globalObj);
-    return;
-  }
 
   // Save the JSValue as a global property
   JS_SetPropertyStr(m_ctx, globalObj, strName.c_str(), javaObjectValue);
   // No JS_FreeValue(m_ctx, javaObjectValue) after JS_SetPropertyStr()
-
-  JS_FreeValue(m_ctx, globalObj);
 }
 
 void JsBridgeContext::registerJavaLambda(const std::string &strName, const JniLocalRef<jobject> &object,
                                          const JniLocalRef<jsBridgeMethod> &method) {
 
   JSValue globalObj = JS_GetGlobalObject(m_ctx);
+  JS_AUTORELEASE_VALUE(m_ctx, globalObj);
+
   if (m_utils->hasPropertyStr(globalObj, strName.c_str())) {
-    queueIllegalArgumentException("Cannot register Java lambda: global object called " + strName + " already exists");
-    JS_FreeValue(m_ctx, globalObj);
-    return;
+    throw std::invalid_argument("Cannot register Java lambda: global object called " + strName + " already exists");
   }
 
   JSValue javaLambdaValue = JavaObject::createLambda(this, strName.c_str(), object, method);
-  if (JS_IsUndefined(javaLambdaValue)) {
-    JS_FreeValue(m_ctx, globalObj);
-    return;
-  }
 
   JS_SetPropertyStr(m_ctx, globalObj, strName.c_str(), javaLambdaValue);
   // No JS_FreeValue(m_ctx, javaLambdaHandlerValue) after JS_SetPropertyStr()
-
-  JS_FreeValue(m_ctx, globalObj);
 }
 
 void JsBridgeContext::registerJsObject(const std::string &strName,
@@ -202,8 +190,9 @@ void JsBridgeContext::registerJsObject(const std::string &strName,
   JSValue jsObjectValue = JS_GetPropertyStr(m_ctx, globalObj, strName.c_str());
   JS_FreeValue(m_ctx, globalObj);
 
+  JS_AUTORELEASE_VALUE(m_ctx, jsObjectValue);
+
   if (!JS_IsObject(jsObjectValue) || JS_IsNull(jsObjectValue)) {
-    JS_FreeValue(m_ctx, jsObjectValue);
     throw std::invalid_argument("Cannot register " + strName + ". It does not exist or is not a valid object.");
   }
 
@@ -217,8 +206,6 @@ void JsBridgeContext::registerJsObject(const std::string &strName,
 
   // Wrap it inside the JS object
   m_utils->createMappedCppPtrValue(cppJsObject, jsObjectValue, strName.c_str());
-
-  JS_FreeValue(m_ctx, jsObjectValue);
 }
 
 void JsBridgeContext::registerJsLambda(const std::string &strName,
@@ -227,8 +214,9 @@ void JsBridgeContext::registerJsLambda(const std::string &strName,
   JSValue jsLambdaValue = JS_GetPropertyStr(m_ctx, globalObj, strName.c_str());
   JS_FreeValue(m_ctx, globalObj);
 
+  JS_AUTORELEASE_VALUE(m_ctx, jsLambdaValue);
+
   if (!JS_IsFunction(m_ctx, jsLambdaValue)) {
-    JS_FreeValue(m_ctx, jsLambdaValue);
     throw std::invalid_argument("Cannot register " + strName + ". It does not exist or is not a valid function.");
   }
 
@@ -237,8 +225,6 @@ void JsBridgeContext::registerJsLambda(const std::string &strName,
 
   // Wrap it inside the JS object
   m_utils->createMappedCppPtrValue(cppJsLambda, jsLambdaValue, strName.c_str());
-
-  JS_FreeValue(m_ctx, jsLambdaValue);
 }
 
 JValue JsBridgeContext::callJsMethod(const std::string &objectName,
@@ -249,6 +235,8 @@ JValue JsBridgeContext::callJsMethod(const std::string &objectName,
   JSValue globalObj = JS_GetGlobalObject(m_ctx);
   JSValue jsObjectValue = JS_GetPropertyStr(m_ctx, globalObj, objectName.c_str());
   JS_FreeValue(m_ctx, globalObj);
+
+  JS_AUTORELEASE_VALUE(m_ctx, jsObjectValue);
 
   if (!JS_IsObject(jsObjectValue)) {
     throw std::invalid_argument("The JS object " + objectName + " cannot be accessed (not an object)");
@@ -261,10 +249,7 @@ JValue JsBridgeContext::callJsMethod(const std::string &objectName,
                                 " because it does not exist or has been deleted!");
   }
 
-  JValue ret = cppJsObject->call(jsObjectValue, javaMethod, args);
-  JS_FreeValue(m_ctx, jsObjectValue);
-
-  return std::move(ret);
+  return cppJsObject->call(jsObjectValue, javaMethod, args);
 }
 
 JValue JsBridgeContext::callJsLambda(const std::string &strFunctionName,
@@ -275,18 +260,17 @@ JValue JsBridgeContext::callJsLambda(const std::string &strFunctionName,
   JSValue jsLambdaValue = JS_GetPropertyStr(m_ctx, globalObj, strFunctionName.c_str());
   JS_FreeValue(m_ctx, globalObj);
 
+  JS_AUTORELEASE_VALUE(m_ctx, jsLambdaValue);
+
   if (!JS_IsFunction(m_ctx, jsLambdaValue)) {
-    JS_FreeValue(m_ctx, jsLambdaValue);
     throw std::invalid_argument("The JS method " + strFunctionName + " cannot be called (not a function)");
   }
 
   // Get C++ JavaScriptLambda instance
   auto cppJsLambda = m_utils->getMappedCppPtrValue<JavaScriptLambda>(jsLambdaValue, strFunctionName.c_str());
-  JS_FreeValue(m_ctx, jsLambdaValue);
   if (cppJsLambda == nullptr) {
-    queueJsException("Cannot invoke the JS function " + strFunctionName +
-                     " because it does not exist or has been deleted!");
-    return JValue();
+    throw std::invalid_argument("Cannot invoke the JS function " + strFunctionName +
+                                " because it does not exist or has been deleted!");
   }
 
   return cppJsLambda->call(this, args, awaitJsPromise);
@@ -298,9 +282,7 @@ void JsBridgeContext::assignJsValue(const std::string &strGlobalName, const JStr
   strCode.releaseChars();  // release chars now as we don't need them anymore
 
   if (JS_IsException(v)) {
-    JS_FreeValue(m_ctx, v);
-    queueJavaExceptionForJsError();
-    return;
+    throw m_exceptionHandler->getCurrentJsException();
   }
 
   JSValue globalObj = JS_GetGlobalObject(m_ctx);
@@ -333,6 +315,10 @@ void JsBridgeContext::newJsFunction(const std::string &strGlobalName, const JObj
     JS_FreeValue(m_ctx, functionArgValues[i]);
   }
 
+  if (JS_IsException(functionValue)) {
+    throw m_exceptionHandler->getCurrentJsException();
+  }
+
   JS_SetPropertyStr(m_ctx, globalObj, strGlobalName.c_str(), functionValue);
   // No JS_FreeValue(m_ctx, functionValue) after JS_SetPropertyStr
   JS_FreeValue(m_ctx, globalObj);
@@ -347,74 +333,11 @@ void JsBridgeContext::processPromiseQueue() {
     err = JS_ExecutePendingJob(m_runtime, &ctx1);
     if (err <= 0) {
       if (err < 0) {
-        queueJavaExceptionForJsError();
+        throw m_exceptionHandler->getCurrentJsException();
       }
       break;
     }
   }
-}
-
-void JsBridgeContext::throwTypeException(const std::string &message, bool inScript) const {
-  if (inScript) {
-    JS_ThrowTypeError(m_ctx, "%s", message.c_str());
-  } else {
-    throw std::invalid_argument(message);
-  }
-}
-
-void JsBridgeContext::queueIllegalArgumentException(const std::string &message) const {
-  m_jniContext->throwNew(m_jniCache->getIllegalArgumentExceptionClass(), message.c_str());
-}
-
-void JsBridgeContext::queueJsException(const std::string &message) const {
-  auto exception = m_jniCache->newJsException(
-      JStringLocalRef(),  // jsonValue
-      JStringLocalRef(m_jniContext, message.c_str()),  // detailedMessage
-      JStringLocalRef(),  // jsStackTrace
-      JniLocalRef<jthrowable>()  // cause
-  );
-  m_jniContext->throw_(exception);
-}
-
-//void JsBridgeContext::queueNullPointerException(const std::string &message) const {
-//}
-
-bool JsBridgeContext::hasPendingJniException() const {
-  return m_jniContext->exceptionCheck();
-}
-
-void JsBridgeContext::rethrowJniException() const {
-  if (!m_jniContext->exceptionCheck()) {
-    return;
-  }
-
-  // Get (and clear) the Java exception and read its message
-  JniLocalRef<jthrowable> exception(m_jniContext, m_jniContext->exceptionOccurred(), JniRefReleaseMode::Never);
-  m_jniContext->exceptionClear();
-
-  auto exceptionClass = m_jniContext->getObjectClass(exception);
-  jmethodID getMessage = m_jniContext->getMethodID(exceptionClass, "getMessage", "()Ljava/lang/String;");
-  JStringLocalRef message = m_jniContext->callStringMethod(exception, getMessage);
-
-
-  // Propagate Java exception to JavaScript (and store pointer to Java exception)
-  // ---
-
-  JSValue errorValue = JS_NewError(m_ctx);
-  JSValue messageValue = JS_NewString(m_ctx, message.toUtf8Chars());
-  JS_SetPropertyStr(m_ctx, errorValue, "message", messageValue);
-  // No JS_FreeValue(m_ctx, messageValue) after JS_SetPropertyStr()
-
-  JSValue javaExceptionValue = m_utils->createJavaRefValue(exception);
-  JS_SetPropertyStr(m_ctx, errorValue, JAVA_EXCEPTION_PROP_NAME, javaExceptionValue);
-  // No JS_FreeValue(m_ctx, javaExceptionValue) after JS_SetPropertyStr()
-
-  JS_Throw(m_ctx, errorValue);
-  // No JS_FreeValue(m_ctx, errorValue) after JS_Throw()
-}
-
-void JsBridgeContext::queueJavaExceptionForJsError() const {
-  m_jniContext->throw_(getJavaExceptionForJsError());
 }
 
 // static
@@ -427,61 +350,5 @@ JsBridgeContext *JsBridgeContext::getInstance(JSContext *ctx) {
   auto that = QuickJsUtils::getCppPtr<JsBridgeContext>(cppWrapperObj);
   JS_FreeValue(ctx, cppWrapperObj);
   return that;
-}
-
-
-// Private methods
-// ---
-
-JniLocalRef<jthrowable> JsBridgeContext::getJavaExceptionForJsError() const {
-  JniLocalRef<jthrowable> ret;
-
-  JSValue exceptionValue = JS_GetException(m_ctx);
-  JSValue jsonValue = custom_stringify(m_ctx, exceptionValue);
-  JStringLocalRef jsonString = m_utils->toJString(jsonValue);
-
-  // Is there an exception thrown from a Java method?
-  JniLocalRef<jthrowable> cause;
-  JSValue javaExceptionValue = JS_GetPropertyStr(m_ctx, exceptionValue, JAVA_EXCEPTION_PROP_NAME);
-  if (!JS_IsUndefined(javaExceptionValue)) {
-    cause = m_utils->getJavaRef<jthrowable>(javaExceptionValue);
-  }
-  JS_FreeValue(m_ctx, javaExceptionValue);
-
-  if (JS_IsError(m_ctx, exceptionValue)) {
-    // Error message
-    std::string msg = m_utils->toString(JS_GetPropertyStr(m_ctx, exceptionValue, "message"));
-    std::string stack;
-
-    // Get the stack trace
-    JSValue stackValue = JS_GetPropertyStr(m_ctx, exceptionValue, "stack");
-    if (!JS_IsUndefined(stackValue)) {
-      stack = m_utils->toString(stackValue);
-    }
-    JS_FreeValue(m_ctx, stackValue);
-
-    ret = m_jniCache->newJsException(
-        jsonString,  // jsonValue
-        JStringLocalRef(m_jniContext, msg.c_str()),  // detailedMessage
-        JStringLocalRef(m_jniContext, stack.c_str()),  // jsStackTrace
-        cause
-    );
-  }
-
-  if (ret.isNull()) {
-    // Not an error or no stacktrace, just convert to a string.
-    JStringLocalRef strThrownValue = m_utils->toJString(exceptionValue);
-
-    ret = m_jniCache->newJsException(
-        jsonString,  // jsonValue
-        strThrownValue,  // detailedMessage
-        JStringLocalRef(),  // jsStackTrace
-        cause
-    );
-  }
-
-  JS_FreeValue(m_ctx, jsonValue);
-  JS_FreeValue(m_ctx, exceptionValue);
-  return ret;
 }
 

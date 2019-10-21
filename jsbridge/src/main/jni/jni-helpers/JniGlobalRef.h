@@ -27,6 +27,11 @@
 
 class JniContext;
 
+enum class JniGlobalRefMode {
+  AutoReleased,  // JNI ref will be released when the JniGlobalRef instance has been destroyed
+  Leaked,  // JNI ref will never be released (use with care!)
+};
+
 // Manages a global reference to a jobject. Copying a JniGlobalRef increments the
 // underlying global reference count on the object in the JVM.
 template <class T>
@@ -34,19 +39,19 @@ class JniGlobalRef: public JniRef<T> {
   using JniRef<T>::m_jniContext;
   using JniRef<T>::m_object;
 
-public:
-  typedef JniRefReleaseMode ReleaseMode;
+  typedef JniGlobalRefMode Mode;
 
+public:
   JniGlobalRef()
     : JniRef<T>(nullptr, nullptr) {
   }
 
-  explicit JniGlobalRef(const JniLocalRef<T> &localRef, ReleaseMode releaseMode = ReleaseMode::Auto)
+  explicit JniGlobalRef(const JniLocalRef<T> &localRef, Mode mode = Mode::AutoReleased)
    : JniRef<T>(localRef.getJniContext(), nullptr) {
 
     if (!localRef.isNull()) {
       m_object = static_cast<T>(JniRefHelper::getJNIEnv(m_jniContext)->NewGlobalRef(localRef.get()));
-      if (releaseMode == ReleaseMode::Auto) {
+      if (mode == Mode::AutoReleased) {
         m_sharedAutoRelease = makeSharedAutoRelease(true);
       }
     }

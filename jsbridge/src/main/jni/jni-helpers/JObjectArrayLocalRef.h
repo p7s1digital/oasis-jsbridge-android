@@ -28,8 +28,8 @@ class JObjectArrayLocalRef : public JniLocalRef<jobjectArray> {
 public:
   JObjectArrayLocalRef() = delete;
 
-  JObjectArrayLocalRef(const JniContext *jniContext, jobjectArray o, ReleaseMode releaseMode = ReleaseMode::Auto)
-      : JniLocalRef<jobjectArray>(jniContext, o, releaseMode) {
+  JObjectArrayLocalRef(const JniContext *jniContext, jobjectArray o, Mode mode = Mode::AutoReleased)
+      : JniLocalRef<jobjectArray>(jniContext, o, mode) {
   }
 
   JObjectArrayLocalRef(const JniContext *jniContext, jsize count, const JniRef<jclass> &elementClass)

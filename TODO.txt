@@ -4,7 +4,12 @@ Features:
 - pure Kotlin version of console (.log, .warn, ...) with
   * varargs JsonObjectWrapper (debug)
   * varargs String (release)
-- unit test for all kinds of exceptions
+- test exceptions:
+  * array too large (how?)
+  * JS exception stack with line number (done)
+  * null pointer exceptions (done)
+- JsValue.fromNativeValue<T: Any?>(v: T)
+- Small app for performance tests
 
 Performance:
 - Long-based JsValue (*)

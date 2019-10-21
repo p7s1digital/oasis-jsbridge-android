@@ -15,11 +15,13 @@
  */
 #include "FunctionX.h"
 
+#include "ExceptionHandler.h"
 #include "JniCache.h"
 #include "JsBridgeContext.h"
 #include "JavaMethod.h"
 #include "JavaScriptLambda.h"
 #include "log.h"
+#include "exceptions/JniException.h"
 #include "jni-helpers/JniContext.h"
 #include "jni-helpers/JniGlobalRef.h"
 #include "jni-helpers/JObjectArrayLocalRef.h"
@@ -59,7 +61,12 @@ namespace {
     assert(jsBridgeContext != nullptr);
 
     CHECK_STACK_NOW();
-    return payload->javaMethodPtr->invoke(jsBridgeContext, payload->javaThis);
+
+    try {
+      return payload->javaMethodPtr->invoke(jsBridgeContext, payload->javaThis);
+    } catch (const std::exception &e) {
+      jsBridgeContext->getExceptionHandler()->jsThrow(e);
+    }
   }
 
   extern "C"
@@ -92,7 +99,11 @@ namespace {
       return JS_EXCEPTION;
     }
 
-    return payload->javaMethodPtr->invoke(jsBridgeContext, payload->javaThis, argc, argv);
+    try {
+      return payload->javaMethodPtr->invoke(jsBridgeContext, payload->javaThis, argc, argv);
+    } catch (const std::exception &e) {
+      jsBridgeContext->getExceptionHandler()->jsThrow(e);
+    }
   }
 #endif
 }
@@ -110,14 +121,14 @@ FunctionX::FunctionX(const JsBridgeContext *jsBridgeContext, const JniRef<jsBrid
 // Pop a JS function, register and create a native wrapper (JavaScriptLambda)
 // - C++ -> Java: call createJsLambdaProxy with <functionId> as argument
 // - Java -> C++: call callJsLambda (with <functionId> + args parameters)
-JValue FunctionX::pop(bool inScript) const {
+JValue FunctionX::pop() const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
   if (!duk_is_function(m_ctx, -1) && !duk_is_null(m_ctx, -1)) {
     const char *message = "Cannot convert return value to FunctionX";
     duk_pop(m_ctx);
     CHECK_STACK_NOW();
-    m_jsBridgeContext->throwTypeException(message, inScript);
+    throw std::invalid_argument(message);
   }
 
   static int jsFunctionCount = 0;
@@ -146,23 +157,22 @@ JValue FunctionX::pop(bool inScript) const {
       JStringLocalRef(m_jniContext, jsFunctionGlobalName.c_str()),
       javaMethod
   );
-  m_jsBridgeContext->rethrowJniException();
+  if (m_jniContext->exceptionCheck()) {
+    throw JniException(m_jniContext);
+  }
 
   return JValue(javaFunction);
 }
 
-JValue FunctionX::popArray(uint32_t count, bool expanded, bool inScript) const {
+JValue FunctionX::popArray(uint32_t count, bool expanded) const {
   expanded ? duk_pop_n(m_ctx, count) : duk_pop(m_ctx);
 
   const char *message = "Cannot pop an array of functions!";
-  m_jsBridgeContext->throwTypeException(message, inScript);
-
-  // Unreachable
-  return JValue();
+  throw std::invalid_argument(message);
 }
 
 // Get a native function, register it and push a JS wrapper
-duk_ret_t FunctionX::push(const JValue &value, bool /*inScript*/) const {
+duk_ret_t FunctionX::push(const JValue &value) const {
 
   // 1. C++: create the JValue object which is a Java FunctionX instance
   const JniLocalRef<jobject> &javaFunctionObject = value.getLocalRef();
@@ -187,12 +197,8 @@ duk_ret_t FunctionX::push(const JValue &value, bool /*inScript*/) const {
   return 1;
 }
 
-duk_ret_t FunctionX::pushArray(const JniLocalRef<jarray> &, bool /*expand*/, bool inScript) const {
-  const char *message = "Cannot push an array of functions!";
-  m_jsBridgeContext->throwTypeException(message, inScript);
-
-  // Unreachable
-  return DUK_RET_ERROR;
+duk_ret_t FunctionX::pushArray(const JniLocalRef<jarray> &, bool /*expand*/) const {
+  throw std::invalid_argument("Cannot push an array of functions!");
 }
 
 #elif defined(QUICKJS)
@@ -200,14 +206,12 @@ duk_ret_t FunctionX::pushArray(const JniLocalRef<jarray> &, bool /*expand*/, boo
 // Get a JS function, register and create a native wrapper (JavaScriptLambda)
 // - C++ -> Java: call createJsLambdaProxy with <functionId> as argument
 // - Java -> C++: call callJsLambda (with <functionId> + args parameters)
-JValue FunctionX::toJava(JSValueConst v, bool inScript) const {
+JValue FunctionX::toJava(JSValueConst v) const {
   const QuickJsUtils *utils = m_jsBridgeContext->getUtils();
   assert(utils != nullptr);
 
   if (!JS_IsFunction(m_ctx, v) && !JS_IsNull(v)) {
-    const char *message = "Cannot convert return value to FunctionX";
-    m_jsBridgeContext->throwTypeException(message, inScript);
-    return JValue();
+    throw std::invalid_argument("Cannot convert return value to FunctionX");
   }
 
   static int jsFunctionCount = 0;
@@ -231,24 +235,19 @@ JValue FunctionX::toJava(JSValueConst v, bool inScript) const {
       JStringLocalRef(m_jniContext, jsFunctionGlobalName.c_str()),
       jniJavaMethod
   );
-  if (m_jsBridgeContext->hasPendingJniException()) {
-    m_jsBridgeContext->rethrowJniException();
-    return JValue();
+  if (m_jniContext->exceptionCheck()) {
+    throw JniException(m_jniContext);
   }
 
   return JValue(javaFunction);
 }
 
-JValue FunctionX::toJavaArray(JSValueConst, bool inScript) const {
-  const char *message = "Cannot transfer from JS to Java an array of functions!";
-  m_jsBridgeContext->throwTypeException(message, inScript);
-
-  // Unreachable
-  return JValue();
+JValue FunctionX::toJavaArray(JSValueConst) const {
+  throw std::invalid_argument("Cannot transfer from JS to Java an array of functions!");
 }
 
 // Get a native function, register it and return JS wrapper
-JSValue FunctionX::fromJava(const JValue &value, bool inScript) const {
+JSValue FunctionX::fromJava(const JValue &value) const {
   const QuickJsUtils *utils = m_jsBridgeContext->getUtils();
   assert(utils != nullptr);
 
@@ -271,12 +270,10 @@ JSValue FunctionX::fromJava(const JValue &value, bool inScript) const {
   return invokeFunctionValue;
 }
 
-JSValue FunctionX::fromJavaArray(const JniLocalRef<jarray> &, bool inScript) const {
-  const char *message = "Cannot transfer from Java to JS an array of functions!";
-  m_jsBridgeContext->throwTypeException(message, inScript);
-
-  return JS_EXCEPTION;
+JSValue FunctionX::fromJavaArray(const JniLocalRef<jarray> &) const {
+  throw std::invalid_argument("Cannot transfer from Java to JS an array of functions!");
 }
+
 #endif
 
 

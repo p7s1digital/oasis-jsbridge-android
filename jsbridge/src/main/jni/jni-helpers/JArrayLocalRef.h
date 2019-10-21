@@ -45,32 +45,32 @@ public:
   }
 
   template<typename U = T>
-  JArrayLocalRef(const JniContext *jniContext, jsize count, ReleaseMode releaseMode = ReleaseMode::Auto, typename std::enable_if_t<std::is_same<U, jboolean>::value>* = nullptr)
-      : JniLocalRef<jarray>(jniContext, JniRefHelper::getJNIEnv(jniContext)->NewBooleanArray(count), releaseMode)
+  JArrayLocalRef(const JniContext *jniContext, jsize count, Mode mode = Mode::AutoReleased, typename std::enable_if_t<std::is_same<U, jboolean>::value>* = nullptr)
+      : JniLocalRef<jarray>(jniContext, JniRefHelper::getJNIEnv(jniContext)->NewBooleanArray(count), mode)
       , m_jniReleaseArrayMode(JNI_ABORT) {
   }
 
   template<typename U = T>
-  JArrayLocalRef(const JniContext *jniContext, jsize count, ReleaseMode releaseMode = ReleaseMode::Auto, typename std::enable_if_t<std::is_same<U, jint>::value>* = nullptr)
-      : JniLocalRef<jarray>(jniContext, JniRefHelper::getJNIEnv(jniContext)->NewIntArray(count), releaseMode)
+  JArrayLocalRef(const JniContext *jniContext, jsize count, Mode mode = Mode::AutoReleased, typename std::enable_if_t<std::is_same<U, jint>::value>* = nullptr)
+      : JniLocalRef<jarray>(jniContext, JniRefHelper::getJNIEnv(jniContext)->NewIntArray(count), mode)
       , m_jniReleaseArrayMode(JNI_ABORT) {
   }
 
   template<typename U = T>
-  JArrayLocalRef(const JniContext *jniContext, jsize count, ReleaseMode releaseMode = ReleaseMode::Auto, typename std::enable_if_t<std::is_same<U, jlong>::value>* = nullptr)
-      : JniLocalRef<jarray>(jniContext, JniRefHelper::getJNIEnv(jniContext)->NewLongArray(count), releaseMode)
+  JArrayLocalRef(const JniContext *jniContext, jsize count, Mode mode = Mode::AutoReleased, typename std::enable_if_t<std::is_same<U, jlong>::value>* = nullptr)
+      : JniLocalRef<jarray>(jniContext, JniRefHelper::getJNIEnv(jniContext)->NewLongArray(count), mode)
       , m_jniReleaseArrayMode(JNI_ABORT) {
   }
 
   template<typename U = T>
-  JArrayLocalRef(const JniContext *jniContext, jsize count, ReleaseMode releaseMode = ReleaseMode::Auto, typename std::enable_if_t<std::is_same<U, jdouble>::value>* = nullptr)
-      : JniLocalRef<jarray>(jniContext, JniRefHelper::getJNIEnv(jniContext)->NewDoubleArray(count), releaseMode)
+  JArrayLocalRef(const JniContext *jniContext, jsize count, Mode mode = Mode::AutoReleased, typename std::enable_if_t<std::is_same<U, jdouble>::value>* = nullptr)
+      : JniLocalRef<jarray>(jniContext, JniRefHelper::getJNIEnv(jniContext)->NewDoubleArray(count), mode)
       , m_jniReleaseArrayMode(JNI_ABORT) {
   }
 
   template<typename U = T>
-  JArrayLocalRef(const JniContext *jniContext, jsize count, ReleaseMode releaseMode = ReleaseMode::Auto, typename std::enable_if_t<std::is_same<U, jfloat>::value>* = nullptr)
-      : JniLocalRef<jarray>(jniContext, JniRefHelper::getJNIEnv(jniContext)->NewFloatArray(count), releaseMode)
+  JArrayLocalRef(const JniContext *jniContext, jsize count, Mode mode = Mode::AutoReleased, typename std::enable_if_t<std::is_same<U, jfloat>::value>* = nullptr)
+      : JniLocalRef<jarray>(jniContext, JniRefHelper::getJNIEnv(jniContext)->NewFloatArray(count), mode)
       , m_jniReleaseArrayMode(JNI_ABORT) {
   }
 

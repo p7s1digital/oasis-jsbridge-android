@@ -20,11 +20,6 @@
 #include <jni.h>
 #include <cassert>
 
-enum class JniRefReleaseMode {
-  Auto,  // JNI ref will be released when the JniRef instance has been destroyed
-  Never  // JNI ref will never be released (e.g. for local references given to entry JNI functions)
-};
-
 class JniContext;
 
 class JniRefBase {

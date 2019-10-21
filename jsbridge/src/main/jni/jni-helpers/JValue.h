@@ -131,7 +131,7 @@ public:
   }
 
   static void releaseAll(const std::vector<JValue> &values) {
-    for (const JValue & value: values) {
+    for (const JValue &value: values) {
       value.releaseLocalRef();
     }
   }

@@ -33,6 +33,7 @@
 #endif
 
 class DuktapeUtils;
+class ExceptionHandler;
 class JavaType;
 class JniCache;
 class JObjectArrayLocalRef;
@@ -74,21 +75,12 @@ public:
 
   void processPromiseQueue();
 
-  void throwTypeException(const std::string &message, bool inScript) const;
-
-  void queueIllegalArgumentException(const std::string &message) const;
-  void queueJsException(const std::string &message) const;
-  //void queueNullPointerException(const std::string &message) const;
-  bool hasPendingJniException() const;
-  void rethrowJniException() const;
-  void queueJavaExceptionForJsError() const;
-
   JniContext *getJniContext() { return m_jniContext; }
   const JniContext *getJniContext() const { return m_jniContext; }
   const JniCache *getJniCache() const { return m_jniCache; }
+  const ExceptionHandler *getExceptionHandler() const { return m_exceptionHandler; }
 
   const JavaTypeProvider &getJavaTypeProvider() const { return m_javaTypeProvider; }
-  JniLocalRef<jthrowable> getJavaExceptionForJsError() const;
 
 #if defined(DUKTAPE)
   static JsBridgeContext *getInstance(duk_context *);
@@ -106,6 +98,7 @@ private:
   // Updated on each Java -> Native call (and reset to nullptr afterwards)
   JniContext *m_jniContext = nullptr;
   JniCache *m_jniCache = nullptr;
+  ExceptionHandler *m_exceptionHandler = nullptr;
 
   const JavaTypeProvider m_javaTypeProvider;
 

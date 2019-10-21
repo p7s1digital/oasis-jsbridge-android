@@ -18,10 +18,12 @@
  */
 #include "JavaMethod.h"
 
+#include "ExceptionHandler.h"
 #include "JavaType.h"
 #include "JniCache.h"
 #include "JniTypes.h"
 #include "JsBridgeContext.h"
+#include "exceptions/JniException.h"
 #include "jni-helpers/JniLocalRef.h"
 #include "jni-helpers/JniLocalFrame.h"
 #include "jni-helpers/JniContext.h"
@@ -76,9 +78,9 @@ JavaMethod::JavaMethod(const JsBridgeContext *jsBridgeContext, const JniLocalRef
     m_methodBody = [=](const JniRef<jobject> &javaThis, const std::vector<JValue> &args) {
       JValue result = callLambda(jsBridgeContext, methodGlobal, javaThis, args);
 #if defined(DUKTAPE)
-      return m_returnValueType->push(result, true /*boxed*/);
+      return m_returnValueType->push(result);
 #elif defined(QUICKJS)
-      return m_returnValueType->fromJava(result, true);
+      return m_returnValueType->fromJava(result);
 #endif
     };
   } else {
@@ -88,9 +90,9 @@ JavaMethod::JavaMethod(const JsBridgeContext *jsBridgeContext, const JniLocalRef
     m_methodBody = [methodId, this](const JniRef<jobject> &javaThis, const std::vector<JValue> &args) {
       JValue result = m_returnValueType->callMethod(methodId, javaThis, args);
 #if defined(DUKTAPE)
-      return m_returnValueType->push(result, true);
+      return m_returnValueType->push(result);
 #elif defined(QUICKJS)
-      return m_returnValueType->fromJava(result, true);
+      return m_returnValueType->fromJava(result);
 #endif
     };
   }
@@ -102,9 +104,6 @@ JavaMethod::JavaMethod(const JsBridgeContext *jsBridgeContext, const JniLocalRef
 
 duk_ret_t JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRef<jobject> &javaThis) const {
   duk_context *ctx = jsBridgeContext->getDuktapeContext();
-  CHECK_STACK(ctx);
-
-  const JniContext *jniContext = jsBridgeContext->getJniContext();
 
   const auto argCount = duk_get_top(ctx);
   const auto minArgs = m_isVarArgs
@@ -112,28 +111,20 @@ duk_ret_t JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRe
       : m_argumentTypes.size();
 
   if (argCount < minArgs || (!m_isVarArgs && argCount > minArgs)) {
-    // Wrong number of arguments given - throw an error.
-    duk_error(ctx, DUK_ERR_ERROR, "wrong number of arguments when calling Java method %s", m_methodName.c_str());
-    // unreachable - duk_error never returns.
-    return DUK_RET_ERROR;
+    throw std::invalid_argument("wrong number of arguments when calling Java method " + m_methodName);
   }
 
-  // Release any local objects allocated in this frame when we leave this scope.
-  const JniLocalFrame localFrame(jniContext, m_argumentTypes.size());
-
   std::vector<JValue> args(m_argumentTypes.size());
-
-  CHECK_STACK_NOW();
 
   // Load the arguments off the stack and convert to Java types.
   // Note we're going backwards since the last argument is at the top of the stack.
   if (m_isVarArgs) {
     const auto &argumentType = m_argumentTypes.back();
-    args[args.size() - 1] = argumentType->popArray(argCount - minArgs, true /*expanded*/, true /*inScript*/);
+    args[args.size() - 1] = argumentType->popArray(argCount - minArgs, true /*expanded*/);
   }
   for (ssize_t i = minArgs - 1; i >= 0; --i) {
     const auto &argumentType = m_argumentTypes[i];
-    JValue value = argumentType->pop(true /*inScript*/);
+    JValue value = argumentType->pop();
     args[i] = std::move(value);
   }
 
@@ -163,9 +154,6 @@ JSValue JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRef<
     return JS_UNDEFINED;
   }
 
-  // Release any local objects allocated in this frame when we leave this scope.
-  const JniLocalFrame localFrame(jniContext, m_argumentTypes.size());
-
   std::vector<JValue> args(m_argumentTypes.size());
 
   // Load the arguments off the stack and convert to Java types.
@@ -178,7 +166,7 @@ JSValue JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRef<
 
   for (int i = 0; i < minArgs; ++i) {
     const auto &argumentType = m_argumentTypes[i];
-    JValue value = argumentType->toJava(argv[i], true /*inScript*/);
+    JValue value = argumentType->toJava(argv[i]);
     args[i] = std::move(value);
   }
 
@@ -204,10 +192,10 @@ JValue JavaMethod::callLambda(const JsBridgeContext *jsBridgeContext, const JniR
 
   JniLocalRef<jobject> ret = jniCache->getMethodInterface(method).callNativeLambda(javaThis, argArray);
 
-  if (jsBridgeContext->hasPendingJniException()) {
-    jsBridgeContext->rethrowJniException();
-    return JValue();
+  if (jniContext->exceptionCheck()) {
+    throw JniException(jniContext);
   }
+
   return JValue(ret);
 }
 

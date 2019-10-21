@@ -17,6 +17,7 @@
 
 #include "JniCache.h"
 #include "JsBridgeContext.h"
+#include "exceptions/JniException.h"
 #include "jni-helpers/JniContext.h"
 #include "jni-helpers/JStringLocalRef.h"
 
@@ -37,7 +38,7 @@ JsValue::JsValue(const JsBridgeContext *jsBridgeContext, bool isNullable)
 #include "StackChecker.h"
 
 // JS to native JsValue
-JValue JsValue::pop(bool inScript) const {
+JValue JsValue::pop() const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
   JNIEnv *env = m_jniContext->getJNIEnv();
@@ -64,7 +65,7 @@ JValue JsValue::pop(bool inScript) const {
 }
 
 // Native JsValue to JS
-duk_ret_t JsValue::push(const JValue &value, bool inScript) const {
+duk_ret_t JsValue::push(const JValue &value) const {
   CHECK_STACK_OFFSET(m_ctx, 1);
 
   const JniLocalRef<jobject> &jValue = value.getLocalRef();
@@ -76,7 +77,9 @@ duk_ret_t JsValue::push(const JValue &value, bool inScript) const {
 
   // Get JsValue JS name from Java
   JStringLocalRef jsValueName = getJniCache()->getJsValueName(jValue);
-  m_jsBridgeContext->rethrowJniException();
+  if (m_jniContext->exceptionCheck()) {
+    throw JniException(m_jniContext);
+  }
 
   // Push the global JS value with that name
   duk_get_global_string(m_ctx, jsValueName.toUtf8Chars());
@@ -85,7 +88,7 @@ duk_ret_t JsValue::push(const JValue &value, bool inScript) const {
 
 #elif defined(QUICKJS)
 
-JValue JsValue::toJava(JSValueConst v, bool inScript) const {
+JValue JsValue::toJava(JSValueConst v) const {
   JNIEnv *env = m_jniContext->getJNIEnv();
   assert(env != nullptr);
 
@@ -112,7 +115,7 @@ JValue JsValue::toJava(JSValueConst v, bool inScript) const {
   return JValue(jsValue);
 }
 
-JSValue JsValue::fromJava(const JValue &value, bool inScript) const {
+JSValue JsValue::fromJava(const JValue &value) const {
   const JniLocalRef<jobject> &jValue = value.getLocalRef();
 
   if (jValue.isNull()) {
@@ -121,9 +124,8 @@ JSValue JsValue::fromJava(const JValue &value, bool inScript) const {
 
   // Get JsValue JS name from Java
   std::string jsValueName = getJniCache()->getJsValueName(jValue).toUtf8Chars();
-  if (m_jsBridgeContext->hasPendingJniException()) {
-    m_jsBridgeContext->rethrowJniException();
-    return JS_EXCEPTION;
+  if (m_jniContext->exceptionCheck()) {
+    throw JniException(m_jniContext);
   }
 
   // Get the global JS value with that name

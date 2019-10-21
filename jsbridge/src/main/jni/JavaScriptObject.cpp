@@ -17,6 +17,9 @@
  * limitations under the License.
  */
 #include "JavaScriptObject.h"
+
+#include "AutoReleasedJSValue.h"
+#include "ExceptionHandler.h"
 #include "JavaScriptMethod.h"
 #include "JavaType.h"
 #include "JniCache.h"
@@ -26,6 +29,7 @@
 #include "jni-helpers/JniLocalFrame.h"
 #include "jni-helpers/JObjectArrayLocalRef.h"
 #include "log.h"
+
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -94,11 +98,7 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
 
 JValue JavaScriptObject::call(const JniLocalRef<jobject> &javaMethod, const JObjectArrayLocalRef &args) const {
 
-  if (m_jsHeapPtr == nullptr) {
-    m_jsBridgeContext->queueJsException(
-        "JavaScript object " + m_name + " has been garbage collected");
-    return JValue();
-  }
+  assert(m_jsHeapPtr != nullptr);
 
   const JniContext *jniContext = m_jsBridgeContext->getJniContext();
   const JniCache *jniCache = m_jsBridgeContext->getJniCache();
@@ -172,10 +172,9 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
 
       // Build a call wrapper that handles marshalling the arguments and return value.
       auto jsMethod = new JavaScriptMethod(jsBridgeContext, method, strMethodName, false);
-
       m_methods.emplace(methodId, std::shared_ptr<JavaScriptMethod>(jsMethod));
-    } catch (const std::invalid_argument &e) {
-      // TODO: free values?
+    } catch (const std::exception &e) {
+      m_methods.clear();
       throw std::invalid_argument("In proxied method \"" + m_name + "." + strMethodName + "\": " + e.what());
     }
   }
@@ -208,26 +207,13 @@ JValue JavaScriptObject::call(JSValueConst jsObjectValue, const JniLocalRef<jobj
   }
 
   JSValue jsMethodValue = JS_GetPropertyStr(ctx, jsObjectValue, jsMethod->getName().c_str());
+  JS_AUTORELEASE_VALUE(ctx, jsMethodValue);
 
-  try {
-    if (!JS_IsFunction(ctx, jsMethodValue)) {
-      throw std::runtime_error("Error while calling JS method");
-    }
-
-    JValue javaValue = jsMethod->invoke(m_jsBridgeContext, jsMethodValue, jsObjectValue, args, false);
-    JS_FreeValue(ctx, jsMethodValue);
-    return std::move(javaValue);
-  } catch (const std::invalid_argument &e) {
-    std::string strError("Invalid argument while calling JS method " + m_name + "." + getMethodName() + ": " + e.what());
-    JS_FreeValue(ctx, jsMethodValue);
-    throw std::runtime_error(strError);
-  } catch (const std::runtime_error &e) {
-    std::string strError("Runtime error while calling JS method " + m_name + "." + getMethodName() + ": " + e.what());
-    JS_FreeValue(ctx, jsMethodValue);
-    throw std::runtime_error(strError);
+  if (!JS_IsFunction(ctx, jsMethodValue)) {
+    throw std::runtime_error("Error while calling JS method: " + m_name + " is not a valid JS function!");
   }
 
-  return JValue();
+  return jsMethod->invoke(m_jsBridgeContext, jsMethodValue, jsObjectValue, args, false);
 }
 
 #endif

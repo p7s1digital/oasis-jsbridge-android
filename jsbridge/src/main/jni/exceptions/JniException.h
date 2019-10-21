@@ -13,27 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "JniRefStats.h"
+#ifndef _JSBRIDGE_JNIEXCEPTION_H
+#define _JSBRIDGE_JNIEXCEPTION_H
 
-void JniRefStats::clear() {
-  m_count = 0;
-}
+#include "jni-helpers/JniLocalRef.h"
+#include <exception>
+#include <jni.h>
+#include <string>
 
-void JniRefStats::add() {
-#ifndef NDEBUG
-  ++m_count;
-  if (m_count > m_maxCount) {
-    m_maxCount = m_count;
+class JniContext;
+
+class JniException : public std::exception {
+public:
+  explicit JniException(const JniContext *);
+
+  const char *what() const throw() override {
+    return m_what.c_str();
   }
 
-  //alog("CREATED LOCAL REF, COUNT: %d, MAX: %d", currentCount(), maxCount());
-#endif
-}
+  const JniLocalRef<jthrowable> &getThrowable() const { return m_throwable; }
 
-void JniRefStats::remove() {
-#ifndef NDEBUG
-  --m_count;
+private:
+  static std::string createMessage(const JniContext *, const JniLocalRef<jthrowable> &);
 
-  //alog("DELETED LOCAL REF, COUNT: %d, MAX: %d", currentCount(), maxCount());
+  JniLocalRef<jthrowable> m_throwable;
+  std::string m_what;
+};
+
 #endif
-}
