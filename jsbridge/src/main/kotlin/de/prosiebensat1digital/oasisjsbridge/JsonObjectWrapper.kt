@@ -55,6 +55,7 @@ open class JsonObjectWrapper(val jsonString: String) {
         @Suppress("UNCHECKED_CAST")
         private fun<T> valueToString(value: T) = when (value) {
             null -> "null"
+            Undefined -> ""
             is JsonObjectWrapper -> value.jsonString
             is Number -> "$value"
             is Boolean -> if (value) "true" else "false"

@@ -384,15 +384,35 @@ class JsBridgeTest {
             assertEquals(error.jsonValue?.toPayload()?.stringValue(), "wrong")
             assertEquals(awaitError.jsonValue?.toPayload()?.stringValue(), "wrong")
         }
+
         // THEN (null JsValue)
         runBlocking {
-            // Non-nullable JsValue with JS var = "null"
-            val nonNullableJsValue: JsValue = subject.evaluate("null")
-            assertEquals(nonNullableJsValue.evaluate<Any?>(), null)
+            // Non-nullable JsValue with JS var = "null" or "undefined"
+            val nonNullableJsValueNull: JsValue = subject.evaluate("null")
+            val nonNullableJsValueUndefined: JsValue = subject.evaluate("undefined")
+            assertNull(nonNullableJsValueNull.evaluate())
+            assertNull(nonNullableJsValueUndefined.evaluate())
 
-            // Nullable JsValue with JS var = "null"
-            val nullableJsValue: JsValue? = subject.evaluate("null")
-            assertNull(nullableJsValue)
+            // Nullable JsValue with JS var = "null" or "undefined"
+            val nullableJsValueNull: JsValue? = subject.evaluate("null")
+            val nullableJsValueUndefined: JsValue? = subject.evaluate("undefined")
+            assertNull(nullableJsValueNull)
+            assertNull(nullableJsValueUndefined)
+        }
+
+        // THEN (null JsonObjectWrapper)
+        runBlocking {
+            // Non-nullable JsonObjectWrapper with JS var = "null" or "undefined"
+            val nonNullableJsonObjectWrapperNull: JsonObjectWrapper = subject.evaluate("null")
+            val nonNullableJsonObjectWrapperUndefined: JsonObjectWrapper = subject.evaluate("undefined")
+            assertEquals(nonNullableJsonObjectWrapperNull.jsonString, "null")
+            assertEquals(nonNullableJsonObjectWrapperUndefined, JsonObjectWrapper.Undefined)
+
+            // Nullable JsonObjectWrapper with JS var = "null" or "undefined"
+            val nullableJsonObjectWrapperNull: JsonObjectWrapper? = subject.evaluate("null")
+            val nullableJsonObjectWrapperUndefined: JsonObjectWrapper? = subject.evaluate("undefined")
+            assertNull(nullableJsonObjectWrapperNull)
+            assertNull(nullableJsonObjectWrapperUndefined)
         }
 
         assertTrue(errors.isEmpty())

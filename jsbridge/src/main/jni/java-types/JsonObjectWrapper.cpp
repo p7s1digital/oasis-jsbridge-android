@@ -26,8 +26,9 @@
 
 namespace JavaTypes {
 
-JsonObjectWrapper::JsonObjectWrapper(const JsBridgeContext *jsBridgeContext)
- : JavaType(jsBridgeContext, JavaTypeId::JsonObjectWrapper) {
+JsonObjectWrapper::JsonObjectWrapper(const JsBridgeContext *jsBridgeContext, bool isNullable)
+ : JavaType(jsBridgeContext, JavaTypeId::JsonObjectWrapper)
+ , m_isNullable(isNullable) {
 }
 
 #if defined(DUKTAPE)
@@ -46,15 +47,13 @@ JValue JsonObjectWrapper::pop() const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
   // Check if the caller passed in a null string.
-  if (duk_is_null_or_undefined(m_ctx, -1)) {
+  if (m_isNullable && duk_is_null_or_undefined(m_ctx, -1)) {
     duk_pop(m_ctx);
     return JValue();
   }
 
-  duk_require_object_coercible(m_ctx, -1);
-
   if (custom_stringify(m_ctx, -1) != DUK_EXEC_SUCCESS) {
-    alog_warn("Could not stringify object!");
+    duk_pop(m_ctx);
     throw getExceptionHandler()->getCurrentJsException();
   }
 
@@ -84,7 +83,7 @@ duk_ret_t JsonObjectWrapper::push(const JValue &value) const {
   }
 
   // Undefined values are returned as an empty string
-  if (!str) {
+  if (!str || strlen(str) == 0) {
     duk_push_undefined(m_ctx);
     return 1;
   }
@@ -93,11 +92,9 @@ duk_ret_t JsonObjectWrapper::push(const JValue &value) const {
   strRef.release();
 
   if (duk_safe_call(m_ctx, tryJsonDecode, nullptr, 1, 1) != DUK_EXEC_SUCCESS) {
-    const char *err = duk_safe_to_string(m_ctx, -1);
-    const auto message = std::string("Error while pushing JsonObjectWrapper value: ") + err;
+    CHECK_STACK_NOW();
     duk_pop(m_ctx);
-
-    throw std::invalid_argument(message);
+    throw std::invalid_argument(std::string("Error while reading JsonObjectWrapper value (\"") + str + "\")");
   }
 
   return 1;
@@ -106,19 +103,14 @@ duk_ret_t JsonObjectWrapper::push(const JValue &value) const {
 #elif defined(QUICKJS)
 
 JValue JsonObjectWrapper::toJava(JSValueConst v) const {
-  if (!JS_IsObject(v) && !JS_IsNull(v)) {
-    throw std::invalid_argument("Cannot convert return value to Object");
-  }
-
-  // Check if the caller passed in a null string.
-  if (JS_IsNull(v) || JS_IsUndefined(v)) {
+  if (m_isNullable && (JS_IsNull(v) || JS_IsUndefined(v))) {
     return JValue();
   }
 
   JSValue jsonValue = custom_stringify(m_ctx, v);
-  if (JS_IsUndefined(jsonValue)) {
-    JS_FreeValue(m_ctx, jsonValue);
-    return JValue();
+  if (JS_IsException(jsonValue)) {
+    JS_GetException(m_ctx);
+    throw getExceptionHandler()->getCurrentJsException();
   }
 
   const char *jsonCStr = JS_ToCString(m_ctx, jsonValue);
@@ -138,24 +130,26 @@ JSValue JsonObjectWrapper::fromJava(const JValue &value) const {
   }
 
   JStringLocalRef strRef = getJniCache()->getJsonObjectWrapperString(jWrapper);
-  const char *str = strRef.toUtf8Chars();
 
   if (m_jniContext->exceptionCheck()) {
     throw JniException(m_jniContext);
   }
 
+  const char *str = strRef.toUtf8Chars();
+
   // Undefined values are returned as an empty string
-  if (!str) {
+  if (!str || strlen(str) == 0) {
     return JS_UNDEFINED;
   }
 
   JSValue decodedValue = JS_ParseJSON(m_ctx, str, strlen(str), "JsonObjectWrapper.cpp");
-  strRef.release();
 
   if (JS_IsException(decodedValue)) {
-    throw std::invalid_argument("Error while reading JsonObjectWrapper value");
+    JS_GetException(m_ctx);
+    throw std::invalid_argument(std::string("Error while reading JsonObjectWrapper value (\"") + str + "\")");
   }
 
+  strRef.release();
   return decodedValue;
 }
 

@@ -116,7 +116,7 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
     case JavaTypeId::JsValue:
       return new JsValue(m_jsBridgeContext, isParameterNullable(parameter));
     case JavaTypeId::JsonObjectWrapper:
-      return new JsonObjectWrapper(m_jsBridgeContext);
+      return new JsonObjectWrapper(m_jsBridgeContext, isParameterNullable(parameter));
     case JavaTypeId::Deferred:
       return new Deferred(m_jsBridgeContext, getGenericParameterType(parameter));
   }

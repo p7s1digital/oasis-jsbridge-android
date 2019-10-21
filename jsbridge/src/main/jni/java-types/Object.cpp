@@ -69,7 +69,7 @@ JValue Object::pop() const {
     }
 
     case DUK_TYPE_OBJECT: {
-      auto jsonObjectWrapperType = std::make_unique<JsonObjectWrapper>(m_jsBridgeContext);
+      auto jsonObjectWrapperType = std::make_unique<JsonObjectWrapper>(m_jsBridgeContext, false /*isNullable*/);
       return jsonObjectWrapperType->pop();
     }
 
@@ -129,7 +129,7 @@ JValue Object::toJava(JSValueConst v) const {
   }
 
   if (JS_IsObject(v)) {
-    auto jsonObjectWrapperType = std::make_unique<JsonObjectWrapper>(m_jsBridgeContext);
+    auto jsonObjectWrapperType = std::make_unique<JsonObjectWrapper>(m_jsBridgeContext, false /*isNullable*/);
     return jsonObjectWrapperType->toJava(v);
   }
 
@@ -181,7 +181,7 @@ JavaType *Object::newJavaType(const JniLocalRef<jobject> &jobject) const {
     case JavaTypeId::String:
       return new String(m_jsBridgeContext);
     case JavaTypeId::JsonObjectWrapper:
-      return new JsonObjectWrapper(m_jsBridgeContext);
+      return new JsonObjectWrapper(m_jsBridgeContext, false /*isNullable*/);
     default:
       return nullptr;
   }

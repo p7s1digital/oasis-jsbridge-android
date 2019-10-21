@@ -18,7 +18,9 @@
 static const char *customStringifyJs = R"(
 // Custom stringify which probably handles Error instances
 // See https://stackoverflow.com/questions/18391212/is-it-not-possible-to-stringify-an-error-using-json-stringify
-global.__jsBridge__stringify = function(err) {
+global.__jsBridge__stringify = function(value) {
+  if (value === undefined) return "";
+
   var replaceErrors = function(_key, value) {
     if (_key === "stack") return;  // TODO: don't hard-code it!
     if (value instanceof Error) {
@@ -32,7 +34,7 @@ global.__jsBridge__stringify = function(err) {
     return value;
   }
 
-  return JSON.stringify(err, replaceErrors);
+  return JSON.stringify(value, replaceErrors);
 };)";
 
 #if defined(DUKTAPE)

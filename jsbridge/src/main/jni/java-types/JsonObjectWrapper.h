@@ -23,7 +23,7 @@ namespace JavaTypes {
 class JsonObjectWrapper : public JavaType {
 
 public:
-  explicit JsonObjectWrapper(const JsBridgeContext *);
+  JsonObjectWrapper(const JsBridgeContext *, bool isNullable);
 
 #if defined(DUKTAPE)
     JValue pop() const override;
@@ -32,6 +32,9 @@ public:
     JValue toJava(JSValueConst) const override;
     JSValue fromJava(const JValue &value) const override;
 #endif
+
+private:
+  bool m_isNullable;
 };
 
 }  // namespace JavaTypes
