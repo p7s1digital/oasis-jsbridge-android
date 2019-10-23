@@ -66,6 +66,7 @@ namespace {
       return payload->javaMethodPtr->invoke(jsBridgeContext, payload->javaThis);
     } catch (const std::exception &e) {
       jsBridgeContext->getExceptionHandler()->jsThrow(e);
+      return DUK_RET_ERROR;
     }
   }
 

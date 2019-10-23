@@ -70,9 +70,7 @@ void ExceptionHandler::jsThrow(const std::exception &e) const {
   duk_context *ctx = m_jsBridgeContext->getDuktapeContext();
 
   if (auto jniException = dynamic_cast<const JniException *>(&e)) {
-    alog("BW - About to push Java exception: %s", e.what());
     pushJavaException(jniException->getThrowable());
-    alog("BW - About to throw Java exception: %s", e.what());
     duk_throw(ctx);
   } else if (auto jsException = dynamic_cast<const JsException *>(&e)) {
     jsException->pushError();
