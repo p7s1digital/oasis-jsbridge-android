@@ -119,8 +119,6 @@ class JsBridgeTest {
         val subject = createAndSetUpJsBridge()
 
         // WHEN
-        val js = """nativeFunctionMock("testString");"""
-        subject.evaluateNoRetVal(js)
 
         runBlocking { waitForDone(subject) }
 

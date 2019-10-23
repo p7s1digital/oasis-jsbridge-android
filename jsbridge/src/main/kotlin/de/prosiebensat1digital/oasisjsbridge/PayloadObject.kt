@@ -19,6 +19,7 @@ import org.json.JSONObject
 import org.json.JSONTokener
 import timber.log.Timber
 import java.util.*
+import kotlin.collections.HashSet
 import kotlin.reflect.jvm.internal.impl.load.kotlin.JvmType
 
 fun payloadObjectOf(vararg values: Pair<String, Any?>) = PayloadObject.fromValues(*values)
@@ -28,10 +29,9 @@ class PayloadObject: Payload {
     private val values = HashMap<String, Any?>()
 
     companion object {
-        fun fromValues(vararg values: Pair<String, Any?>): PayloadObject = fromValueMap(hashMapOf(*values))
+        fun fromValues(vararg values: Pair<String, Any?>): PayloadObject = fromMap(hashMapOf(*values))
 
-        // TODO: make it recursive!
-        fun fromValueMap(values: Map<String, Any?>): PayloadObject {
+        fun fromMap(values: Map<String, Any?>): PayloadObject {
             val payloadObject = PayloadObject()
 
             @Suppress("UNCHECKED_CAST")
@@ -39,8 +39,9 @@ class PayloadObject: Payload {
                 val value = entry.value
                 when {
                     value == null -> null
-                    value is Map<*, *> -> fromValueMap(value as Map<String, Any?>)
-                    value is Array<*> -> PayloadArray.fromValueArray(value as Array<Any?>)
+                    value is Map<*, *> -> fromMap(value as Map<String, Any?>)
+                    value is Array<*> -> PayloadArray.fromArray(value as Array<Any?>)
+                    value is Collection<*> -> PayloadArray.fromCollection(value as Collection<Any?>)
                     else -> value
                 }
             }
@@ -135,6 +136,15 @@ class PayloadObject: Payload {
         }
 
         return value == null
+    }
+
+    fun toMap(): Map<String, Any?> = values.mapValues { entry ->
+        val newValue = when (val value = entry.value) {
+            is PayloadArray -> value.toList()
+            is PayloadObject -> value.toMap()
+            else -> value
+        }
+        newValue
     }
 
     override fun equals(other: Any?): Boolean {

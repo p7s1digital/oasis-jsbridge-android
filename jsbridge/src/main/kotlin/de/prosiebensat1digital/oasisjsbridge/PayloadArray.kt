@@ -27,9 +27,15 @@ class PayloadArray(length: Int): Payload {
     val isEmpty get() = array.isEmpty()
 
     companion object {
-        fun fromValues(vararg values: Any?): PayloadArray? = fromValueArray(arrayOf(*values))
+        fun fromValues(vararg values: Any?): PayloadArray? = fromArray(arrayOf(*values))
 
-        fun fromValueArray(values: Array<Any?>): PayloadArray? {
+        fun fromArray(values: Array<Any?>): PayloadArray? {
+            val payloadArray = PayloadArray(values.size)
+            values.forEachIndexed { index, value -> payloadArray.array[index] = value }
+            return payloadArray
+        }
+
+        fun fromCollection(values: Collection<Any?>): PayloadArray? {
             val payloadArray = PayloadArray(values.size)
             values.forEachIndexed { index, value -> payloadArray.array[index] = value }
             return payloadArray
@@ -90,6 +96,14 @@ class PayloadArray(length: Int): Payload {
         )
 
         array[index] = value
+    }
+
+    fun toList(): List<Any?> = array.map { value ->
+        when (value) {
+            is PayloadObject -> value.toMap()
+            is PayloadArray -> value.toList()
+            else -> value
+        }
     }
 
     override fun toJsString(orderAlphabetically: Boolean) = array.joinToString(", ", prefix = "[", postfix = "]", transform = ::valueToJsString)

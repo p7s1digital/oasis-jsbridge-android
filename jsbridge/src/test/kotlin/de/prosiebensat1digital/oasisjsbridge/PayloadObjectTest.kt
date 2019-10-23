@@ -111,7 +111,7 @@ class PayloadObjectTest {
     @Test
     fun fromValuesMap() {
         // WHEN
-        val subject = PayloadObject.fromValueMap(mapOf(
+        val subject = PayloadObject.fromMap(mapOf(
             "key1" to 123.4,
             "key2" to "testString",
             "key3" to arrayOf(1, "two", null),
@@ -156,7 +156,7 @@ class PayloadObjectTest {
     @Test
     fun toJsonString() {
         // WHEN
-        val subject = PayloadObject.fromValueMap(mapOf(
+        val subject = PayloadObject.fromMap(mapOf(
             "title" to "Welcome to \"Jupiter\"",
             "duration" to 1234
         ))
@@ -171,7 +171,7 @@ class PayloadObjectTest {
     @Test
     fun toJsString() {
         // WHEN
-        val subject = PayloadObject.fromValueMap(mapOf(
+        val subject = PayloadObject.fromMap(mapOf(
             "title" to "Welcome to \"Jupiter\"",
             "duration" to 1234
         ))
@@ -328,5 +328,39 @@ class PayloadObjectTest {
         assertEquals(subject.getString("testString"), """This is a "useful" test""")
         assertEquals(subject.toJsonString(), """{"testString": "This is a \"useful\" test"}""")
         assertEquals(subject.toJsString(), """{testString: "This is a \"useful\" test"}""")
+    }
+
+    @Test
+    fun toMap() {
+        // WHEN
+        val subject = payloadObjectOf(
+            "key1" to 123.4,
+            "key2" to "testString",
+            "key3" to payloadArrayOf(1, "two", null, payloadObjectOf("eins" to 1)),
+            "key4" to payloadObjectOf(
+                "subKey1" to 456.7,
+                "subKey2" to "anotherTestString"
+            ),
+            "key5" to null,
+            "key6" to 69,
+            "key7" to true,
+            "key8" to false
+        )
+
+        // THEN
+        val expectedMap = mapOf(
+            "key1" to 123.4,
+            "key2" to "testString",
+            "key3" to listOf(1, "two", null, mapOf("eins" to 1)),
+            "key4" to mapOf(
+                "subKey1" to 456.7,
+                "subKey2" to "anotherTestString"
+            ),
+            "key5" to null,
+            "key6" to 69,
+            "key7" to true,
+            "key8" to false
+        )
+        assertEquals(subject.toMap().toSortedMap(), expectedMap.toSortedMap())
     }
 }
