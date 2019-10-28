@@ -77,6 +77,8 @@ class PayloadNull: Payload {
 // ---
 
 fun JsonObjectWrapper.toPayload() = Payload.fromJsonString(this.jsonString)
+fun JsonObjectWrapper.toPayloadObject() = PayloadObject.fromJsonString(this.jsonString)
+fun JsonObjectWrapper.toPayloadArray() = PayloadArray.fromJsonString(this.jsonString)
 
 
 // String extensions

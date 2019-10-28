@@ -21,6 +21,7 @@ open class JsonObjectWrapper(val jsonString: String) {
     constructor(vararg pairs: Pair<String, Any?>): this(pairsToJsonString(pairs))
     constructor(map: Map<String, Any?>): this(*map.map { it.toPair() }.toTypedArray())
     constructor(array: Array<out Any?>): this(arrayToJsonString(array))
+    constructor(collection: Collection<Any?>): this(collectionToJsonString(collection))
 
     object Undefined: JsonObjectWrapper("")
 
@@ -52,6 +53,15 @@ open class JsonObjectWrapper(val jsonString: String) {
             return "[$inside]"
         }
 
+        private fun collectionToJsonString(collection: Collection<Any?>): String {
+            val inside = collection.fold("") { acc, item ->
+                if (item is Undefined) return@fold acc
+                val prefix = if (acc.isEmpty()) acc else "$acc, "
+                """$prefix${valueToString(item)}"""
+            }
+            return "[$inside]"
+        }
+
         @Suppress("UNCHECKED_CAST")
         private fun<T> valueToString(value: T) = when (value) {
             null -> "null"
@@ -61,6 +71,7 @@ open class JsonObjectWrapper(val jsonString: String) {
             is Boolean -> if (value) "true" else "false"
             is String -> "\"$value\""
             is Array<*> -> JsonObjectWrapper(value).jsonString
+            is Collection<*> -> JsonObjectWrapper(value as Collection<Any?>).jsonString
             is Map<*, *> -> JsonObjectWrapper(value as Map<String, Any?>).jsonString
             else -> throw Exception("Unsupported value in JsonStringWrapper ($value)")
         }
