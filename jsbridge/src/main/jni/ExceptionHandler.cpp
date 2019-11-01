@@ -107,6 +107,9 @@ void ExceptionHandler::jniThrow(const std::exception &e) const {
   } else if (dynamic_cast<const std::invalid_argument *>(&e)) {
     const JniCache *jniCache = m_jsBridgeContext->getJniCache();
     jniContext->throwNew(jniCache->getIllegalArgumentExceptionClass(), e.what());
+  } else {
+    const JniCache *jniCache = m_jsBridgeContext->getJniCache();
+    jniContext->throwNew(jniCache->getRuntimeExceptionClass(), e.what());
   }
 }
 

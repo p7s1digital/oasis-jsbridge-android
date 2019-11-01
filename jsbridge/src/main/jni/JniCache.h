@@ -50,6 +50,7 @@ public:
 
   // Exceptions
   const JniRef<jclass> &getIllegalArgumentExceptionClass() const { return m_illegalArgumentExceptionClass; }
+  const JniRef<jclass> &getRuntimeExceptionClass() const { return m_runtimeExceptionClass; }
   JniLocalRef<jthrowable> newJsException(
       const JStringLocalRef &jsonValue, const JStringLocalRef &detailedMessage,
       const JStringLocalRef &jsStackTrace, const JniRef<jthrowable> &cause) const;
@@ -77,6 +78,7 @@ private:
   JniGlobalRef<jclass> m_jsBridgeClass;
   JniGlobalRef<jclass> m_jsExceptionClass;
   JniGlobalRef<jclass> m_illegalArgumentExceptionClass;
+  JniGlobalRef<jclass> m_runtimeExceptionClass;
 
   JniGlobalRef<jclass> m_jsBridgeMethodClass;
   JniGlobalRef<jclass> m_jsBridgeParameterClass;

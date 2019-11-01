@@ -25,6 +25,7 @@ JniCache::JniCache(const JsBridgeContext *jsBridgeContext, const JniLocalRef<job
  , m_jsBridgeClass(m_jniContext->findClass(JSBRIDGE_PKG_PATH "/JsBridge"))
  , m_jsExceptionClass(m_jniContext->findClass(JSBRIDGE_PKG_PATH "/JsException"))
  , m_illegalArgumentExceptionClass(m_jniContext->findClass("java/lang/IllegalArgumentException"))
+ , m_runtimeExceptionClass(m_jniContext->findClass("java/lang/RuntimeException"))
  , m_jsBridgeMethodClass(m_jniContext->findClass(JSBRIDGE_PKG_PATH "/Method"))
  , m_jsBridgeParameterClass(m_jniContext->findClass(JSBRIDGE_PKG_PATH "/Parameter"))
  , m_jsBridgeJsValueClass(getJavaClass(JavaTypeId::JsValue))
