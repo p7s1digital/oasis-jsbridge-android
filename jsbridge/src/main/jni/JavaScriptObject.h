@@ -45,11 +45,11 @@ public:
   typedef std::unordered_map<jmethodID, std::shared_ptr<JavaScriptMethod>> MethodMap;
 
 #if defined(DUKTAPE)
-  JavaScriptObject(const JsBridgeContext *, std::string strName, duk_idx_t jsObjectIndex, const JObjectArrayLocalRef &methods);
+  JavaScriptObject(const JsBridgeContext *, std::string strName, duk_idx_t jsObjectIndex, const JObjectArrayLocalRef &methods, bool check);
 
   JValue call(const JniLocalRef<jobject> &javaMethod, const JObjectArrayLocalRef &args) const;
 #elif defined(QUICKJS)
-  JavaScriptObject(const JsBridgeContext *, std::string strName, JSValueConst jsObjectValue, const JObjectArrayLocalRef &methods);
+  JavaScriptObject(const JsBridgeContext *, std::string strName, JSValueConst jsObjectValue, const JObjectArrayLocalRef &methods, bool check);
 
   JValue call(JSValueConst jsObjectValue, const JniLocalRef<jobject> &javaMethod, const JObjectArrayLocalRef &args) const;
 #endif

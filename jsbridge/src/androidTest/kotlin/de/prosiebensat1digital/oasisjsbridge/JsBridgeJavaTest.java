@@ -109,7 +109,7 @@ public final class JsBridgeJavaTest {
         );
 
         // THEN
-        JsApi jsApi = nativeApiJsValue.mapToNativeObject(JsApi.class);
+        JsApi jsApi = nativeApiJsValue.mapToNativeObjectBlocking(JsApi.class);
         int sum = jsApi.calcSum(6, 4);
 
         // THEN

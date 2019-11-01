@@ -354,10 +354,12 @@ class JsBridge(context: Context): CoroutineScope {
 
     // Register a "JS" interface called by native.
     //
-    // All the methods of the given interface must be implemented in
-    // JS as:
+    // All the methods of the given interface must be implemented in JS as:
     //
     // MyJsApi.myMethod(arg1, arg2, ...)
+    //
+    // If check is set to true, this method will throw an exception when the JS object is invalid or
+    // does not implement all the methods of the given NativeToJsInterface
     //
     // Notes:
     // - objects and array must be defined wrapped as JsonObjectWrapper
@@ -367,12 +369,21 @@ class JsBridge(context: Context): CoroutineScope {
     //
     // TODO: support for suspend methods!
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
-    fun <T : NativeToJsInterface> registerNativeToJsInterface(jsValue: JsValue, type: KClass<T>): T {
-        return try {
-            registerNativeToJsInterfaceHelper(jsValue, type)
-        } catch (t: Throwable) {
-            throw NativeToJsRegistrationError(type, cause = t)
-                .also(::notifyErrorListeners)
+    suspend fun <T : NativeToJsInterface> registerNativeToJsInterface(jsValue: JsValue, type: KClass<T>, check: Boolean): T {
+        return registerNativeToJsInterfaceHelper(jsValue, type, check, false)
+    }
+
+    // Register a "JS" interface called by native (blocking)
+    //
+    // When check = false, the proxy object will be directly returned
+    // When check = true, the method will block the current thread until the registration has been
+    // done and then return the proxy object
+    @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
+    fun <T : NativeToJsInterface> registerNativeToJsInterfaceBlocking(jsValue: JsValue, type: KClass<T>, check: Boolean): T {
+        val async = !check
+
+        return runBlocking(Dispatchers.Unconfined) {
+            registerNativeToJsInterfaceHelper(jsValue, type, check, async)
         }
     }
 
@@ -639,8 +650,11 @@ class JsBridge(context: Context): CoroutineScope {
         return null
     }
 
+    // - If async = true, the proxy object is returned directly the registration itself is
+    // launched asynchronously a
+    // - If async = false, the proxy object is only returned after a successful registration
     @Throws
-    private fun <T: Any> registerNativeToJsInterfaceHelper(jsValue: JsValue, type: KClass<T>): T {
+    private suspend fun <T: Any> registerNativeToJsInterfaceHelper(jsValue: JsValue, type: KClass<T>, check: Boolean, async: Boolean): T {
         if (!type.java.isInterface) {
             throw NativeToJsRegistrationError(type, customMessage = "$type must be an interface")
         }
@@ -691,14 +705,21 @@ class JsBridge(context: Context): CoroutineScope {
             // => Sequence<Method>
             .values
 
-        launch {
-            val jniJsContext = jniJsContextOrThrow()
+        if (async) {
+            launch(this@JsBridge.coroutineContext) {
+                val jniJsContext = jniJsContextOrThrow()
 
-            try {
+                try {
+                    jsValue.codeEvaluationDeferred?.await()
+                    jniRegisterJsObject(jniJsContext, jsValue.associatedJsName, methods.toTypedArray(), check)
+                } catch (t: Throwable) {
+                    throw NativeToJsRegistrationError(type, cause = t)
+                }
+            }
+        } else {
+            withContext(coroutineContext) {
                 jsValue.codeEvaluationDeferred?.await()
-                jniRegisterJsObject( jniJsContext, jsValue.associatedJsName, methods.toTypedArray())
-            } catch (t: Throwable) {
-                throw NativeToJsRegistrationError(type, cause = t)
+                jniRegisterJsObject(jniJsContextOrThrow(), jsValue.associatedJsName, methods.toTypedArray(), check)
             }
         }
 
@@ -870,7 +891,8 @@ class JsBridge(context: Context): CoroutineScope {
     private external fun jniRegisterJsObject(
         context: Long,
         name: String,
-        methods: Array<Any>
+        methods: Array<Any>,
+        check: Boolean
     )
     private external fun jniRegisterJsLambda(
         context: Long,

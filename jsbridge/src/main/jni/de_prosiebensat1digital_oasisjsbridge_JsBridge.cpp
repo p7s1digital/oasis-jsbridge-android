@@ -169,7 +169,7 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
 }
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRegisterJsObject
-    (JNIEnv *env, jobject, jlong lctx, jstring name, jobjectArray methods) {
+    (JNIEnv *env, jobject, jlong lctx, jstring name, jobjectArray methods, jboolean check) {
 
   //alog("jniRegisterJsObject()");
 
@@ -179,7 +179,7 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
   std::string strName = JStringLocalRef(jniContext, name, JniLocalRefMode::Borrowed).toUtf8Chars();
 
   try {
-    jsBridgeContext->registerJsObject(strName, JObjectArrayLocalRef(jniContext, methods, JniLocalRefMode::Borrowed));
+    jsBridgeContext->registerJsObject(strName, JObjectArrayLocalRef(jniContext, methods, JniLocalRefMode::Borrowed), check);
   } catch (const std::exception &e) {
     jsBridgeContext->getExceptionHandler()->jniThrow(e);
   }

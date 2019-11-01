@@ -144,9 +144,9 @@ there is no existing reference to the JsValue instance in the JVM!
 #### 2.4 JsValue evaluation and mapping to Kotlin/Java
 
 A JS value can be evaluated via:
-- `JsValue.evaluate<T>()`
+- `JsValue.evaluate<T>()`  // suspending function
 - `JsValue.evaluateAsync<T>()`
-- `JsValue.evaluateBlocking<T>()`
+- `JsValue.evaluateBlocking<T>()`  // blocking
 - `JsValue.evaluateBlocking(Class<*> javaClass)`  // from Java
 
 A JS function can be [mapped to a Kotlin proxy function](#using-js-functions-from-native) via `JsValue.mapToNativeObject()`.
@@ -187,7 +187,12 @@ Note: the native function is triggered from the "JS" thread
 ### 5. Using JS objects from Java/Kotlin
 
 An interface extending `NativeToJsInterface` must be defined with the methods implemented by the
-JS object and mapped to a native object via `JsValue.mapToNativeObject()``
+JS object and mapped to a native object via:
+- `JsValue.mapToNativeObject()`  // suspending, check that all methods are defined in the JS object
+- `JsValue.mapToNativeObjectBlocking()`  // blocking, check that all methods are defined in the JS object
+- `JsValue.mapToNativeObjectUnchecked()`  // non-suspending function, no check
+- `JsValue.mapToNativeObjectBlocking(Class<*> javaClass, Boolean check)`  // from Java (blocking, with check)
+- `JsValue.mapToNativeObjectUnchecked(Class<*> javaClass)`  // from Java (no check)
 
 ```kotlin
 interface JsApi: NativeToJsInterface {

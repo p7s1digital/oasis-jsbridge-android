@@ -251,12 +251,13 @@ void JsBridgeContext::registerJavaLambda(const std::string &strName, const JniLo
 }
 
 void JsBridgeContext::registerJsObject(const std::string &strName,
-                                       const JObjectArrayLocalRef &methods) {
+                                       const JObjectArrayLocalRef &methods,
+                                       bool check) {
   CHECK_STACK(m_ctx);
 
   duk_get_global_string(m_ctx, strName.c_str());
 
-  if (!duk_is_object(m_ctx, -1) || duk_is_null(m_ctx, -1)) {
+  if (check && (!duk_is_object(m_ctx, -1) || duk_is_null(m_ctx, -1))) {
     duk_pop(m_ctx);
     throw std::invalid_argument("Cannot register " + strName + ". It does not exist or is not a valid object");
   }
@@ -268,7 +269,7 @@ void JsBridgeContext::registerJsObject(const std::string &strName,
 
   try {
     // Create the JavaScriptObject instance (which takes over jsObjectValue and will free it in its destructor)
-    auto cppJsObject = new JavaScriptObject(this, strName, -1, methods);  // auto-deleted
+    auto cppJsObject = new JavaScriptObject(this, strName, -1, methods, check);  // auto-deleted
 
     // Wrap it inside the JS object
     m_utils->createMappedCppPtrValue(cppJsObject, -1, strName.c_str());

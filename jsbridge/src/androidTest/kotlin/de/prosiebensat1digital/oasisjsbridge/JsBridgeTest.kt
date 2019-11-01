@@ -119,6 +119,8 @@ class JsBridgeTest {
         val subject = createAndSetUpJsBridge()
 
         // WHEN
+        val js = """nativeFunctionMock("testString");"""
+        subject.evaluateNoRetVal(js)
 
         runBlocking { waitForDone(subject) }
 
@@ -777,7 +779,7 @@ class JsBridgeTest {
             |    );
             |  }
             |})""".trimMargin()
-        ).mapToNativeObject()
+        ).mapToNativeObjectUnchecked()
 
         val nativeCbMock = mockk<(Int) -> Unit>(relaxed = true)
         jsApi.registerCallback(nativeCbMock)
@@ -1211,7 +1213,7 @@ class JsBridgeTest {
         assertNotNull(arr)
 
         // WHEN
-        val jsApi: TestJsApiInterface = testJsApi.mapToNativeObject()
+        val jsApi: TestJsApiInterface = testJsApi.mapToNativeObjectBlocking()
         jsApi.jsMethodWithString("Hello JS!")
         jsApi.jsMethodWithJsonObjects(obj, arr)
         val jsValueParam = JsValue(subject, "\"This is a JS value\"")
@@ -1277,6 +1279,53 @@ class JsBridgeTest {
     }
 
     @Test
+    fun testRegisterNativeToJsInterfaceChecked() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+        val jsApiNoObjectValue = JsValue(subject, "undefined")
+        val jsApiEmptyObjectValue = JsValue(subject, "({})")
+
+        // WHEN
+        runBlocking {
+            assertFailsWith<IllegalArgumentException> {
+                jsApiNoObjectValue.mapToNativeObject<TestJsApiInterface>()
+            }
+            assertFailsWith<IllegalArgumentException> {
+                jsApiEmptyObjectValue.mapToNativeObject<TestJsApiInterface>()
+            }
+        }
+    }
+
+    @Test
+    fun testRegisterNativeToJsInterfaceUnchecked() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+        val jsApiValue = JsValue(subject, """({
+          jsMethodReturningFulfilledPromise: function(msg) {
+            return msg;
+          }
+        });""")
+        val jsApiNoObjectValue = JsValue(subject, "undefined")
+        val jsApiEmptyObjectValue = JsValue(subject, "({})")
+
+        // WHEN
+        val jsApi: TestJsApiInterface = jsApiValue.mapToNativeObjectUnchecked()
+        val jsApiNoObject: TestJsApiInterface = jsApiNoObjectValue.mapToNativeObjectUnchecked()
+        val jsApiEmptyObject: TestJsApiInterface = jsApiEmptyObjectValue.mapToNativeObjectUnchecked()
+
+        // THEN
+        runBlocking {
+            assertEquals(jsApi.jsMethodReturningFulfilledPromise("test string").await(), "test string")
+            assertFailsWith<IllegalArgumentException> {
+                jsApiNoObject.jsMethodReturningFulfilledPromise("test string").await()
+            }
+            assertFailsWith<JsException> {
+                jsApiEmptyObject.jsMethodReturningFulfilledPromise("test string").await()
+            }
+        }
+    }
+
+    @Test
     fun testRegisterNativeToJsInterfaceFromPromise() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
@@ -1285,21 +1334,14 @@ class JsBridgeTest {
               resolve({
                 jsMethodWithString: function(msg) {
                   nativeFunctionMock(msg);
-                },
-                jsMethodWithJsonObjects: function() {},  // unused
-                jsMethodWithJsValue: function() {},  // unused
-                jsMethodWithCallback: function() {},  // unused
-                jsMethodWithUnitCallback: function() {},  // unused
-                jsMethodReturningFulfilledPromise: function() {},  // unused
-                jsMethodReturningRejectedPromise: function() {},  // unused
-                jsMethodReturningJsValue: function() {}  // unused
+                }
               });
             });"""
         )
 
         // WHEN
         runBlocking {
-            val jsApi: TestJsApiInterface = jsApiPromise.await().mapToNativeObject()
+            val jsApi: TestJsApiInterface = jsApiPromise.await().mapToNativeObjectUnchecked()
             jsApi.jsMethodWithString("Hello JS!")
         }
 
@@ -1313,16 +1355,9 @@ class JsBridgeTest {
         // WHEN
         val subject = createAndSetUpJsBridge()
         val testJsApi = JsValue(subject, """({
-            jsMethodWithString: function() {},  // unused
-            jsMethodWithJsonObjects: function() {},  // unused
-            jsMethodWithJsValue: function() {},  // unused
-            jsMethodWithCallback: function(cb) { cb(); },
-            jsMethodWithUnitCallback: function(cb) { cb(); },
-            jsMethodReturningFulfilledPromise: function() {},  // unused
-            jsMethodReturningRejectedPromise: function() {},  // unused
-            jsMethodReturningJsValue: function() {}  // unused
+            jsMethodWithCallback: function(cb) { cb(); }
         })""")
-        val jsApi: TestJsApiInterface = testJsApi.mapToNativeObject()
+        val jsApi: TestJsApiInterface = testJsApi.mapToNativeObjectUnchecked()
 
         var callbackCalled = false
 

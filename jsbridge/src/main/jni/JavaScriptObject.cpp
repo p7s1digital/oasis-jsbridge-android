@@ -38,7 +38,7 @@
 
 #include "StackChecker.h"
 
-JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::string strName, duk_idx_t jsObjectIndex, const JObjectArrayLocalRef &methods)
+JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::string strName, duk_idx_t jsObjectIndex, const JObjectArrayLocalRef &methods, bool check)
  : m_name(std::move(strName))
  , m_jsBridgeContext(jsBridgeContext) {
 
@@ -66,16 +66,21 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
     const JniLocalRef<jsBridgeMethod> method = methods.getElement<jsBridgeMethod>(i);
     MethodInterface methodInterface = jniCache->getMethodInterface(method);
 
-    // Sanity check that as of right now, the object we're proxying has a function with this name.
     std::string strMethodName = methodInterface.getName().toUtf8Chars();
-    if (!duk_get_prop_string(ctx, -1, strMethodName.c_str())) {
-      duk_pop_2(ctx);
-      throw std::runtime_error("JS global " + m_name + " has no method called " + strMethodName);
-    } else if (!duk_is_callable(ctx, -1)) {
-      duk_pop_2(ctx);
-      throw std::runtime_error("JS property " + m_name + "." + strMethodName + " not callable");
-    }
 
+    if (check) {
+      // Sanity check that as of right now, the object we're proxying has a function with this name
+      if (!duk_get_prop_string(ctx, -1, strMethodName.c_str())) {
+        duk_pop_2(ctx);
+        throw std::invalid_argument("JS global " + m_name + " has no method called " + strMethodName);
+      } else if (!duk_is_callable(ctx, -1)) {
+        duk_pop_2(ctx);
+        throw std::invalid_argument("JS property " + m_name + "." + strMethodName + " not callable");
+      }
+
+      // Pop the method property.
+      duk_pop(ctx);
+    }
     try {
       JniLocalRef<jobject> javaMethod = methodInterface.getJavaMethod();
       jmethodID methodId = jniContext->fromReflectedMethod(javaMethod);
@@ -85,12 +90,9 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
 
       m_methods.emplace(methodId, std::shared_ptr<JavaScriptMethod>(jsMethod));
     } catch (const std::invalid_argument &e) {
-      duk_pop_2(ctx);
+      duk_pop(ctx);
       throw std::invalid_argument("In proxied method \"" + m_name + "." + strMethodName + "\": " + e.what());
     }
-
-    // Pop the method property.
-    duk_pop(ctx);
   }
 
   duk_pop(ctx);  // JS object
@@ -115,7 +117,7 @@ JValue JavaScriptObject::call(const JniLocalRef<jobject> &javaMethod, const JObj
 
   try {
     if (methodIt == m_methods.end()) {
-      throw std::runtime_error("Could not find method " + m_name + "." + getMethodName());
+      throw std::invalid_argument("Could not find method " + m_name + "." + getMethodName());
     }
 
     // Method found -> call it
@@ -131,7 +133,7 @@ JValue JavaScriptObject::call(const JniLocalRef<jobject> &javaMethod, const JObj
 
 #include "QuickJsUtils.h"
 
-JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::string strName, JSValueConst jsObjectValue, const JObjectArrayLocalRef &methods)
+JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::string strName, JSValueConst jsObjectValue, const JObjectArrayLocalRef &methods, bool check)
  : m_name(std::move(strName))
  , m_jsBridgeContext(jsBridgeContext) {
 
@@ -154,17 +156,19 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
     JniLocalRef<jsBridgeMethod > method = methods.getElement<jsBridgeMethod>(i);
     MethodInterface methodInterface = jniCache->getMethodInterface(method);
 
-    // Sanity check that as of right now, the object we're proxying has a function with this name.
     std::string strMethodName = methodInterface.getName().toUtf8Chars();
-    JSValue methodValue = JS_GetPropertyStr(ctx, jsObjectValue, strMethodName.c_str());
-    if (JS_IsUndefined(methodValue)) {
-      throw std::runtime_error("JS global " + m_name + " has no method called " + strMethodName);
-    } else if (!JS_IsFunction(ctx, methodValue)) {
-      JS_FreeValue(ctx, methodValue);
-      throw std::runtime_error("JS property " + m_name + "." + strMethodName + " is not function");
-    }
 
-    JS_FreeValue(ctx, methodValue);
+    if (check) {
+      // Sanity check that as of right now, the object we're proxying has a function with this name
+      JSValue methodValue = JS_GetPropertyStr(ctx, jsObjectValue, strMethodName.c_str());
+      JS_AUTORELEASE_VALUE(ctx, methodValue);
+
+      if (JS_IsUndefined(methodValue)) {
+        throw std::invalid_argument("JS global " + m_name + " has no method called " + strMethodName);
+      } else if (!JS_IsFunction(ctx, methodValue)) {
+        throw std::invalid_argument("JS property " + m_name + "." + strMethodName + " is not function");
+      }
+    }
 
     try {
       JniLocalRef<jobject> javaMethod = methodInterface.getJavaMethod();
@@ -209,9 +213,9 @@ JValue JavaScriptObject::call(JSValueConst jsObjectValue, const JniLocalRef<jobj
   JSValue jsMethodValue = JS_GetPropertyStr(ctx, jsObjectValue, jsMethod->getName().c_str());
   JS_AUTORELEASE_VALUE(ctx, jsMethodValue);
 
-  if (!JS_IsFunction(ctx, jsMethodValue)) {
-    throw std::runtime_error("Error while calling JS method: " + m_name + " is not a valid JS function!");
-  }
+  //if (!JS_IsFunction(ctx, jsMethodValue)) {
+  //  throw std::invalid_argument("Error while calling JS method: " + m_name + " is not a valid JS function!");
+  //}
 
   return jsMethod->invoke(m_jsBridgeContext, jsMethodValue, jsObjectValue, args, false);
 }

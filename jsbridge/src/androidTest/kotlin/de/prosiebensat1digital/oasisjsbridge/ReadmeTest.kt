@@ -42,7 +42,7 @@ class ReadmeTest {
 
     @After
     fun cleanUp() {
-        jsBridge?.let {
+        jsBridge.let {
             runBlocking {
                 waitForDone(it)
                 it.release()
@@ -147,13 +147,13 @@ class ReadmeTest {
 
     @Test
     fun testNativeToJsInterface() {
-        val jsApi: JsApi = JsValue(jsBridge, """({
-            calcSum: function(a, b) { return a + b; },
-            setCallback: function(cb) { this._cb = cb; },
-            triggerEvent: function() { if (_cb) cb({ value: 12 }); } 
-        })""".trimIndent()).mapToNativeObject()
-
         runBlocking {
+            val jsApi: JsApi = JsValue(jsBridge, """({
+                calcSum: function(a, b) { return a + b; },
+                setCallback: function(cb) { this._cb = cb; },
+                triggerEvent: function() { if (_cb) cb({ value: 12 }); } 
+            })""".trimIndent()).mapToNativeObject()
+
             val result = jsApi.calcSum(1, 2).await()
             println("sum is = $result")
             jsApi.setCallback { payload -> println("Got JS event with payload $payload") }

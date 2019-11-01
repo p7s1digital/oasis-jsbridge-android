@@ -185,7 +185,8 @@ void JsBridgeContext::registerJavaLambda(const std::string &strName, const JniLo
 }
 
 void JsBridgeContext::registerJsObject(const std::string &strName,
-                                       const JObjectArrayLocalRef &methods) {
+                                       const JObjectArrayLocalRef &methods,
+                                       bool check) {
   JSValue globalObj = JS_GetGlobalObject(m_ctx);
   JSValue jsObjectValue = JS_GetPropertyStr(m_ctx, globalObj, strName.c_str());
   JS_FreeValue(m_ctx, globalObj);
@@ -202,7 +203,7 @@ void JsBridgeContext::registerJsObject(const std::string &strName,
   }
 
   // Create the JavaScriptObject instance
-  auto cppJsObject = new JavaScriptObject(this, strName, jsObjectValue, methods);  // auto-deleted
+  auto cppJsObject = new JavaScriptObject(this, strName, jsObjectValue, methods, check);  // auto-deleted
 
   // Wrap it inside the JS object
   m_utils->createMappedCppPtrValue(cppJsObject, jsObjectValue, strName.c_str());

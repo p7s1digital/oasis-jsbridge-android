@@ -274,25 +274,64 @@ internal constructor(
 
     // Create a native proxy to a JS object
     // Notes:
-    // - the methods will be launched asynchronously in the JS thread
-    // - return values are only supported
-    inline fun <reified T: NativeToJsInterface> mapToNativeObject(): T {
+    // - this method will throw an exception if the JS object does not implement all the methods
+    // of the NativeToJsInterface
+    // - the methods of the returned proxy object will be running in the JS thread and block the
+    // caller thread if the return value is not Unit or Deferred
+    suspend inline fun <reified T: NativeToJsInterface> mapToNativeObject(): T {
         val jsBridge = jsBridge
                 ?: throw NativeToJsRegistrationError(T::class, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
 
-        return jsBridge.registerNativeToJsInterface(this, T::class)
+        return jsBridge.registerNativeToJsInterface(this, T::class, true)
+    }
+
+    inline fun <reified T: NativeToJsInterface> mapToNativeObjectBlocking(): T {
+        val jsBridge = jsBridge
+                ?: throw NativeToJsRegistrationError(T::class, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
+
+        return jsBridge.registerNativeToJsInterfaceBlocking(this, T::class, true)
     }
 
     // Create a native proxy to a JS object
     // Notes:
-    // - the methods will be running in the JS thread and block the caller thread if there is a
-    // return value
+    // - the proxy object will be returned even if the JS object is invalid or does not implement
+    // all of the methods of the NativeToJsInterface
+    // - the methods of the returned proxy object will be running in the JS thread and block the
+    // caller thread if the return value is not Unit or Deferred
+    inline fun <reified T: NativeToJsInterface> mapToNativeObjectUnchecked(): T {
+        val jsBridge = jsBridge
+                ?: throw NativeToJsRegistrationError(T::class, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
+
+        return jsBridge.registerNativeToJsInterfaceBlocking(this, T::class, false)
+    }
+
+    // Create a native proxy to a JS object
+    // Notes:
+    // - this method will block the current thread until the object has been registered
+    // - this method will throw an exception if the JS object does not implement all the methods
+    // of the NativeToJsInterface
+    // - the methods of the returned proxy object will be running in the JS thread and block the
+    // caller thread if there is a return value
     // - from Kotlin, it is recommended to use the method with generic parameter, instead!
-    fun <T: NativeToJsInterface> mapToNativeObject(nativeToJsInterface: Class<T>): T {
+    fun <T: NativeToJsInterface> mapToNativeObjectBlocking(nativeToJsInterface: Class<T>): T {
         val jsBridge = jsBridge
                 ?: throw NativeToJsRegistrationError(nativeToJsInterface.kotlin, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
 
-        return jsBridge.registerNativeToJsInterface(this, nativeToJsInterface.kotlin)
+        return jsBridge.registerNativeToJsInterfaceBlocking(this, nativeToJsInterface.kotlin, true)
+    }
+
+    // Create a native proxy to a JS object
+    // Notes:
+    // - the proxy object will be returned even if the JS object is invalid or does not implement
+    // all of the methods of the NativeToJsInterface
+    // - the methods of the returned proxy object will be running in the JS thread and block the
+    // caller thread if there is a return value
+    // - from Kotlin, it is recommended to use the method with generic parameter, instead!
+    fun <T: NativeToJsInterface> mapToNativeObjectUnchecked(nativeToJsInterface: Class<T>): T {
+        val jsBridge = jsBridge
+                ?: throw NativeToJsRegistrationError(nativeToJsInterface.kotlin, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
+
+        return jsBridge.registerNativeToJsInterfaceBlocking(this, nativeToJsInterface.kotlin, false)
     }
 
     // Unfortunately crashes with latest Kotlin (1.3.40) because typeOf<>() does not work yet for suspending functions,
