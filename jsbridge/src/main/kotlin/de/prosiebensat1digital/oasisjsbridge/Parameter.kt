@@ -83,6 +83,30 @@ internal open class Parameter private constructor(
         Method(javaMethod, kotlinType.arguments, true)
     }
 
+    // Return the component type of an array (e.g. for varargs parameters)
+    //
+    // e.g.: if the parameter is vararg Int, return Int
+    @Suppress("UNUSED")  // Called from JNI
+    fun getComponentType(): Parameter? {
+        val javaComponentType = javaClass?.componentType
+        if (javaComponentType?.isPrimitive == true) {
+            return Parameter(javaComponentType)
+        }
+
+        return if (kotlinType == null) {
+            if (javaComponentType == null) {
+                // No type information => using generic Object type
+                Parameter(Any::class.java)
+            } else {
+                Parameter(javaComponentType)
+            }
+        } else {
+            // Use KType instance to create the (only) generic type
+            kotlinType.arguments.firstOrNull()?.type?.let { genericParameterType ->
+                Parameter(genericParameterType)
+            }
+        }
+    }
 
     // For Deferred
     // TODO: replace it into more "generic" method like "getGenericParameters()"

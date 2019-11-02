@@ -49,13 +49,10 @@ JavaMethod::JavaMethod(const JsBridgeContext *jsBridgeContext, const JniLocalRef
     JniLocalRef<jsBridgeParameter> parameter = parameters.getElement<jsBridgeParameter>(i);
 
     if (m_isVarArgs && i == numParameters - 1) {
-      // TODO: create the array component Parameter, maybe sth like Parameter.getArrayComponent()
-      //Parameter parameterInterface = jsBridgeContext->getJniCache()->getParameterInterface(parameter);
-      //jmethodID getVarArgParameter = jniContext->getMethodID(
-      //    jsBridgeParameterClass, "getVarArgParameter", "()Lde/prosiebensat1digital/oasisjsbridge/Parameter;");
-      //JniLocalRef<jsBridgeParameter> varArgParameter = jniContext->callObjectMethod<jsBridgeParameter>(javaClass, getVarArgParameter);
-      //auto javaType = jsBridgeContext->getJavaTypeProvider().makeUniqueType(varArgParameter, m_isLambda /*boxed*/);
-      //m_argumentTypes[i] = std::move(javaType);
+      ParameterInterface parameterInterface = jsBridgeContext->getJniCache()->getParameterInterface(parameter);
+      JniLocalRef<jsBridgeParameter> varArgParameter = parameterInterface.getComponentType();
+      auto javaType = jsBridgeContext->getJavaTypeProvider().makeUniqueType(varArgParameter, m_isLambda /*boxed*/);
+      m_argumentTypes[i] = std::move(javaType);
       break;
     }
 
@@ -156,19 +153,24 @@ JSValue JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRef<
 
   std::vector<JValue> args(m_argumentTypes.size());
 
-  // Load the arguments off the stack and convert to Java types.
-  if (m_isVarArgs) {
-    const auto &argumentType = m_argumentTypes.back();
-    // TODO: QuickJS varargs
-    assert(false);
-    //args[args.size() - 1] = argumentLoader->toJavaArray(argv[argc - 1], argc - minArgs, true);
-  }
-
+  // Load arguments off the stack and convert to Java types
   for (int i = 0; i < minArgs; ++i) {
     const auto &argumentType = m_argumentTypes[i];
     JValue value = argumentType->toJava(argv[i]);
     args[i] = std::move(value);
   }
+
+  if (m_isVarArgs) {
+    // Move the varargs into a JS array before converting it to a Java array
+    const auto &argumentType = m_argumentTypes.back();
+    int varArgCount = argc - minArgs;
+    JSValue varArgArray = JS_NewArray(ctx);
+    for (int i = 0; i < varArgCount; ++i) {
+      JS_SetPropertyUint32(ctx, varArgArray, static_cast<uint32_t>(i), argv[minArgs + i]);
+    }
+    args[args.size() - 1] = argumentType->toJavaArray(varArgArray);
+  }
+
 
   return m_methodBody(javaThis, args);
 }

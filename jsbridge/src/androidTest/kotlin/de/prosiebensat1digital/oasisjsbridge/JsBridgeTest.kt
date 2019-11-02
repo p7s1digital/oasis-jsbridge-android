@@ -41,6 +41,8 @@ interface TestNativeApiInterface : JsToNativeInterface {
     fun nativeMethodWithBool(b: Boolean?)
     fun nativeMethodWithString(msg: String?)
     fun nativeMethodWithJsonObjects(jsonObject1: JsonObjectWrapper?, jsonObject2: JsonObjectWrapper?)
+    fun nativeMethodWithIntVarArg(b: Boolean, vararg ints: Int)
+    fun nativeMethodWithStringVarArg(b: Boolean, vararg strings: String)
     fun nativeMethodWithCallback(cb: (string: String, obj: JsonObjectWrapper, bool1: Boolean, bool2: Boolean, int: Int, double: Double, optionalInt1: Int?, optionalInt2: Int?) -> Unit)
     fun nativeMethodThrowingException()
 }
@@ -49,6 +51,8 @@ interface TestJsApiInterface : NativeToJsInterface {
     fun jsMethodWithString(msg: String)
     fun jsMethodWithJsonObjects(jsonObject1: JsonObjectWrapper, jsonObject2: JsonObjectWrapper)
     fun jsMethodWithJsValue(jsValue: JsValue)
+    fun jsMethodWithIntVarArg(b: Boolean, vararg ints: Int)
+    fun jsMethodWithStringVarArg(b: Boolean, vararg strings: String)
     fun jsMethodWithCallback(cb: (msg: String, jsonObject1: JsonObjectWrapper, jsonObject2: JsonObjectWrapper, bool1: Boolean, bool2: Boolean, int: Int, double: Double, optionalInt1: Int?, optionalInt2: Int?) -> String)
     fun jsMethodWithUnitCallback(cb: () -> Unit)
     fun jsMethodReturningFulfilledPromise(str: String): Deferred<String>
@@ -1098,7 +1102,9 @@ class JsBridgeTest {
         var receivedString: String? = null
         var receivedJsonObject1: JsonObjectWrapper? = null
         var receivedJsonObject2: JsonObjectWrapper? = null
-        
+        var receivedIntVarArg: IntArray? = null
+        var receivedStringVarArg: Array<out String>? = null
+
         val nativeApi = object : TestNativeApiInterface {
             override fun nativeMethodReturningTrue() = true
             override fun nativeMethodReturningFalse() = false
@@ -1142,6 +1148,14 @@ class JsBridgeTest {
             override fun nativeMethodWithJsonObjects(jsonObject1: JsonObjectWrapper?, jsonObject2: JsonObjectWrapper?) {
                 receivedJsonObject1 = jsonObject1
                 receivedJsonObject2 = jsonObject2
+            }
+
+            override fun nativeMethodWithIntVarArg(b: Boolean, vararg ints: Int) {
+                receivedIntVarArg = ints
+            }
+
+            override fun nativeMethodWithStringVarArg(b: Boolean, vararg strings: String) {
+                receivedStringVarArg = strings.clone()
             }
 
             override fun nativeMethodWithCallback(cb: (string: String, obj: JsonObjectWrapper, bool1: Boolean, bool2: Boolean, int: Int, double: Double, optionalInt1: Int?, optionalInt2: Int?) -> Unit) {
@@ -1195,6 +1209,8 @@ class JsBridgeTest {
             $testNativeApi.nativeMethodWithBool(retBool2);
             $testNativeApi.nativeMethodWithString(retString);
             $testNativeApi.nativeMethodWithJsonObjects(retObject, [1, "two", 3]);
+            $testNativeApi.nativeMethodWithIntVarArg(false, 1, 2, 3, 4, 5);
+            $testNativeApi.nativeMethodWithStringVarArg(true, "vararg1", "vararg2", "vararg3");
             $testNativeApi.nativeMethodWithCallback(function(string, obj, bool1, bool2, int, double, optionalInt1, optionalInt2) {
               $jsExpectationsJsValue.addExpectation("cbString", string);
               $jsExpectationsJsValue.addExpectation("cbObj", obj);
@@ -1221,6 +1237,8 @@ class JsBridgeTest {
         assertEquals(receivedString, "Hello JsBridgeTest!")
         assertEquals(receivedJsonObject1?.jsonString, """{"returnKey1":1,"returnKey2":"returnValue2"}""")
         assertEquals(receivedJsonObject2?.jsonString, """[1,"two",3]""")
+        assertArrayEquals(receivedIntVarArg, intArrayOf(1, 2, 3, 4, 5))
+        assertArrayEquals(receivedStringVarArg, arrayOf("vararg1", "vararg2", "vararg3"))
 
         runBlocking { waitForDone(subject) }
 
@@ -1335,6 +1353,14 @@ class JsBridgeTest {
             jsMethodWithJsValue: function(v) {
               $jsExpectationsJsValue.addExpectation("jsValueArg", v);
             },
+            jsMethodWithIntVarArg: function(b/*, ...ints*/) {
+              var intArray = Array.prototype.slice.call(arguments, 1);
+              $jsExpectationsJsValue.addExpectation("intVarArg", intArray);
+            },
+            jsMethodWithStringVarArg: function(b/*, ...strings*/) {
+              var stringArray = Array.prototype.slice.call(arguments, 1);
+              $jsExpectationsJsValue.addExpectation("stringVarArg", stringArray);
+            },
             jsMethodWithCallback: function(cb) {
               var cbRet = cb("Callback message", {test1: "value1", test2: 2}, [1, 2, 3], true, false, 69, 123.456, 123, null);
               $jsExpectationsJsValue.addExpectation("cbRet", cbRet);
@@ -1372,6 +1398,8 @@ class JsBridgeTest {
         jsApi.jsMethodWithJsonObjects(obj, arr)
         val jsValueParam = JsValue(subject, "\"This is a JS value\"")
         jsApi.jsMethodWithJsValue(jsValueParam)
+        jsApi.jsMethodWithIntVarArg(true, 1, 2, 3, 4)
+        jsApi.jsMethodWithStringVarArg(true, "one", "two", "three", "four")
         jsApi.jsMethodWithCallback { string, jsonObject1, jsonObject2, bool1, bool2, int, double, optionalInt1, optionalInt2 ->
             callbackValues = CallbackValues(string, jsonObject1, jsonObject2, bool1, bool2, int, double, optionalInt1, optionalInt2)
             "CallbackTestRetVal"
@@ -1426,6 +1454,8 @@ class JsBridgeTest {
             assertNotNull(jsValueArg)
             assertTrue(subject.evaluateAsync<Boolean>("$jsValueArg == $jsValueParam").await())
         }
+        jsExpectations.checkEquals("intVarArg", intArrayOf(1, 2, 3, 4))
+        jsExpectations.checkEquals("stringVarArg", arrayOf("one", "two", "three", "four"))
         jsExpectations.checkEquals("cbRet", "CallbackTestRetVal")
         assertTrue(jsExpectations.isEmpty)
 
@@ -1832,7 +1862,11 @@ class JsBridgeTest {
         }
 
         inline fun <reified T: Any> checkEquals(name: String, value: T?) {
-            assertEquals(value, takeExpectation(name))
+            when (value) {
+                is IntArray -> assertArrayEquals(takeExpectation(name), value)
+                is Array<*> -> assertArrayEquals(takeExpectation(name), value)
+                else -> assertEquals(takeExpectation(name), value)
+            }
         }
 
         inline fun <reified T: Any> checkBlock(name: String, block: (T?) -> Unit) {

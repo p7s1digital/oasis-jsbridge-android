@@ -77,6 +77,7 @@ public:
   JniLocalRef<jobject> getJava() const;
   JStringLocalRef getJavaName() const;
   jboolean isNullable() const;
+  JniLocalRef<jsBridgeParameter> getComponentType() const;
   JniLocalRef<jsBridgeParameter> getGenericParameter() const;
   JStringLocalRef getName() const;
 };

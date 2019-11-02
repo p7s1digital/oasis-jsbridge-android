@@ -164,6 +164,11 @@ jboolean ParameterInterface::isNullable() const {
   return m_jniCache->getJniContext()->callBooleanMethod(m_object, methodId);
 }
 
+JniLocalRef<jsBridgeParameter> ParameterInterface::getComponentType() const {
+  static thread_local jmethodID methodId = m_jniCache->getJniContext()->getMethodID(m_class, "getComponentType", "()L" JSBRIDGE_PKG_PATH "/Parameter;");
+  return m_jniCache->getJniContext()->callObjectMethod<jsBridgeParameter>(m_object, methodId);
+}
+
 JniLocalRef<jsBridgeParameter> ParameterInterface::getGenericParameter() const {
   static thread_local jmethodID methodId = m_jniCache->getJniContext()->getMethodID(m_class, "getGenericParameter", "()L" JSBRIDGE_PKG_PATH "/Parameter;");
   return m_jniCache->getJniContext()->callObjectMethod<jsBridgeParameter>(m_object, methodId);

@@ -38,6 +38,7 @@ JavaScriptMethod::JavaScriptMethod(const JsBridgeContext *jsBridgeContext, const
   const JavaTypeProvider &javaTypeProvider = jsBridgeContext->getJavaTypeProvider();
 
   MethodInterface methodInterface = jniCache->getMethodInterface(method);
+  m_isVarArgs = methodInterface.isVarArgs();
 
   {
     // Create return value loader
@@ -54,9 +55,17 @@ JavaScriptMethod::JavaScriptMethod(const JsBridgeContext *jsBridgeContext, const
 
   m_argumentTypes.resize(numParameters);
 
-  // Create ArgumentLoader instances
+  // Create JavaType instances
   for (jsize i = 0; i < numParameters; ++i) {
-    JniLocalRef<jsBridgeParameter> parameter = parameters.getElement<jsBridgeParameter >(i);
+    JniLocalRef<jsBridgeParameter> parameter = parameters.getElement<jsBridgeParameter>(i);
+
+    if (m_isVarArgs && i == numParameters - 1) {
+        ParameterInterface parameterInterface = jsBridgeContext->getJniCache()->getParameterInterface(parameter);
+        JniLocalRef<jsBridgeParameter> varArgParameter = parameterInterface.getComponentType();
+        auto javaType = jsBridgeContext->getJavaTypeProvider().makeUniqueType(varArgParameter, false /*boxed*/);
+        m_argumentTypes[i] = std::move(javaType);
+        break;
+    }
 
     // Always load the boxed type instead of the primitive type (e.g. Integer vs int)
     // because we are going to a Proxy object
@@ -70,7 +79,8 @@ JavaScriptMethod::JavaScriptMethod(JavaScriptMethod &&other) noexcept
  , m_returnValueType(std::move(other.m_returnValueType))
  , m_returnValueParameter(std::move(other.m_returnValueParameter))
  , m_argumentTypes(std::move(other.m_argumentTypes))
- , m_isLambda(other.m_isLambda) {
+ , m_isLambda(other.m_isLambda)
+ , m_isVarArgs(other.m_isVarArgs) {
 }
 
 JavaScriptMethod &JavaScriptMethod::operator=(JavaScriptMethod &&other) noexcept {
@@ -79,6 +89,7 @@ JavaScriptMethod &JavaScriptMethod::operator=(JavaScriptMethod &&other) noexcept
   m_returnValueParameter = std::move(other.m_returnValueParameter);
   m_argumentTypes = std::move(other.m_argumentTypes);
   m_isLambda = other.m_isLambda;
+  m_isVarArgs = other.m_isVarArgs;
 
   return *this;
 }
@@ -110,6 +121,10 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, void *js
     JValue arg(args.getElement(i));
     const auto &argumentType = m_argumentTypes[i];
     try {
+      if (m_isVarArgs && i == numArguments - 1) {
+        numArguments = i + argumentType->pushArray(arg.getLocalRef().staticCast<jarray>(), true /*expand*/);
+        break;
+      }
       argumentType->push(arg);
     } catch (const std::exception &) {
       duk_pop_n(ctx, (m_isLambda ? 1 : 2) + i);  // lambda: func + previous args, method: obj + methodName + previous args
@@ -149,13 +164,34 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, void *js
 JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, JSValueConst jsMethod, JSValueConst jsThis, const JObjectArrayLocalRef &javaArgs, bool awaitJsPromise) const {
   JSContext *ctx = jsBridgeContext->getQuickJsContext();
 
-  int numArguments = javaArgs.isNull() ? 0 : (int) javaArgs.getLength();
+  int numJavaArguments = javaArgs.isNull() ? 0 : (int) javaArgs.getLength();
+  int numJsArguments = numJavaArguments;
 
-  JSValue jsArgs[numArguments];
-  for (jsize i = 0; i < numArguments; ++i) {
+  JniLocalRef<jarray> varArgJavaArray;
+  int varArgCount = 0;
+
+  if (m_isVarArgs) {
+    varArgJavaArray = javaArgs.getElement(numJavaArguments - 1).staticCast<jarray>();
+    varArgCount = jsBridgeContext->getJniContext()->getArrayLength(varArgJavaArray);
+    numJsArguments += varArgCount - 1;
+  }
+
+  JSValue jsArgs[numJsArguments];
+
+  for (jsize i = 0; i < numJsArguments; ++i) {
     JValue javaArg(javaArgs.getElement(i));
     const auto &argumentType = m_argumentTypes[i];
     try {
+      if (m_isVarArgs && i >= numJavaArguments - 1) {
+        // For varargs, convert Java array to JS array and "expand" it to the JS args
+        JSValue varArgJsArray = argumentType->fromJavaArray(varArgJavaArray);
+        for (int j = 0; j < varArgCount; ++j, ++i) {
+          JSValue elementJsValue = JS_GetPropertyUint32(ctx, varArgJsArray, static_cast<uint32_t>(j));
+          jsArgs[i] = elementJsValue;
+        }
+        JS_FreeValue(ctx, varArgJsArray);
+        break;
+      }
       jsArgs[i] = argumentType->fromJava(javaArg);
     } catch (const std::exception &) {
       // Free all the JSValue instances which had been added until now
@@ -166,10 +202,10 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, JSValueC
     }
   }
 
-  JSValue ret = JS_Call(ctx, jsMethod, jsThis, numArguments, jsArgs);
+  JSValue ret = JS_Call(ctx, jsMethod, jsThis, numJsArguments, jsArgs);
   JS_AUTORELEASE_VALUE(ctx, ret);
 
-  for (jsize i = 0; i < numArguments; ++i) {
+  for (jsize i = 0; i < numJsArguments; ++i) {
     JS_FreeValue(ctx, jsArgs[i]);
   }
 
