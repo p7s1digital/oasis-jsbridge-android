@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.reflect.typeOf
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.reflect.KType
 import kotlin.reflect.full.createType
 
 // A simple wrapper around a JS value stored as a global JS variable and deleted
@@ -336,113 +337,99 @@ internal constructor(
 
     // Unfortunately crashes with latest Kotlin (1.3.40) because typeOf<>() does not work yet for suspending functions,
     // that's why we have to use the registerJsFunctionX() methods below (X = parameter count)
-    // TODO: when supported, also check for varargs...
     //
     //inline fun <reified F: Function<*>> mapToNativeTunction(kFunction = typeOf<F>()): F {
     //  ...
     //}
 
     @UseExperimental(ExperimentalStdlibApi::class)
-    inline fun <reified R> mapToNativeFunction0(): suspend () -> R {
-        val types = listOf(typeOf<R>())
+    @PublishedApi
+    internal inline fun <reified R> mapToNativeFunctionHelper(types: List<KType>): suspend (Array<Any?>) -> R {
         val awaitJsPromise = types.lastOrNull()?.classifier != Deferred::class
-        val lambdaJsValue = jsBridge?.registerJsLambda(this, types, false)
+        val lambdaJsValue = jsBridge?.registerJsLambda(this, types)
                 ?: throw JsToNativeRegistrationError(R::class, customMessage = "Cannot map JS value to native function because the JS interpreter has been destroyed")
 
-        return {
+        return { params ->
             val jsBridge = jsBridge
                     ?: throw JsToNativeRegistrationError(R::class, customMessage = "Cannot map JS value to native function because the JS interpreter has been destroyed")
 
             this.hold()
 
             @Suppress("UNCHECKED_CAST")
-            jsBridge.callJsLambda(lambdaJsValue, arrayOf(), awaitJsPromise) as R
+            jsBridge.callJsLambda(lambdaJsValue, params, awaitJsPromise) as R
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    @PublishedApi
+    internal inline fun <reified R> mapToNativeBlockingFunctionHelper(types: List<KType>): (Array<Any?>) -> R {
+        val awaitJsPromise = types.lastOrNull()?.classifier != Deferred::class
+        val lambdaJsValue = jsBridge?.registerJsLambda(this, types)
+                ?: throw JsToNativeRegistrationError(R::class, customMessage = "Cannot map JS value to native function because the JS interpreter has been destroyed")
+
+        return { params ->
+            val jsBridge = jsBridge
+                    ?: throw JsToNativeRegistrationError(R::class, customMessage = "Cannot map JS value to native function because the JS interpreter has been destroyed")
+
+            this.hold()
+
+            runBlocking {
+                @Suppress("UNCHECKED_CAST")
+                jsBridge.callJsLambda(lambdaJsValue, params, awaitJsPromise) as R
+            }
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    inline fun <reified R> mapToNativeFunction0(): suspend () -> R {
+        val functionWithParamArray = mapToNativeFunctionHelper<R>(listOf(typeOf<R>()))
+        return {
+            functionWithParamArray(arrayOf())
         }
     }
 
     @UseExperimental(ExperimentalStdlibApi::class)
     inline fun <reified R> mapToNativeBlockingFunction0(context: CoroutineContext? = null): () -> R {
         val types = listOf(typeOf<R>())
-        val awaitJsPromise = types.lastOrNull()?.classifier != Deferred::class
-        val lambdaJsValue = jsBridge?.registerJsLambda(this, types, false)
-                ?: throw JsToNativeRegistrationError(R::class, customMessage = "Cannot map JS value to native function because the JS interpreter has been destroyed")
-
+        val functionWithParamArray = mapToNativeBlockingFunctionHelper<R>(types)
         return {
-            val jsBridge = jsBridge
-                    ?: throw JsToNativeRegistrationError(R::class, customMessage = "Cannot map JS value to native function because the JS interpreter has been destroyed")
-
-            runBlocking(context ?: EmptyCoroutineContext) {
-                @Suppress("UNCHECKED_CAST")
-                jsBridge.callJsLambda(lambdaJsValue, arrayOf(), awaitJsPromise) as R
-            }
+            functionWithParamArray(arrayOf())
         }
     }
 
     @UseExperimental(ExperimentalStdlibApi::class)
     inline fun <reified T1, reified R> mapToNativeFunction1(): suspend (T1) -> R {
         val types = listOf(typeOf<T1>(), typeOf<R>())
-        val awaitJsPromise = types.lastOrNull()?.classifier != Deferred::class
-        val lambdaJsValue = jsBridge?.registerJsLambda(this, types, false)
-                ?: throw JsToNativeRegistrationError(R::class, customMessage = "Cannot map JS value to native function because the JS interpreter has been destroyed")
-
+        val functionWithParamArray = mapToNativeFunctionHelper<R>(types)
         return { p1 ->
-            val jsBridge = jsBridge
-                    ?: throw JsToNativeRegistrationError(R::class, customMessage = "Cannot map JS value to native function because the JS interpreter has been destroyed")
-
-            @Suppress("UNCHECKED_CAST")
-            jsBridge.callJsLambda(lambdaJsValue, arrayOf(p1), awaitJsPromise) as R
+            functionWithParamArray(arrayOf(p1))
         }
     }
 
     @UseExperimental(ExperimentalStdlibApi::class)
     inline fun <reified T1, reified R> mapToNativeBlockingFunction1(context: CoroutineContext? = null): (T1) -> R {
         val types = listOf(typeOf<T1>(), typeOf<R>())
-        val awaitJsPromise = types.lastOrNull()?.classifier != Deferred::class
-        val lambdaJsValue = jsBridge?.registerJsLambda(this, types, false)
-                ?: throw JsToNativeRegistrationError(R::class, customMessage = "Cannot map JS value to native function because the JS interpreter has been destroyed")
-
+        val functionWithParamArray = mapToNativeBlockingFunctionHelper<R>(types)
         return { p1 ->
-            val jsBridge = jsBridge
-                    ?: throw JsToNativeRegistrationError(R::class, customMessage = "Cannot map JS value to native function because the JS interpreter has been destroyed")
-
-            runBlocking(context ?: EmptyCoroutineContext) {
-                @Suppress("UNCHECKED_CAST")
-                jsBridge.callJsLambda(lambdaJsValue, arrayOf(p1), awaitJsPromise) as R
-            }
+            functionWithParamArray(arrayOf(p1))
         }
     }
 
     @UseExperimental(ExperimentalStdlibApi::class)
     inline fun <reified T1, reified T2, reified R> mapToNativeFunction2(): suspend (T1, T2) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<R>())
-        val awaitJsPromise = types.lastOrNull()?.classifier != Deferred::class
-        val lambdaJsValue = jsBridge?.registerJsLambda(this, types, false)
-                ?: throw JsToNativeRegistrationError(R::class, customMessage = "Cannot map JS value to native function because the JS interpreter has been destroyed")
-
+        val functionWithParamArray = mapToNativeFunctionHelper<R>(types)
         return { p1, p2 ->
-            val jsBridge = jsBridge
-                    ?: throw JsToNativeRegistrationError(R::class, customMessage = "Cannot map JS value to native function because the JS interpreter has been destroyed")
-
-            @Suppress("UNCHECKED_CAST")
-            jsBridge.callJsLambda(lambdaJsValue, arrayOf(p1, p2), awaitJsPromise) as R
+            functionWithParamArray(arrayOf(p1, p2))
         }
     }
 
     @UseExperimental(ExperimentalStdlibApi::class)
     inline fun <reified T1, reified T2, reified R> mapToNativeBlockingFunction2(context: CoroutineContext? = null): (T1, T2) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<R>())
-        val awaitJsPromise = types.lastOrNull()?.classifier != Deferred::class
-        val lambdaJsValue = jsBridge?.registerJsLambda(this, types, false)
-                ?: throw JsToNativeRegistrationError(R::class, customMessage = "Cannot map JS value to native function because the JS interpreter has been destroyed")
-
+        val functionWithParamArray = mapToNativeBlockingFunctionHelper<R>(types)
         return { p1, p2 ->
-            val jsBridge = jsBridge
-                    ?: throw JsToNativeRegistrationError(R::class, customMessage = "Cannot map JS value to native function because the JS interpreter has been destroyed")
-
-            runBlocking(context ?: EmptyCoroutineContext) {
-                @Suppress("UNCHECKED_CAST")
-                jsBridge.callJsLambda(lambdaJsValue, arrayOf(p1, p2), awaitJsPromise) as R
-            }
+            functionWithParamArray(arrayOf(p1, p2))
         }
     }
 

@@ -453,11 +453,11 @@ class JsBridge(context: Context): CoroutineScope {
     // Register a JS lambda from a JsValue and return a new JsValue which can be used for calling
     // the lambda via callJsLambda()
     @PublishedApi
-    internal fun registerJsLambda(jsValue: JsValue, types: List<KType>, isVarArgs: Boolean): JsValue {
+    internal fun registerJsLambda(jsValue: JsValue, types: List<KType>): JsValue {
         val parameters = types.map { Parameter(it) }
         val inputParameters = parameters.take(types.count() - 1)
         val outputParameter = parameters.last()
-        val method = Method(inputParameters.toTypedArray(), outputParameter, isVarArgs)
+        val method = Method(inputParameters.toTypedArray(), outputParameter, false)
 
         // Create a separate JS value just for the call
         val suffix = internalCounter.incrementAndGet()

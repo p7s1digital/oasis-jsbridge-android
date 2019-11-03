@@ -60,7 +60,7 @@ class PromisePolyfillExtension(private val jsBridge: JsBridge) {
         )
 
         val jsValue = JsValue.newFunction(jsBridge, "Promise.runQueue();")
-        processQueueJsValue = jsBridge.registerJsLambda(jsValue, listOf(typeOf<Unit>()), false)
+        processQueueJsValue = jsBridge.registerJsLambda(jsValue, listOf(typeOf<Unit>()))
 
         // Ensure that isReady remains false while evaluating Polyfill and registering JS lambda
         jsBridge.launch {
