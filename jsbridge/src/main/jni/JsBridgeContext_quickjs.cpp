@@ -190,15 +190,6 @@ void JsBridgeContext::registerJsObject(const std::string &strName,
 
   JS_AUTORELEASE_VALUE(m_ctx, jsObjectValue);
 
-  if (!JS_IsObject(jsObjectValue) || JS_IsNull(jsObjectValue)) {
-    throw std::invalid_argument("Cannot register " + strName + ". It does not exist or is not a valid object.");
-  }
-
-  // Check that it is not a promise!
-  if (m_utils->hasPropertyStr(jsObjectValue, "then")) {
-    alog_warn("Attempting to register a JS promise (%s)... JsValue.await() should probably be called, first...");
-  }
-
   // Create the JavaScriptObject instance
   auto cppJsObject = new JavaScriptObject(this, strName, jsObjectValue, methods, check);  // auto-deleted
 
@@ -208,15 +199,12 @@ void JsBridgeContext::registerJsObject(const std::string &strName,
 
 void JsBridgeContext::registerJsLambda(const std::string &strName,
                                        const JniLocalRef<jsBridgeMethod> &method) {
+
   JSValue globalObj = JS_GetGlobalObject(m_ctx);
   JSValue jsLambdaValue = JS_GetPropertyStr(m_ctx, globalObj, strName.c_str());
   JS_FreeValue(m_ctx, globalObj);
 
   JS_AUTORELEASE_VALUE(m_ctx, jsLambdaValue);
-
-  if (!JS_IsFunction(m_ctx, jsLambdaValue)) {
-    throw std::invalid_argument("Cannot register " + strName + ". It does not exist or is not a valid function.");
-  }
 
   // Create the JavaScriptObject instance
   auto cppJsLambda = new JavaScriptLambda(this, method, strName, jsLambdaValue);  // auto-deleted

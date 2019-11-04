@@ -849,7 +849,7 @@ class JsBridgeTest {
             |    );
             |  }
             |})""".trimMargin()
-        ).mapToNativeObjectUnchecked()
+        ).mapToNativeObject()
 
         val nativeCbMock = mockk<(Int) -> Unit>(relaxed = true)
         jsApi.registerCallback(nativeCbMock)
@@ -972,6 +972,16 @@ class JsBridgeTest {
         assertEquals(calcSumBlocking(3, 7), 10)
 
         runBlocking {
+            // Missing JS function (the evalution of the JS code should throw)
+            assertFailsWith<JsException> {
+                JsValue(subject, "non_existing_function").mapToNativeFunction0<Unit>(true)
+            }
+
+            // Invalid JS function (the registration should throw)
+            assertFailsWith<IllegalArgumentException> {
+                JsValue(subject, "123").mapToNativeFunction0<Unit>(true)
+            }
+
             // Call JS function calcSum(3, 4)
             val sum = calcSum(3, 4)
             assertEquals(sum, 7)
@@ -1465,7 +1475,7 @@ class JsBridgeTest {
     }
 
     @Test
-    fun testRegisterNativeToJsInterfaceChecked() {
+    fun testRegisterNativeToJsInterfaceSuspend() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
         val jsApiNoObjectValue = JsValue(subject, "undefined")
@@ -1474,10 +1484,14 @@ class JsBridgeTest {
         // WHEN
         runBlocking {
             assertFailsWith<IllegalArgumentException> {
-                jsApiNoObjectValue.mapToNativeObject<TestJsApiInterface>()
+                jsApiNoObjectValue.mapToNativeObject<TestJsApiInterface>(false)
             }
             assertFailsWith<IllegalArgumentException> {
-                jsApiEmptyObjectValue.mapToNativeObject<TestJsApiInterface>()
+                jsApiNoObjectValue.mapToNativeObject<TestJsApiInterface>(true)
+            }
+            jsApiEmptyObjectValue.mapToNativeObject<TestJsApiInterface>(false)  // do not fail
+            assertFailsWith<IllegalArgumentException> {
+                jsApiEmptyObjectValue.mapToNativeObject<TestJsApiInterface>(true)
             }
         }
     }
@@ -1495,9 +1509,9 @@ class JsBridgeTest {
         val jsApiEmptyObjectValue = JsValue(subject, "({})")
 
         // WHEN
-        val jsApi: TestJsApiInterface = jsApiValue.mapToNativeObjectUnchecked()
-        val jsApiNoObject: TestJsApiInterface = jsApiNoObjectValue.mapToNativeObjectUnchecked()
-        val jsApiEmptyObject: TestJsApiInterface = jsApiEmptyObjectValue.mapToNativeObjectUnchecked()
+        val jsApi: TestJsApiInterface = jsApiValue.mapToNativeObject()
+        val jsApiNoObject: TestJsApiInterface = jsApiNoObjectValue.mapToNativeObject()
+        val jsApiEmptyObject: TestJsApiInterface = jsApiEmptyObjectValue.mapToNativeObject()
 
         // THEN
         runBlocking {
@@ -1527,7 +1541,7 @@ class JsBridgeTest {
 
         // WHEN
         runBlocking {
-            val jsApi: TestJsApiInterface = jsApiPromise.await().mapToNativeObjectUnchecked()
+            val jsApi: TestJsApiInterface = jsApiPromise.await().mapToNativeObject()
             jsApi.jsMethodWithString("Hello JS!")
         }
 
@@ -1546,7 +1560,7 @@ class JsBridgeTest {
         val testJsApi = JsValue(subject, """({
             jsMethodWithCallback: function(cb) { cb(); }
         })""")
-        val jsApi: TestJsApiInterface = testJsApi.mapToNativeObjectUnchecked()
+        val jsApi: TestJsApiInterface = testJsApi.mapToNativeObject()
 
         var callbackCalled = false
 

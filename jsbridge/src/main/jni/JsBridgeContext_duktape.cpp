@@ -252,16 +252,6 @@ void JsBridgeContext::registerJsObject(const std::string &strName,
 
   duk_get_global_string(m_ctx, strName.c_str());
 
-  if (check && (!duk_is_object(m_ctx, -1) || duk_is_null(m_ctx, -1))) {
-    duk_pop(m_ctx);
-    throw std::invalid_argument("Cannot register " + strName + ". It does not exist or is not a valid object");
-  }
-
-  // Check that it is not a promise!
-  if (duk_is_object(m_ctx, -1) && duk_has_prop_string(m_ctx, -1, "then")) {
-    alog_warn("Attempting to register a JS promise (%s)... JsValue.await() should probably be called, first...");
-  }
-
   try {
     // Create the JavaScriptObject instance (which takes over jsObjectValue and will free it in its destructor)
     auto cppJsObject = new JavaScriptObject(this, strName, -1, methods, check);  // auto-deleted
@@ -281,11 +271,6 @@ void JsBridgeContext::registerJsLambda(const std::string &strName,
   CHECK_STACK(m_ctx);
 
   duk_get_global_string(m_ctx, strName.c_str());
-
-  if (!duk_is_function(m_ctx, -1)) {
-    duk_pop(m_ctx);
-    throw std::invalid_argument("Cannot register " + strName + ". It does not exist or is not a valid function.");
-  }
 
   try {
     // Create the JavaScriptObject instance

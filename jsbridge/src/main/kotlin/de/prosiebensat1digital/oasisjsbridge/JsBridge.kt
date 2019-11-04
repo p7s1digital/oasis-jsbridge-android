@@ -407,7 +407,15 @@ class JsBridge(context: Context): CoroutineScope {
     // - if the JS value is a promise, you need to resolve it first with jsValue.await() or jsValue.awaitAsync()
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
     suspend fun <T : NativeToJsInterface> registerNativeToJsInterface(jsValue: JsValue, type: KClass<T>, check: Boolean): T {
-        return registerNativeToJsInterfaceHelper(jsValue, type, check, false)
+        return registerNativeToJsInterfaceHelper(jsValue, type, check, true)
+    }
+
+    // Register a "JS" interface called by native (unchecked)
+    @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
+    fun <T : NativeToJsInterface> registerNativeToJsInterfaceUnchecked(jsValue: JsValue, type: KClass<T>, check: Boolean): T {
+        return runBlocking(Dispatchers.Unconfined) {
+            registerNativeToJsInterfaceHelper(jsValue, type, false, false)
+        }
     }
 
     // Register a "JS" interface called by native (blocking)
@@ -416,11 +424,11 @@ class JsBridge(context: Context): CoroutineScope {
     // When check = true, the method will block the current thread until the registration has been
     // done and then return the proxy object
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
-    fun <T : NativeToJsInterface> registerNativeToJsInterfaceBlocking(jsValue: JsValue, type: KClass<T>, check: Boolean): T {
-        val async = !check
+    fun <T : NativeToJsInterface> registerNativeToJsInterfaceBlocking(jsValue: JsValue, type: KClass<T>, check: Boolean, context: CoroutineContext?): T {
+        val waitForRegistration = check
 
-        return runBlocking(Dispatchers.Unconfined) {
-            registerNativeToJsInterfaceHelper(jsValue, type, check, async)
+        return runBlocking(context ?: Dispatchers.Unconfined) {
+            registerNativeToJsInterfaceHelper(jsValue, type, check, waitForRegistration)
         }
     }
 
@@ -450,10 +458,42 @@ class JsBridge(context: Context): CoroutineScope {
         return jsValue
     }
 
-    // Register a JS lambda from a JsValue and return a new JsValue which can be used for calling
-    // the lambda via callJsLambda()
+    // Register a JS lambda from a JsValue.
+    //
+    // Return a new JsValue which can be used for calling the lambda via callJsLambda()
     @PublishedApi
-    internal fun registerJsLambda(jsValue: JsValue, types: List<KType>): JsValue {
+    internal suspend fun registerJsLambda(jsValue: JsValue, types: List<KType>, waitForRegistration: Boolean): JsValue {
+        return registerJsLambdaHelper(jsValue, types, waitForRegistration)
+    }
+
+    // Register a JS lambda from a JsValue (unchecked).
+    //
+    // Return a new JsValue which can be used for calling the lambda via callJsLambda()
+    // Register a "JS" interface called by native (blocking)
+    @PublishedApi
+    internal fun registerJsLambdaAsync(jsValue: JsValue, types: List<KType>): JsValue {
+        return runBlocking(Dispatchers.Unconfined) {
+            registerJsLambdaHelper(jsValue, types, false)
+        }
+    }
+
+    // Register a JS lambda from a JsValue (blocking).
+    //
+    // Return a new JsValue which can be used for calling the lambda via callJsLambda()
+    // Register a "JS" interface called by native (blocking)
+    //
+    // When check = false, the proxy function will be directly returned
+    // When check = true, the method will block the current thread until the registration has been
+    // done and then return the proxy function
+    @PublishedApi
+    internal fun registerJsLambdaBlocking(jsValue: JsValue, types: List<KType>, context: CoroutineContext?): JsValue {
+        return runBlocking(context ?: Dispatchers.Unconfined) {
+            registerJsLambdaHelper(jsValue, types, false)
+        }
+    }
+
+    @PublishedApi
+    internal suspend fun registerJsLambdaHelper(jsValue: JsValue, types: List<KType>, waitForRegistration: Boolean): JsValue {
         val parameters = types.map { Parameter(it) }
         val inputParameters = parameters.take(types.count() - 1)
         val outputParameter = parameters.last()
@@ -463,18 +503,30 @@ class JsBridge(context: Context): CoroutineScope {
         val suffix = internalCounter.incrementAndGet()
         val lambdaJsValue = JsValue(this, null, associatedJsName =  "__jsBridge_jsLambda$suffix")
 
-        launch {
+        val registerBlock = suspend {
             val jniJsContext = jniJsContextOrThrow()
 
-            try {
-                jsValue.codeEvaluationDeferred?.await()
-                jniEvaluateString(jniJsContext, "$lambdaJsValue = $jsValue", null, false)  // TODO: jniCopyJsValue
-                jniRegisterJsLambda(jniJsContext, lambdaJsValue.associatedJsName, method)
-                Timber.v("Registered JS lambda ${lambdaJsValue.associatedJsName}")
-                lambdaJsValue.hold()
-            } catch (t: Throwable) {
-                throw t as? JsException
-                        ?: NativeToJsFunctionRegistrationError(jsValue.associatedJsName, t)
+            jsValue.codeEvaluationDeferred?.await()
+            jniEvaluateString(jniJsContext, "$lambdaJsValue = $jsValue", null, false)  // TODO: jniCopyJsValue
+            jniRegisterJsLambda(jniJsContext, lambdaJsValue.associatedJsName, method)
+            Timber.v("Registered JS lambda ${lambdaJsValue.associatedJsName}")
+            lambdaJsValue.hold()
+        }
+
+        if (waitForRegistration) {
+            // Synchronous registration
+            withContext(coroutineContext) {
+                registerBlock()
+            }
+        } else {
+            // Asynchronous registration
+            launch {
+                try {
+                    registerBlock()
+                } catch (t: Throwable) {
+                    throw t as? JsException
+                            ?: NativeToJsFunctionRegistrationError(jsValue.associatedJsName, t)
+                }
             }
         }
 
@@ -691,7 +743,7 @@ class JsBridge(context: Context): CoroutineScope {
     // launched asynchronously a
     // - If async = false, the proxy object is only returned after a successful registration
     @Throws
-    private suspend fun <T: Any> registerNativeToJsInterfaceHelper(jsValue: JsValue, type: KClass<T>, check: Boolean, async: Boolean): T {
+    private suspend fun <T: Any> registerNativeToJsInterfaceHelper(jsValue: JsValue, type: KClass<T>, check: Boolean, waitForRegistration: Boolean): T {
         if (!type.java.isInterface) {
             throw NativeToJsRegistrationError(type, customMessage = "$type must be an interface")
         }
@@ -742,21 +794,21 @@ class JsBridge(context: Context): CoroutineScope {
             // => Sequence<Method>
             .values
 
-        if (async) {
-            launch(this@JsBridge.coroutineContext) {
-                val jniJsContext = jniJsContextOrThrow()
-
-                try {
-                    jsValue.codeEvaluationDeferred?.await()
-                    jniRegisterJsObject(jniJsContext, jsValue.associatedJsName, methods.toTypedArray(), check)
-                } catch (t: Throwable) {
-                    throw NativeToJsRegistrationError(type, cause = t)
-                }
-            }
-        } else {
+        if (waitForRegistration) {
+            // Synchronous registration
             withContext(coroutineContext) {
                 jsValue.codeEvaluationDeferred?.await()
                 jniRegisterJsObject(jniJsContextOrThrow(), jsValue.associatedJsName, methods.toTypedArray(), check)
+            }
+        } else {
+            // Asynchronous registration
+            launch(this@JsBridge.coroutineContext) {
+                try {
+                    jsValue.codeEvaluationDeferred?.await()
+                    jniRegisterJsObject(jniJsContextOrThrow(), jsValue.associatedJsName, methods.toTypedArray(), check)
+                } catch (t: Throwable) {
+                    throw NativeToJsRegistrationError(type, cause = t)
+                }
             }
         }
 
@@ -926,33 +978,14 @@ class JsBridge(context: Context): CoroutineScope {
     private external fun jniCreateContext(): Long
     private external fun jniStartDebugger(context: Long, port: Int)
     private external fun jniCancelDebug(context: Long)
-
     private external fun jniDeleteContext(context: Long)
     private external fun jniEvaluateString(context: Long, js: String, type: Parameter?, awaitJsPromise: Boolean): Any?
     private external fun jniEvaluateFileContent(context: Long, js: String, filename: String)
-    private external fun jniRegisterJavaLambda(
-        context: Long,
-        name: String,
-        obj: Any,
-        method: Any
-    )
-    private external fun jniRegisterJavaObject(
-        context: Long,
-        name: String,
-        obj: Any,
-        methods: Array<Any>
-    )
-    private external fun jniRegisterJsObject(
-        context: Long,
-        name: String,
-        methods: Array<Any>,
-        check: Boolean
-    )
-    private external fun jniRegisterJsLambda(
-        context: Long,
-        name: String,
-        method: Any
-    )
+    private external fun jniRegisterJavaLambda(context: Long, name: String, obj: Any, method: Any)
+    private external fun jniRegisterJavaObject(context: Long, name: String, obj: Any, methods: Array<Any>)
+    private external fun jniRegisterJsObject(context: Long, name: String, methods: Array<Any>, check: Boolean)
+    private external fun jniRegisterJsLambda(context: Long, name: String, method: Any)
+    private external fun jniCallJsMethod(context: Long, objectName: String, javaMethod: JavaMethod, args: Array<Any?>): Any?
     private external fun jniCallJsMethod(context: Long, objectName: String, javaMethod: JavaMethod, args: Array<Any?>, awaitJsPromise: Boolean): Any?
     private external fun jniCallJsLambda(context: Long, objectName: String, args: Array<Any?>, awaitJsPromise: Boolean): Any?
     private external fun jniAssignJsValue(context: Long, globalName: String, jsCode: String)

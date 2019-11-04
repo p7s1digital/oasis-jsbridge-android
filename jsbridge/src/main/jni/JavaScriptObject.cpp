@@ -48,17 +48,16 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
 
   CHECK_STACK(ctx);
 
-  m_jsHeapPtr = duk_get_heapptr(ctx, jsObjectIndex);
-  duk_push_heapptr(ctx, m_jsHeapPtr);
-
-  if (!duk_is_object(ctx, -1) || duk_is_null(ctx, -1)) {
-    duk_pop(ctx);
-    throw std::runtime_error("JavaScript object " + m_name + "cannot be accessed");
+  if (!duk_is_object(ctx, jsObjectIndex) || duk_is_null(ctx, jsObjectIndex)) {
+    throw std::invalid_argument("JavaScript object " + m_name + " cannot be accessed");
   }
 
-  if (duk_has_prop_string(ctx, -1, "then")) {
+  if (duk_has_prop_string(ctx, jsObjectIndex, "then")) {
     alog_warn("Registering a JS object from a promise... You probably need to call JsValue.await(), first!");
   }
+
+  m_jsHeapPtr = duk_get_heapptr(ctx, jsObjectIndex);
+  duk_push_heapptr(ctx, m_jsHeapPtr);
 
   // Make sure that the object has all of the methods we want and add them
   const jsize numMethods = methods.getLength();
@@ -81,6 +80,7 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
       // Pop the method property.
       duk_pop(ctx);
     }
+
     try {
       JniLocalRef<jobject> javaMethod = methodInterface.getJavaMethod();
       jmethodID methodId = jniContext->fromReflectedMethod(javaMethod);
@@ -100,7 +100,9 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
 
 JValue JavaScriptObject::call(const JniLocalRef<jobject> &javaMethod, const JObjectArrayLocalRef &args, bool awaitJsPromise) const {
 
-  assert(m_jsHeapPtr != nullptr);
+  if (m_jsHeapPtr == nullptr) {
+    throw std::invalid_argument("JavaScript object " + m_name + " cannot be accessed");
+  }
 
   const JniContext *jniContext = m_jsBridgeContext->getJniContext();
   const JniCache *jniCache = m_jsBridgeContext->getJniCache();
@@ -142,12 +144,13 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
   const JniCache *jniCache = jsBridgeContext->getJniCache();
   const QuickJsUtils *utils = jsBridgeContext->getUtils();
 
-  if (!JS_IsObject(jsObjectValue)) {
-    throw std::runtime_error("JavaScript object " + strName + " cannot be accessed (not an object)");
+  if (!JS_IsObject(jsObjectValue) || JS_IsNull(jsObjectValue)) {
+    throw std::invalid_argument("Cannot register " + strName + ". It does not exist or is not a valid object.");
   }
 
+  // Check that it is not a promise!
   if (utils->hasPropertyStr(jsObjectValue, "then")) {
-    alog_warn("Registering a JS object from a promise... You probably need to call JsValue.await(), first!");
+    alog_warn("Attempting to register a JS promise (%s)... JsValue.await() should probably be called, first...");
   }
 
   // Make sure that the object has all of the methods we want and add them

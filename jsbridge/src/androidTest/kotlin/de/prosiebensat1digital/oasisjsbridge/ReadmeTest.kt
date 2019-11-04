@@ -57,15 +57,15 @@ class ReadmeTest {
 
     @Test
     fun testUsageAdvanced() {
-        // Create a Kotlin proxy to a JS function
-        val helloJs: suspend (String) -> Unit = JsValue.newFunction(jsBridge, "s",
-            "console.log('Hello ' + s + '!');"
-        ).mapToNativeFunction1()
-
-        // Create a JS proxy to a Kotlin function
-        val toUpperCaseNative = JsValue.fromNativeFunction1(jsBridge) { s: String -> s.toUpperCase() }
-
         runBlocking {
+            // Create a Kotlin proxy to a JS function
+            val helloJs: suspend (String) -> Unit = JsValue.newFunction(jsBridge, "s",
+                "console.log('Hello ' + s + '!');"
+            ).mapToNativeFunction1()
+
+            // Create a JS proxy to a Kotlin function
+            val toUpperCaseNative = JsValue.fromNativeFunction1(jsBridge) { s: String -> s.toUpperCase() }
+
             // Evaluate JS promise calling Kotlin function "toUpperCaseNative()"
             // (suspend function call) -> returns "WORLD" after 1s timeout
             val world: String = jsBridge.evaluate("""new Promise(function(resolve) {

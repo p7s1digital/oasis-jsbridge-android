@@ -16,15 +16,15 @@
 package de.prosiebensat1digital.oasisjsbridge.extensions
 
 import de.prosiebensat1digital.oasisjsbridge.*
-import kotlinx.coroutines.launch
-import timber.log.Timber
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlin.reflect.typeOf
 
 @UseExperimental(ExperimentalStdlibApi::class)
 class PromisePolyfillExtension(private val jsBridge: JsBridge) {
-    private val processQueueJsValue: JsValue
+    private val processQueueJsValue: Deferred<JsValue>
     private var onUnhandledPromiseRejectedJsValue: JsValue?
-    private var isReady = false
 
     init {
         onUnhandledPromiseRejectedJsValue = JsValue.fromNativeFunction3(jsBridge) { json: JsonObjectWrapper, message: String, stacktrace: String ->
@@ -60,11 +60,8 @@ class PromisePolyfillExtension(private val jsBridge: JsBridge) {
         )
 
         val jsValue = JsValue.newFunction(jsBridge, "Promise.runQueue();")
-        processQueueJsValue = jsBridge.registerJsLambda(jsValue, listOf(typeOf<Unit>()))
-
-        // Ensure that isReady remains false while evaluating Polyfill and registering JS lambda
-        jsBridge.launch {
-            isReady = true
+        processQueueJsValue = jsBridge.async {
+            jsBridge.registerJsLambda(jsValue, listOf(typeOf<Unit>()), true)
         }
     }
 
@@ -72,13 +69,14 @@ class PromisePolyfillExtension(private val jsBridge: JsBridge) {
         onUnhandledPromiseRejectedJsValue = null
     }
 
+    @UseExperimental(ExperimentalCoroutinesApi::class)
     fun processQueue() {
-        if (!isReady) {
+        if (!processQueueJsValue.isCompleted) {
             return
         }
 
         try {
-            jsBridge.callJsLambdaUnsafe(processQueueJsValue, arrayOf(), false)
+            jsBridge.callJsLambdaUnsafe(processQueueJsValue.getCompleted(), arrayOf(), false)
         } catch (t: Throwable) {
             val errorMessage = "Error while processing promise queue: ${t.message}"
             val jsException = JsException(detailedMessage = errorMessage, jsStackTrace = null, cause = t)

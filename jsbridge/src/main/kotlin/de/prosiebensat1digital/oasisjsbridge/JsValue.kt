@@ -79,6 +79,10 @@ internal constructor(
             return jsValue
         }
 
+
+        // Proxy native to JS object
+        // ---
+
         // Create a JsValue which is a JS proxy to a native object
         // Note: the native methods will be called in the JS thread!
         inline fun <reified T: JsToNativeInterface> fromNativeObject(jsBridge: JsBridge, nativeObject: T): JsValue {
@@ -96,6 +100,10 @@ internal constructor(
         fun fromNativeObject(jsBridge: JsBridge, nativeObject: Any, jsToNativeInterface: Class<*>): JsValue {
             return jsBridge.registerJsToNativeInterface(jsToNativeInterface.kotlin, nativeObject)
         }
+
+
+        // Proxy native to JS lambda
+        // ---
 
         // Note: as reflection is still not well supported for lambdas, we cannot use typeOf<F>()
         //inline fun <reified F: Function<*>> fromNativeFunction(func: F): JsValue {
@@ -151,6 +159,10 @@ internal constructor(
         inline fun <reified P1, reified P2, reified P3, reified P4, reified P5, reified P6, reified P7, reified P8, reified P9, reified R> fromNativeFunction9(jsBridge: JsBridge, noinline func: (p1: P1, p2: P2, p3: P3, p4: P4, p5: P5, p6: P6, p7: P7, p8: P8, p9: P9) -> R): JsValue {
             return jsBridge.registerJsToNativeFunction(func, listOf(typeOf<P1>(), typeOf<P2>(), typeOf<P3>(), typeOf<P4>(), typeOf<P5>(), typeOf<P6>(), typeOf<P7>(), typeOf<P8>(), typeOf<P9>(), typeOf<R>()))
         }
+
+
+        // Private
+        // ---
 
         private fun generateJsGlobalName(): String {
             val suffix = internalCounter.incrementAndGet()
@@ -273,67 +285,74 @@ internal constructor(
         return evaluateAsync()
     }
 
+
+    // Proxy JS to native object
+    // ---
+
     // Create a native proxy to a JS object
+    //
     // Notes:
-    // - this method will throw an exception if the JS object does not implement all the methods
-    // of the NativeToJsInterface
+    // - when check = true, this method will throw an exception if the JS object does not implement
+    // all the methods of the NativeToJsInterface
+    // - when check = false, the proxy object will be returned even if the JS object is invalid or
+    // does not implement all of the methods of the NativeToJsInterface
     // - the non-suspend methods of the returned proxy object will be running in the JS thread and
     // block the caller thread if the return value is not Unit or Deferred
-    suspend inline fun <reified T: NativeToJsInterface> mapToNativeObject(): T {
+    suspend inline fun <reified T: NativeToJsInterface> mapToNativeObject(check: Boolean): T {
         val jsBridge = jsBridge
                 ?: throw NativeToJsRegistrationError(T::class, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
 
-        return jsBridge.registerNativeToJsInterface(this, T::class, true)
+        return jsBridge.registerNativeToJsInterface(this, T::class, check)
     }
 
-    inline fun <reified T: NativeToJsInterface> mapToNativeObjectBlocking(): T {
+    // Create a native proxy to a JS object (blocking)
+    // -> see JsValue.mapToNativeObject(check: Boolean)
+    inline fun <reified T: NativeToJsInterface> mapToNativeObjectBlocking(check: Boolean = false, context: CoroutineContext? = null): T {
         val jsBridge = jsBridge
                 ?: throw NativeToJsRegistrationError(T::class, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
 
-        return jsBridge.registerNativeToJsInterfaceBlocking(this, T::class, true)
+        return jsBridge.registerNativeToJsInterfaceBlocking(this, T::class, check, context)
     }
 
-    // Create a native proxy to a JS object
+    // Create a native proxy to a JS object (without checks)
+    //
     // Notes:
     // - the proxy object will be returned even if the JS object is invalid or does not implement
     // all of the methods of the NativeToJsInterface
     // - the non-suspend methods of the returned proxy object will be running in the JS thread and
     // block the caller thread if the return value is not Unit or Deferred
-    inline fun <reified T: NativeToJsInterface> mapToNativeObjectUnchecked(): T {
+    inline fun <reified T: NativeToJsInterface> mapToNativeObject(): T {
         val jsBridge = jsBridge
                 ?: throw NativeToJsRegistrationError(T::class, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
 
-        return jsBridge.registerNativeToJsInterfaceBlocking(this, T::class, false)
+        // Note: as check = false, the method will actually directly return without blocking the
+        // current thread
+        return jsBridge.registerNativeToJsInterfaceBlocking(this, T::class, false, null)
     }
 
     // Create a native proxy to a JS object
+    //
     // Notes:
     // - this method will block the current thread until the object has been registered
-    // - this method will throw an exception if the JS object does not implement all the methods
-    // of the NativeToJsInterface
+    // - when check = true, this method will block the current thread until the object has been
+    // registered or will throw an exception if the JS object does not implement  all the methods of
+    // the NativeToJsInterface
+    // - when check = false, the proxy object will be returned even if the JS object is invalid or
+    // does not implement/ all of the methods of the NativeToJsInterface
     // - the methods of the returned proxy object will be running in the JS thread and block the
     // caller thread if there is a return value
     // - from Kotlin, it is recommended to use the method with generic parameter, instead!
-    fun <T: NativeToJsInterface> mapToNativeObjectBlocking(nativeToJsInterface: Class<T>): T {
+    @JvmOverloads
+    fun <T: NativeToJsInterface> mapToNativeObjectBlocking(nativeToJsInterface: Class<T>, check: Boolean = false, context: CoroutineContext? = null): T {
         val jsBridge = jsBridge
                 ?: throw NativeToJsRegistrationError(nativeToJsInterface.kotlin, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
 
-        return jsBridge.registerNativeToJsInterfaceBlocking(this, nativeToJsInterface.kotlin, true)
+        return jsBridge.registerNativeToJsInterfaceBlocking(this, nativeToJsInterface.kotlin, check, context)
     }
 
-    // Create a native proxy to a JS object
-    // Notes:
-    // - the proxy object will be returned even if the JS object is invalid or does not implement
-    // all of the methods of the NativeToJsInterface
-    // - the methods of the returned proxy object will be running in the JS thread and block the
-    // caller thread if there is a return value
-    // - from Kotlin, it is recommended to use the method with generic parameter, instead!
-    fun <T: NativeToJsInterface> mapToNativeObjectUnchecked(nativeToJsInterface: Class<T>): T {
-        val jsBridge = jsBridge
-                ?: throw NativeToJsRegistrationError(nativeToJsInterface.kotlin, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
 
-        return jsBridge.registerNativeToJsInterfaceBlocking(this, nativeToJsInterface.kotlin, false)
-    }
+    // Proxy JS to native function
+    // ---
 
     // Unfortunately crashes with latest Kotlin (1.3.40) because typeOf<>() does not work yet for suspending functions,
     // that's why we have to use the registerJsFunctionX() methods below (X = parameter count)
@@ -343,10 +362,95 @@ internal constructor(
     //}
 
     @UseExperimental(ExperimentalStdlibApi::class)
+    suspend inline fun <reified R> mapToNativeFunction0(waitForRegistration: Boolean): suspend () -> R {
+        val functionWithParamArray = mapToNativeFunctionHelper<R>(listOf(typeOf<R>()), waitForRegistration)
+        return {
+            functionWithParamArray(arrayOf())
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    inline fun <reified R> mapToNativeFunction0(): suspend () -> R {
+        val functionWithParamArray = mapToNativeFunctionAsyncHelper<R>(listOf(typeOf<R>()))
+        return {
+            functionWithParamArray(arrayOf())
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    inline fun <reified R> mapToNativeBlockingFunction0(context: CoroutineContext? = null): () -> R {
+        val types = listOf(typeOf<R>())
+        val functionWithParamArray = mapToNativeBlockingFunctionHelper<R>(types, context)
+        return {
+            functionWithParamArray(arrayOf())
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    suspend inline fun <reified T1, reified R> mapToNativeFunction1(waitForRegistration: Boolean): suspend (T1) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeFunctionHelper<R>(types, waitForRegistration)
+        return { p1 ->
+            functionWithParamArray(arrayOf(p1))
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    inline fun <reified T1, reified R> mapToNativeFunction1(): suspend (T1) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeFunctionAsyncHelper<R>(types)
+        return { p1 ->
+            functionWithParamArray(arrayOf(p1))
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    inline fun <reified T1, reified R> mapToNativeBlockingFunction1(context: CoroutineContext? = null): (T1) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeBlockingFunctionHelper<R>(types, context)
+        return { p1 ->
+            functionWithParamArray(arrayOf(p1))
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    suspend inline fun <reified T1, reified T2, reified R> mapToNativeFunction2(waitForRegistration: Boolean): suspend (T1, T2) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeFunctionHelper<R>(types, waitForRegistration)
+        return { p1, p2 ->
+            functionWithParamArray(arrayOf(p1, p2))
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    inline fun <reified T1, reified T2, reified R> mapToNativeFunction2(): suspend (T1, T2) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeFunctionAsyncHelper<R>(types)
+        return { p1, p2 ->
+            functionWithParamArray(arrayOf(p1, p2))
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    inline fun <reified T1, reified T2, reified R> mapToNativeBlockingFunction2(context: CoroutineContext? = null): (T1, T2) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeBlockingFunctionHelper<R>(types, context)
+        return { p1, p2 ->
+            functionWithParamArray(arrayOf(p1, p2))
+        }
+    }
+
+    // TODO: mapToNative(Blocking)Function3-9
+
+
+    // Internal
+    // ---
+
+    @UseExperimental(ExperimentalStdlibApi::class)
     @PublishedApi
-    internal inline fun <reified R> mapToNativeFunctionHelper(types: List<KType>): suspend (Array<Any?>) -> R {
+    internal suspend inline fun <reified R> mapToNativeFunctionHelper(types: List<KType>, waitForRegistration: Boolean): suspend (Array<Any?>) -> R {
         val awaitJsPromise = types.lastOrNull()?.classifier != Deferred::class
-        val lambdaJsValue = jsBridge?.registerJsLambda(this, types)
+        val lambdaJsValue = jsBridge?.registerJsLambda(this, types, waitForRegistration)
                 ?: throw JsToNativeRegistrationError(R::class, customMessage = "Cannot map JS value to native function because the JS interpreter has been destroyed")
 
         return { params ->
@@ -362,9 +466,27 @@ internal constructor(
 
     @UseExperimental(ExperimentalStdlibApi::class)
     @PublishedApi
-    internal inline fun <reified R> mapToNativeBlockingFunctionHelper(types: List<KType>): (Array<Any?>) -> R {
+    internal inline fun <reified R> mapToNativeFunctionAsyncHelper(types: List<KType>): suspend (Array<Any?>) -> R {
         val awaitJsPromise = types.lastOrNull()?.classifier != Deferred::class
-        val lambdaJsValue = jsBridge?.registerJsLambda(this, types)
+        val lambdaJsValue = jsBridge?.registerJsLambdaAsync(this, types)
+                ?: throw JsToNativeRegistrationError(R::class, customMessage = "Cannot map JS value to native function because the JS interpreter has been destroyed")
+
+        return { params ->
+            val jsBridge = jsBridge
+                    ?: throw JsToNativeRegistrationError(R::class, customMessage = "Cannot map JS value to native function because the JS interpreter has been destroyed")
+
+            this.hold()
+
+            @Suppress("UNCHECKED_CAST")
+            jsBridge.callJsLambda(lambdaJsValue, params, awaitJsPromise) as R
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    @PublishedApi
+    internal inline fun <reified R> mapToNativeBlockingFunctionHelper(types: List<KType>, context: CoroutineContext?): (Array<Any?>) -> R {
+        val awaitJsPromise = types.lastOrNull()?.classifier != Deferred::class
+        val lambdaJsValue = jsBridge?.registerJsLambdaBlocking(this, types, context)
                 ?: throw JsToNativeRegistrationError(R::class, customMessage = "Cannot map JS value to native function because the JS interpreter has been destroyed")
 
         return { params ->
@@ -379,59 +501,4 @@ internal constructor(
             }
         }
     }
-
-    @UseExperimental(ExperimentalStdlibApi::class)
-    inline fun <reified R> mapToNativeFunction0(): suspend () -> R {
-        val functionWithParamArray = mapToNativeFunctionHelper<R>(listOf(typeOf<R>()))
-        return {
-            functionWithParamArray(arrayOf())
-        }
-    }
-
-    @UseExperimental(ExperimentalStdlibApi::class)
-    inline fun <reified R> mapToNativeBlockingFunction0(context: CoroutineContext? = null): () -> R {
-        val types = listOf(typeOf<R>())
-        val functionWithParamArray = mapToNativeBlockingFunctionHelper<R>(types)
-        return {
-            functionWithParamArray(arrayOf())
-        }
-    }
-
-    @UseExperimental(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified R> mapToNativeFunction1(): suspend (T1) -> R {
-        val types = listOf(typeOf<T1>(), typeOf<R>())
-        val functionWithParamArray = mapToNativeFunctionHelper<R>(types)
-        return { p1 ->
-            functionWithParamArray(arrayOf(p1))
-        }
-    }
-
-    @UseExperimental(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified R> mapToNativeBlockingFunction1(context: CoroutineContext? = null): (T1) -> R {
-        val types = listOf(typeOf<T1>(), typeOf<R>())
-        val functionWithParamArray = mapToNativeBlockingFunctionHelper<R>(types)
-        return { p1 ->
-            functionWithParamArray(arrayOf(p1))
-        }
-    }
-
-    @UseExperimental(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified T2, reified R> mapToNativeFunction2(): suspend (T1, T2) -> R {
-        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<R>())
-        val functionWithParamArray = mapToNativeFunctionHelper<R>(types)
-        return { p1, p2 ->
-            functionWithParamArray(arrayOf(p1, p2))
-        }
-    }
-
-    @UseExperimental(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified T2, reified R> mapToNativeBlockingFunction2(context: CoroutineContext? = null): (T1, T2) -> R {
-        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<R>())
-        val functionWithParamArray = mapToNativeBlockingFunctionHelper<R>(types)
-        return { p1, p2 ->
-            functionWithParamArray(arrayOf(p1, p2))
-        }
-    }
-
-    // TODO: mapToNative(Blocking)Function3-9
 }
