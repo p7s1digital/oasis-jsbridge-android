@@ -361,6 +361,10 @@ internal constructor(
     //  ...
     //}
 
+
+    // Proxy JS to native function (0)
+    // ---
+
     @UseExperimental(ExperimentalStdlibApi::class)
     suspend inline fun <reified R> mapToNativeFunction0(waitForRegistration: Boolean): suspend () -> R {
         val functionWithParamArray = mapToNativeFunctionHelper<R>(listOf(typeOf<R>()), waitForRegistration)
@@ -385,6 +389,10 @@ internal constructor(
             functionWithParamArray(arrayOf())
         }
     }
+
+
+    // Proxy JS to native function (1)
+    // ---
 
     @UseExperimental(ExperimentalStdlibApi::class)
     suspend inline fun <reified T1, reified R> mapToNativeFunction1(waitForRegistration: Boolean): suspend (T1) -> R {
@@ -413,6 +421,10 @@ internal constructor(
         }
     }
 
+
+    // Proxy JS to native function (2)
+    // ---
+
     @UseExperimental(ExperimentalStdlibApi::class)
     suspend inline fun <reified T1, reified T2, reified R> mapToNativeFunction2(waitForRegistration: Boolean): suspend (T1, T2) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<R>())
@@ -440,7 +452,222 @@ internal constructor(
         }
     }
 
-    // TODO: mapToNative(Blocking)Function3-9
+
+    // Proxy JS to native function (3)
+    // ---
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    suspend inline fun <reified T1, reified T2, reified T3, reified R> mapToNativeFunction3(waitForRegistration: Boolean): suspend (T1, T2, T3) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeFunctionHelper<R>(types, waitForRegistration)
+        return { p1, p2, p3 ->
+            functionWithParamArray(arrayOf(p1, p2, p3))
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    inline fun <reified T1, reified T2, reified T3, reified R> mapToNativeFunction3(): suspend (T1, T2, T3) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeFunctionAsyncHelper<R>(types)
+        return { p1, p2, p3 ->
+            functionWithParamArray(arrayOf(p1, p2, p3))
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    inline fun <reified T1, reified T2, reified T3, reified R> mapToNativeBlockingFunction3(context: CoroutineContext? = null): (T1, T2, T3) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeBlockingFunctionHelper<R>(types, context)
+        return { p1, p2, p3 ->
+            functionWithParamArray(arrayOf(p1, p2, p3))
+        }
+    }
+
+
+    // Proxy JS to native function (4)
+    // ---
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    suspend inline fun <reified T1, reified T2, reified T3, reified T4, reified R> mapToNativeFunction4(waitForRegistration: Boolean): suspend (T1, T2, T3, T4) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeFunctionHelper<R>(types, waitForRegistration)
+        return { p1, p2, p3, p4 ->
+            functionWithParamArray(arrayOf(p1, p2, p3, p4))
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified R> mapToNativeFunction4(): suspend (T1, T2, T3, T4) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeFunctionAsyncHelper<R>(types)
+        return { p1, p2, p3, p4 ->
+            functionWithParamArray(arrayOf(p1, p2, p3, p4))
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified R> mapToNativeBlockingFunction4(context: CoroutineContext? = null): (T1, T2, T3, T4) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeBlockingFunctionHelper<R>(types, context)
+        return { p1, p2, p3, p4 ->
+            functionWithParamArray(arrayOf(p1, p2, p3, p4))
+        }
+    }
+
+
+    // Proxy JS to native function (5)
+    // ---
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    suspend inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified R> mapToNativeFunction5(waitForRegistration: Boolean): suspend (T1, T2, T3, T4, T5) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeFunctionHelper<R>(types, waitForRegistration)
+        return { p1, p2, p3, p4, p5 ->
+            functionWithParamArray(arrayOf(p1, p2, p3, p4, p5))
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified R> mapToNativeFunction5(): suspend (T1, T2, T3, T4, T5) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeFunctionAsyncHelper<R>(types)
+        return { p1, p2, p3, p4, p5 ->
+            functionWithParamArray(arrayOf(p1, p2, p3, p4, p5))
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified R> mapToNativeBlockingFunction5(context: CoroutineContext? = null): (T1, T2, T3, T4, T5) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeBlockingFunctionHelper<R>(types, context)
+        return { p1, p2, p3, p4, p5 ->
+            functionWithParamArray(arrayOf(p1, p2, p3, p4, p5))
+        }
+    }
+
+
+    // Proxy JS to native function (6)
+    // ---
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    suspend inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified R> mapToNativeFunction6(waitForRegistration: Boolean): suspend (T1, T2, T3, T4, T5, T6) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeFunctionHelper<R>(types, waitForRegistration)
+        return { p1, p2, p3, p4, p5, p6 ->
+            functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6))
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified R> mapToNativeFunction6(): suspend (T1, T2, T3, T4, T5, T6) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeFunctionAsyncHelper<R>(types)
+        return { p1, p2, p3, p4, p5, p6 ->
+            functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6))
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified R> mapToNativeBlockingFunction6(context: CoroutineContext? = null): (T1, T2, T3, T4, T5, T6) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeBlockingFunctionHelper<R>(types, context)
+        return { p1, p2, p3, p4, p5, p6 ->
+            functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6))
+        }
+    }
+
+
+    // Proxy JS to native function (7)
+    // ---
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    suspend inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified R> mapToNativeFunction7(waitForRegistration: Boolean): suspend (T1, T2, T3, T4, T5, T6, T7) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<T7>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeFunctionHelper<R>(types, waitForRegistration)
+        return { p1, p2, p3, p4, p5, p6, p7 ->
+            functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6, p7))
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified R> mapToNativeFunction7(): suspend (T1, T2, T3, T4, T5, T6, T7) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<T7>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeFunctionAsyncHelper<R>(types)
+        return { p1, p2, p3, p4, p5, p6, p7 ->
+            functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6, p7))
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified R> mapToNativeBlockingFunction7(context: CoroutineContext? = null): (T1, T2, T3, T4, T5, T6, T7) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<T7>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeBlockingFunctionHelper<R>(types, context)
+        return { p1, p2, p3, p4, p5, p6, p7 ->
+            functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6, p7))
+        }
+    }
+
+
+    // Proxy JS to native function (8)
+    // ---
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    suspend inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified T8, reified R> mapToNativeFunction8(waitForRegistration: Boolean): suspend (T1, T2, T3, T4, T5, T6, T7, T8) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<T7>(), typeOf<T8>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeFunctionHelper<R>(types, waitForRegistration)
+        return { p1, p2, p3, p4, p5, p6, p7, p8 ->
+            functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6, p7, p8))
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified T8, reified R> mapToNativeFunction8(): suspend (T1, T2, T3, T4, T5, T6, T7, T8) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<T7>(), typeOf<T8>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeFunctionAsyncHelper<R>(types)
+        return { p1, p2, p3, p4, p5, p6, p7, p8 ->
+            functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6, p7, p8))
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified T8, reified R> mapToNativeBlockingFunction8(context: CoroutineContext? = null): (T1, T2, T3, T4, T5, T6, T7, T8) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<T7>(), typeOf<T8>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeBlockingFunctionHelper<R>(types, context)
+        return { p1, p2, p3, p4, p5, p6, p7, p8 ->
+            functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6, p7, p8))
+        }
+    }
+
+
+    // Proxy JS to native function (9)
+    // ---
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    suspend inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified T8, reified T9, reified R> mapToNativeFunction9(waitForRegistration: Boolean): suspend (T1, T2, T3, T4, T5, T6, T7, T8, T9) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<T7>(), typeOf<T8>(), typeOf<T9>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeFunctionHelper<R>(types, waitForRegistration)
+        return { p1, p2, p3, p4, p5, p6, p7, p8, p9 ->
+            functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6, p7, p8, p9))
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified T8, reified T9, reified R> mapToNativeFunction9(): suspend (T1, T2, T3, T4, T5, T6, T7, T8, T9) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<T7>(), typeOf<T8>(), typeOf<T9>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeFunctionAsyncHelper<R>(types)
+        return { p1, p2, p3, p4, p5, p6, p7, p8, p9 ->
+            functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6, p7, p8, p9))
+        }
+    }
+
+    @UseExperimental(ExperimentalStdlibApi::class)
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified T8, reified T9, reified R> mapToNativeBlockingFunction9(context: CoroutineContext? = null): (T1, T2, T3, T4, T5, T6, T7, T8, T9) -> R {
+        val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<T7>(), typeOf<T8>(), typeOf<T9>(), typeOf<R>())
+        val functionWithParamArray = mapToNativeBlockingFunctionHelper<R>(types, context)
+        return { p1, p2, p3, p4, p5, p6, p7, p8, p9 ->
+            functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6, p7, p8, p9))
+        }
+    }
 
 
     // Internal
