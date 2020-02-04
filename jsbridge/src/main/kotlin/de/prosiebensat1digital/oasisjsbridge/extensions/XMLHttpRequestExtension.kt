@@ -95,6 +95,8 @@ class XMLHttpRequestExtension(
                     RequestBody.create(MediaType.parse(contentType), data)
                 }
 
+                Timber.d("Performing XHR request (query: $url)...")
+
                 // Send request via OkHttp
                 lateinit var request: Request
                 val httpUrl = HttpUrl.parse(url) ?: throw Throwable("Cannot parse URL: $url")

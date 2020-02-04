@@ -53,8 +53,7 @@ namespace {
 
 extern "C" {
 
-JNIEXPORT jlong JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCreateContext
-    (JNIEnv *env, jobject object, jboolean doDebug) {
+JNIEXPORT jlong JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCreateContext(JNIEnv *env, jobject object) {
 
   alog("jniCreateContext()");
 
@@ -63,15 +62,18 @@ JNIEXPORT jlong JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniC
 
   try {
     jsBridgeContext->init(jniContext, JniLocalRef<jobject>(jniContext, object, JniLocalRefMode::Borrowed));
-
-    if (doDebug) {
-      jsBridgeContext->initDebugger();
-    }
   } catch (const std::bad_alloc &) {
     return 0L;
   }
 
   return reinterpret_cast<jlong>(jsBridgeContext);
+}
+
+JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniStartDebugger
+    (JNIEnv *env, jobject, jlong lctx) {
+
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
+  jsBridgeContext->startDebugger();
 }
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCancelDebug

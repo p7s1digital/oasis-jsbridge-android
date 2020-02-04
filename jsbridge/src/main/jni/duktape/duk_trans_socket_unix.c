@@ -22,9 +22,7 @@
 #include "duktape.h"
 #include "duk_trans_socket.h"
 
-#if !defined(DUK_DEBUG_PORT)
-#define DUK_DEBUG_PORT 9091
-#endif
+#define DUK_DEBUG_PORT DEBUGGER_SERVER_PORT
 
 #if 0
 #define DEBUG_PRINTS

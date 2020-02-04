@@ -102,6 +102,8 @@ class JsBridge(context: Context): CoroutineScope {
 
     private var internalCounter = AtomicInteger(0)
 
+    val isJsDebuggerActive: Boolean get() = jsDebuggerExtension?.isActive == true
+
 
     init {
         launch {
@@ -118,8 +120,8 @@ class JsBridge(context: Context): CoroutineScope {
     // - create the Duktape context via JNI
     // - set up the interpreter with polyfills and helpers (e.g. support for setTimeout)
     @JvmOverloads
-    fun start(useDebugger: Boolean = false, activity: Activity? = null, okHttpClient: OkHttpClient? = null) {
-        Timber.d("Starting JsBridge - useDebugger = $useDebugger")
+    fun start(okHttpClient: OkHttpClient? = null) {
+        Timber.d("Starting JsBridge")
 
         // Pending -> Starting1
         if (!state.compareAndSet(State.Pending.intValue, State.Starting1.intValue)) {
@@ -135,7 +137,7 @@ class JsBridge(context: Context): CoroutineScope {
             }
 
             try {
-                val jniJsContext = createJniJsContext(useDebugger)
+                val jniJsContext = createJniJsContext()
 
                 assert(this@JsBridge.jniJsContext == null)
                 this@JsBridge.jniJsContext = jniJsContext
@@ -149,7 +151,7 @@ class JsBridge(context: Context): CoroutineScope {
         }
 
         // Extensions (TODO: use a Configuration data class)
-        jsDebuggerExtension = JsDebuggerExtension(this@JsBridge, activity)
+        jsDebuggerExtension = JsDebuggerExtension(this)
         if (!BuildConfig.HAS_BUILTIN_PROMISE) promisePolyfillExtension = PromisePolyfillExtension(this@JsBridge)
         setTimeoutExtension = SetTimeoutExtension(this@JsBridge)
         xmlHttpRequestExtension = XMLHttpRequestExtension(this@JsBridge, okHttpClient)
@@ -217,6 +219,19 @@ class JsBridge(context: Context): CoroutineScope {
 
     fun unregisterErrorListener(listener: ErrorListener) {
         errorListeners.remove(listener)
+    }
+
+    fun startDebugger(activity: Activity? = null) {
+        val jsDebuggerExtension = jsDebuggerExtension ?: run {
+            Timber.w("Cannot start debugger: JS debugger extension has not been created!")
+            return
+        }
+
+        jsDebuggerExtension.activity = activity
+
+        launch {
+            jniStartDebugger(jniJsContextOrThrow())
+        }
     }
 
     // Evaluate a local JS file which should be bundled as an asset.
@@ -556,7 +571,7 @@ class JsBridge(context: Context): CoroutineScope {
 
     // Create the JNI/JS context and return a Deferred which is rejected with a
     // JsBridgeError in case of error
-    private fun createJniJsContext(useDebugger: Boolean): Long {
+    private fun createJniJsContext(): Long {
         checkJsThread()
 
         if (!isLibraryLoaded) {
@@ -573,7 +588,7 @@ class JsBridge(context: Context): CoroutineScope {
             isLibraryLoaded = true
         }
 
-        return jniCreateContext(useDebugger)
+        return jniCreateContext()
     }
 
     @Throws
@@ -760,6 +775,20 @@ class JsBridge(context: Context): CoroutineScope {
         }
     }
 
+    @Suppress("UNUSED")  // Called from JNI
+    private fun onDebuggerPending() {
+        checkJsThread()
+
+        jsDebuggerExtension?.onDebuggerPending()
+    }
+
+    @Suppress("UNUSED")  // Called from JNI
+    private fun onDebuggerReady() {
+        checkJsThread()
+
+        jsDebuggerExtension?.onDebuggerReady()
+    }
+
     // Create a native proxy to a JS function defined by a reflected (lambda) Method. The function
     // will be called from Java/Kotlin and will trigger execution of the JS lambda.
     //
@@ -870,7 +899,8 @@ class JsBridge(context: Context): CoroutineScope {
 
 
     // JNI functions
-    private external fun jniCreateContext(doDebug: Boolean): Long
+    private external fun jniCreateContext(): Long
+    private external fun jniStartDebugger(context: Long)
     private external fun jniCancelDebug(context: Long)
 
     private external fun jniDeleteContext(context: Long)

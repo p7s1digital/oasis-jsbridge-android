@@ -91,7 +91,7 @@ void JsBridgeContext::init(JniContext *jniContext, const JniLocalRef<jobject> &j
   quickjs_console_init(m_ctx);
 }
 
-void JsBridgeContext::initDebugger() {
+void JsBridgeContext::startDebugger() {
   // Not supported yet
 }
 

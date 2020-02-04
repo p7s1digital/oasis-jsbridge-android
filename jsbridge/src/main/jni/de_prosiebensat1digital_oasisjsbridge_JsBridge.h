@@ -26,7 +26,10 @@ extern "C" {
 #endif
 
 JNIEXPORT jlong JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCreateContext
-  (JNIEnv *, jobject, jboolean);
+  (JNIEnv *, jobject);
+
+JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniStartDebug
+    (JNIEnv *, jobject, jlong);
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCancelDebug
     (JNIEnv *, jobject, jlong);
