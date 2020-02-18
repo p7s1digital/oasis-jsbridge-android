@@ -259,7 +259,12 @@ void Deferred::completeJsPromise(const JsBridgeContext *jsBridgeContext, const s
   JSValue resolveOrReject = JS_GetPropertyStr(ctx, promiseObj, resolveOrRejectStr);
   if (JS_IsFunction(ctx, resolveOrReject)) {
     // Call it with the Promise value
-    JSValue promiseParam = componentType->fromJava(JValue(value));
+    JSValue promiseParam;
+    if (isFulfilled) {
+      promiseParam = componentType->fromJava(JValue(value));
+    } else {
+      promiseParam = jsBridgeContext->getExceptionHandler()->javaExceptionToJsValue(value.staticCast<jthrowable>());
+    }
     JSValue ret = JS_Call(ctx, resolveOrReject, promiseObj, 1, &promiseParam);
     if (JS_IsException(ret)) {
       alog("Could not complete Promise with id %s", strId.c_str());

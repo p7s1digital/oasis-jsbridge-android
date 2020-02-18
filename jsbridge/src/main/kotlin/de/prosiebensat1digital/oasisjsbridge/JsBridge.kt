@@ -54,7 +54,7 @@ import kotlin.reflect.full.createType
 // Most basic types are supported, as well as lambda parameters. More complex objects can be
 // transferred using the JsonObjectWrapper class.
 //
-// JS values which do not need to be converted to native code can be encapsulated into a
+// JS values which do not need to be converted to native values can be encapsulated into a
 // JsValue object.
 //
 // Note: all the public methods are asynchronous and will not block the caller threads. They
@@ -862,7 +862,7 @@ class JsBridge(context: Context): CoroutineScope {
                 jniCompleteJsPromise(jniJsContext, id, true, result)
             } catch (t: Throwable) {
                 // Reject promise
-                jniCompleteJsPromise(jniJsContext, id, false, t.message ?: "Deferred error")
+                jniCompleteJsPromise(jniJsContext, id, false, Exception(t.message ?: "Deferred error"))
             }
 
             processPromiseQueue()
