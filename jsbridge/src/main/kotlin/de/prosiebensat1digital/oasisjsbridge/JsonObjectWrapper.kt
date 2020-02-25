@@ -69,7 +69,7 @@ open class JsonObjectWrapper(val jsonString: String) {
             is JsonObjectWrapper -> value.jsonString
             is Number -> "$value"
             is Boolean -> if (value) "true" else "false"
-            is String -> "\"$value\""
+            is String -> "\"${escape(value)}\""
             is Array<*> -> JsonObjectWrapper(value).jsonString
             is Collection<*> -> JsonObjectWrapper(value as Collection<Any?>).jsonString
             is Map<*, *> -> JsonObjectWrapper(value as Map<String, Any?>).jsonString
@@ -91,3 +91,8 @@ open class JsonObjectWrapper(val jsonString: String) {
 
     override fun toString() = jsonString
 }
+
+private fun escape(s: String): String = s.replace("\"", "\\\"")
+    .replace("\n", "\\n")
+    .replace("\t", "\\t")
+    .replace("\r", "\\r")

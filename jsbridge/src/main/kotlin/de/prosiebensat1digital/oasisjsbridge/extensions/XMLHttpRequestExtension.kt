@@ -108,7 +108,18 @@ class XMLHttpRequestExtension(
                 val response = okHttpClient.newCall(request).execute()
 
                 // Convert header mutlimap (key -> [value1, value2, ...]) into a list of [key, value] arrays
-                val headerKeyValues = response.headers().toMultimap().flatMap { (key, values) -> values.map { arrayOf(key, it.replace("\"", "\\\"")) } }
+                val headerKeyValues = response
+                    .headers()
+                    .toMultimap()
+                    .flatMap { (key, values) ->
+                        values
+                            .map { value ->
+                                arrayOf(
+                                    key,
+                                    value.replace("""([^\])"""", """$1\"""")
+                                )
+                            }
+                    }
 
                 responseInfo = JsonObjectWrapper(
                     "statusCode" to response.code(),
