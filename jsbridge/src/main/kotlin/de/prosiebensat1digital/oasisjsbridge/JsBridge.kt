@@ -855,16 +855,18 @@ class JsBridge(context: Context): CoroutineScope {
         launch {
             val jniJsContext = jniJsContextOrThrow()
 
-            try {
-                val result = deferred.await()
+            var isFulfilled: Boolean = false
 
-                // Resolve promise
-                jniCompleteJsPromise(jniJsContext, id, true, result)
+            val promiseValue = try {
+                val result = deferred.await()
+                isFulfilled = true
+                result
             } catch (t: Throwable) {
                 // Reject promise
-                jniCompleteJsPromise(jniJsContext, id, false, Exception(t.message ?: "Deferred error"))
+                t
             }
 
+            jniCompleteJsPromise(jniJsContext, id, isFulfilled, promiseValue)
             processPromiseQueue()
         }
     }

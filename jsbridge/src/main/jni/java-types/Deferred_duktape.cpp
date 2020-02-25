@@ -339,7 +339,12 @@ void Deferred::completeJsPromise(const JsBridgeContext *jsBridgeContext, const s
 
   // Call it with the Promise value
   if (isFulfilled) {
-    componentType->push(JValue(value));
+    try {
+      componentType->push(JValue(value));
+    } catch (const std::exception &e) {
+      duk_pop_2(ctx);  // resolve/reject function
+      throw;
+    }
   } else {
     jsBridgeContext->getExceptionHandler()->pushJavaException(value.staticCast<jthrowable>());
   }
