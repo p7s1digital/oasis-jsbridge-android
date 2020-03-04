@@ -27,23 +27,20 @@ import de.prosiebensat1digital.oasisjsbridge.extensions.JsDebuggerExtension
 import de.prosiebensat1digital.oasisjsbridge.extensions.PromisePolyfillExtension
 import de.prosiebensat1digital.oasisjsbridge.extensions.SetTimeoutExtension
 import de.prosiebensat1digital.oasisjsbridge.extensions.XMLHttpRequestExtension
+import kotlinx.coroutines.*
+import okhttp3.OkHttpClient
+import timber.log.Timber
 import java.io.FileNotFoundException
 import java.io.InputStream
-import java.lang.reflect.Method as JavaMethod
 import java.lang.reflect.Proxy
 import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.Function
-import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.coroutines.*
 import kotlin.reflect.*
-import kotlin.reflect.KClass
-import kotlin.reflect.full.declaredMemberFunctions
-import kotlinx.coroutines.*
-import okhttp3.OkHttpClient
-import timber.log.Timber
 import kotlin.reflect.full.createType
+import kotlin.reflect.full.declaredMemberFunctions
+import java.lang.reflect.Method as JavaMethod
 
 
 // Execute JS code via Duktape or QuickJS and handle the bi-directional communication between native
@@ -381,8 +378,6 @@ class JsBridge(context: Context): CoroutineScope {
     // - function parameters are supported (with the same limitations as in registerJsToNativeInterface)
     // - native methods returning a "Kotlin coroutine" Deferred are mapped to a JS Promise
     // - if the JS value is a promise, you need to resolve it first with jsValue.await() or jsValue.awaitAsync()
-    //
-    // TODO: support for suspend methods!
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
     suspend fun <T : NativeToJsInterface> registerNativeToJsInterface(jsValue: JsValue, type: KClass<T>, check: Boolean): T {
         return registerNativeToJsInterfaceHelper(jsValue, type, check, false)
@@ -623,7 +618,7 @@ class JsBridge(context: Context): CoroutineScope {
                 ?: throw JsToNativeRegistrationError(this::class, customMessage = "Cannot map native object to JS because it does not implement any JsToNativeInterface-based interface")
 
         if (!type.isInstance(obj)) {
-            throw JsToNativeRegistrationError(type, Throwable("$obj.javaClass.name is not an instance of $type"))
+            throw JsToNativeRegistrationError(type, Throwable("${obj.javaClass.name} is not an instance of $type"))
         }
 
         val methods = linkedMapOf<String, Method>()
@@ -958,11 +953,18 @@ class JsBridge(context: Context): CoroutineScope {
                 method.name == "equals" -> jsValue.toString() == args?.firstOrNull()?.toString()
                 method.name == "toString" -> jsValue.toString()
 
-                method.returnType == Unit::class ||
-                method.returnType == Void::class ||
+                method.returnType == Unit::class.java ||
+                method.returnType == Void::class.java ||
                 method.returnType == Void::class.javaPrimitiveType -> {
                     callJsMethodWithoutRetVal(method, args)
                     CompletableDeferred(Unit)
+                }
+
+                args?.lastOrNull() is Continuation<*> -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val continuation = args.last() as Continuation<Any?>
+                    val jsArgs = args.copyOfRange(0, args.size - 1)
+                    callJsMethodSuspended(method, jsArgs, continuation)
                 }
 
                 method.returnType.isAssignableFrom(Deferred::class.java) -> callJsMethodAsync(method, args)
@@ -981,6 +983,19 @@ class JsBridge(context: Context): CoroutineScope {
                         .also(::notifyErrorListeners)
                 }
             }
+        }
+
+        private fun callJsMethodSuspended(method: JavaMethod, args: Array<Any?>, continuation: Continuation<Any?>): Any {
+            launch {
+                try {
+                    val result = callJsMethod(jsValue.associatedJsName, method, args)
+                    continuation.resume(result)
+                } catch (t: Throwable) {
+                    continuation.resumeWithException(t)
+                }
+            }
+
+            return kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
         }
 
         private fun callJsMethodAsync(method: JavaMethod, args: Array<Any?>?): Deferred<Any?> {

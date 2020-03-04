@@ -17,19 +17,21 @@ package de.prosiebensat1digital.oasisjsbridge
 
 import androidx.test.platform.app.InstrumentationRegistry
 import de.prosiebensat1digital.oasisjsbridge.JsBridgeError.*
-import io.mockk.*
-import kotlin.test.*
+import io.mockk.Ordering
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.*
-import okhttp3.*
+import okhttp3.OkHttpClient
+import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.fail
-import org.junit.After
 import org.junit.BeforeClass
 import org.junit.Ignore
 import org.junit.Test
 import timber.log.Timber
-import java.lang.IllegalArgumentException
-import java.lang.NullPointerException
+import kotlin.coroutines.coroutineContext
+import kotlin.test.*
 
 interface TestNativeApiInterface : JsToNativeInterface {
     fun nativeMethodReturningTrue(): Boolean
@@ -56,6 +58,11 @@ interface TestJsApiInterface : NativeToJsInterface {
     fun jsMethodReturningFulfilledPromise(str: String): Deferred<String>
     fun jsMethodReturningRejectedPromise(d: Double): Deferred<Double>
     fun jsMethodReturningJsValue(str: String): Deferred<JsValue>
+}
+
+interface TestJsApiInterfaceWithSuspend : NativeToJsInterface {
+    suspend fun jsMethodWithString(msg: String)
+    suspend fun jsMethodReturningJsonObject(): JsonObjectWrapper
 }
 
 interface JsExpectationsNativeApi : JsToNativeInterface {
@@ -1174,6 +1181,41 @@ class JsBridgeTest {
     }
 
     @Test
+    fun testRegisterNativeToJsInterfaceWithSuspendMethods() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        val jsExpectations = JsExpectations()
+        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+
+        val testJsApi = JsValue(subject, """({
+            jsMethodWithString: function(msg) {
+              $jsExpectationsJsValue.addExpectation("stringArg", msg);
+            },
+            jsMethodReturningJsonObject: function() {
+              return { key: "value" };
+            }
+        })""")
+
+
+        // WHEN
+        val jsApi: TestJsApiInterfaceWithSuspend = testJsApi.mapToNativeObjectBlocking()
+        runBlocking {
+            jsApi.jsMethodWithString("Hello JS!")
+            val result = jsApi.jsMethodReturningJsonObject()
+            assertEquals("value", result.toPayloadObject()?.getString("key"))
+
+            waitForDone(subject)
+        }
+
+        // THEN
+        jsExpectations.checkEquals("stringArg", "Hello JS!")
+        assertTrue(jsExpectations.isEmpty)
+
+        assertTrue(errors.isEmpty())
+    }
+
+    @Test
     fun testRegisterNativeToJsInterface() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
@@ -1627,7 +1669,7 @@ class JsBridgeTest {
         }
 
         inline fun <reified T: Any> checkEquals(name: String, value: T?) {
-            assertEquals(takeExpectation<T>(name), value)
+            assertEquals(value, takeExpectation(name))
         }
 
         inline fun <reified T: Any> checkBlock(name: String, block: (T?) -> Unit) {
