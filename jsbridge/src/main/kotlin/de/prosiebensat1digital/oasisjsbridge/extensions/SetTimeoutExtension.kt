@@ -18,30 +18,46 @@ package de.prosiebensat1digital.oasisjsbridge.extensions
 import de.prosiebensat1digital.oasisjsbridge.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.yield
 import timber.log.Timber
 
 // Support for setTimeout() and setInterval()
 class SetTimeoutExtension(private val jsBridge: JsBridge) {
+    private val setTimeoutHelperJs: JsValue
     private val activeTimers = mutableSetOf<String>()
     private var timerCounter = 0
 
     init {
-        JsValue.fromNativeFunction2(jsBridge) { cb: () -> Unit, msecs: Long -> setTimeoutHelper(cb, msecs, false) }
+        setTimeoutHelperJs = JsValue.fromNativeFunction3(jsBridge, ::setTimeoutHelper)
+
+        // As setTimeout(cb, ms, args...) can also receive arguments passed to the given callback,
+        // we need to convert them to an array and wrap the callback lambda
+        JsValue.newFunction(jsBridge, "cb", "msecs", """
+            var argArray = [].slice.call(arguments, 2);
+            var cbWrapper = function() {
+              cb.apply(null, argArray);
+            };
+            return $setTimeoutHelperJs(cbWrapper, msecs, false);
+        """.trimIndent())
             .assignToGlobal("setTimeout")
 
         JsValue.fromNativeFunction1(jsBridge) { id: String? -> clearTimeoutHelper(id) }
             .assignToGlobal("clearTimeout")
 
-        JsValue.fromNativeFunction2(jsBridge) { cb: () -> Unit, msecs: Long -> setTimeoutHelper(cb, msecs, true) }
+        // Same as for setTimeout but with setTimeoutHelper repeat parameter set to true
+        JsValue.newFunction(jsBridge, "cb", "msecs", """
+            var argArray = [].slice.call(arguments, 2);
+            var cbWrapper = function() {
+              cb.apply(null, argArray);
+            };
+            return $setTimeoutHelperJs(cbWrapper, msecs, true);
+        """.trimIndent())
             .assignToGlobal("setInterval")
 
         JsValue.fromNativeFunction1(jsBridge) { id: String? -> clearTimeoutHelper(id) }
             .assignToGlobal("clearInterval")
     }
 
-    fun release() {
-    }
+    fun release() = Unit
 
     private fun setTimeoutHelper(cb: () -> Unit, msecs: Long, repeat: Boolean): String {
         val id = "timerId${timerCounter++}"

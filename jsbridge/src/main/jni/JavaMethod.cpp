@@ -111,7 +111,7 @@ duk_ret_t JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRe
       : m_argumentTypes.size();
 
   if (argCount < minArgs || (!m_isVarArgs && argCount > minArgs)) {
-    throw std::invalid_argument("wrong number of arguments when calling Java method " + m_methodName);
+    throw std::invalid_argument(std::string() + "wrong number of arguments when calling Java method " + m_methodName + " (expected: " + std::to_string(minArgs) + ", received: " + std::to_string(argCount) + ")");
   }
 
   std::vector<JValue> args(m_argumentTypes.size());

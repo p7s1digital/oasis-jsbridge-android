@@ -1481,6 +1481,34 @@ class JsBridgeTest {
     }
 
     @Test
+    fun testSetTimeoutWithArgs() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+        val jsExpectations = JsExpectations()
+        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+
+        // WHEN
+        val js = """
+            setTimeout(function(a, b, c) {
+                $jsExpectationsJsValue.addExpectation("a", a);
+                $jsExpectationsJsValue.addExpectation("b", b);
+                $jsExpectationsJsValue.addExpectation("c", c);
+            }, 100, "aString", null, 69);
+        """.trimIndent()
+
+        subject.evaluateNoRetVal(js)
+
+        runBlocking { delay(1000); waitForDone(subject) }
+
+        // THEN
+        jsExpectations.checkEquals("a", "aString")
+        jsExpectations.checkEquals("b", JsonObjectWrapper("null"))
+        jsExpectations.checkEquals("c", 69)
+
+        assertTrue(errors.isEmpty())
+    }
+
+    @Test
     fun testClearTimeout() {
         val events = mutableListOf<String>()
 
