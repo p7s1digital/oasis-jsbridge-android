@@ -115,7 +115,7 @@ duk_ret_t Double::pushArray(const JniLocalRef<jarray> &values, bool expand) cons
 
 namespace {
   inline jdouble getDouble(JSValue v) {
-    if (JS_IsInteger(v)) {
+    if (JS_IsBigInt(NULL, v)) {
       return JS_VALUE_GET_INT(v);
     }
 

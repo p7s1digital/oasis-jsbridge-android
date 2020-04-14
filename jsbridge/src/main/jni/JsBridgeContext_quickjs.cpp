@@ -69,7 +69,7 @@ void JsBridgeContext::init(JniContext *jniContext, const JniLocalRef<jobject> &j
   //JS_SetInterruptHandler(rt, interrupt_handler, NULL)
 
   m_ctx = JS_NewContext(m_runtime);
-  JS_SetMaxStackSize(m_ctx, 1 * 1024 * 1024);  // default: 256kb, now: 1MB
+  JS_SetMaxStackSize(m_runtime, 1 * 1024 * 1024);  // default: 256kb, now: 1MB
 
   m_jniCache = new JniCache(this, jsBridgeObject);
   m_utils = new QuickJsUtils(jniContext, m_ctx);
