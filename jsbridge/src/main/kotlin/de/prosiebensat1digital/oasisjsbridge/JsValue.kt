@@ -276,8 +276,8 @@ internal constructor(
     // Notes:
     // - this method will throw an exception if the JS object does not implement all the methods
     // of the NativeToJsInterface
-    // - the methods of the returned proxy object will be running in the JS thread and block the
-    // caller thread if the return value is not Unit or Deferred
+    // - the non-suspend methods of the returned proxy object will be running in the JS thread and
+    // block the caller thread if the return value is not Unit or Deferred
     suspend inline fun <reified T: NativeToJsInterface> mapToNativeObject(): T {
         val jsBridge = jsBridge
                 ?: throw NativeToJsRegistrationError(T::class, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
@@ -296,8 +296,8 @@ internal constructor(
     // Notes:
     // - the proxy object will be returned even if the JS object is invalid or does not implement
     // all of the methods of the NativeToJsInterface
-    // - the methods of the returned proxy object will be running in the JS thread and block the
-    // caller thread if the return value is not Unit or Deferred
+    // - the non-suspend methods of the returned proxy object will be running in the JS thread and
+    // block the caller thread if the return value is not Unit or Deferred
     inline fun <reified T: NativeToJsInterface> mapToNativeObjectUnchecked(): T {
         val jsBridge = jsBridge
                 ?: throw NativeToJsRegistrationError(T::class, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")

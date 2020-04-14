@@ -17,27 +17,31 @@ package de.prosiebensat1digital.oasisjsbridge
 
 import androidx.test.platform.app.InstrumentationRegistry
 import de.prosiebensat1digital.oasisjsbridge.JsBridgeError.*
-import io.mockk.*
-import kotlin.test.*
+import io.mockk.Ordering
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.*
-import okhttp3.*
+import okhttp3.OkHttpClient
+import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.fail
-import org.junit.After
 import org.junit.BeforeClass
 import org.junit.Ignore
 import org.junit.Test
 import timber.log.Timber
-import java.lang.IllegalArgumentException
-import java.lang.NullPointerException
+import kotlin.coroutines.coroutineContext
+import kotlin.test.*
 
 interface TestNativeApiInterface : JsToNativeInterface {
     fun nativeMethodReturningTrue(): Boolean
     fun nativeMethodReturningFalse(): Boolean
     fun nativeMethodReturningString(): String
     fun nativeMethodReturningJsonObject(): JsonObjectWrapper
-    fun nativeMethodReturningResolvedDeferred(): Deferred<String>
-    fun nativeMethodReturningRejectedDeferred(): Deferred<String>
+    fun nativeMethodReturningResolvedJsonObjectDeferred(): Deferred<JsonObjectWrapper>
+    fun nativeMethodReturningRejectedJsonObjectDeferred(): Deferred<JsonObjectWrapper>
+    fun nativeMethodReturningResolvedStringDeferred(): Deferred<String>
+    fun nativeMethodReturningRejectedStringDeferred(): Deferred<String>
     fun nativeMethodWithBool(b: Boolean?)
     fun nativeMethodWithString(msg: String?)
     fun nativeMethodWithJsonObjects(jsonObject1: JsonObjectWrapper?, jsonObject2: JsonObjectWrapper?)
@@ -54,6 +58,11 @@ interface TestJsApiInterface : NativeToJsInterface {
     fun jsMethodReturningFulfilledPromise(str: String): Deferred<String>
     fun jsMethodReturningRejectedPromise(d: Double): Deferred<Double>
     fun jsMethodReturningJsValue(str: String): Deferred<JsValue>
+}
+
+interface TestJsApiInterfaceWithSuspend : NativeToJsInterface {
+    suspend fun jsMethodWithString(msg: String)
+    suspend fun jsMethodReturningJsonObject(): JsonObjectWrapper
 }
 
 interface JsExpectationsNativeApi : JsToNativeInterface {
@@ -1038,16 +1047,23 @@ class JsBridgeTest {
                 {"returnKey1": 1, "returnKey2": "returnValue2"}
             """)
 
-            override fun nativeMethodReturningResolvedDeferred(): Deferred<String> {
-                val deferred = CompletableDeferred<String>()
-                deferred.complete("returned deferred value")
-                return deferred
+            override fun nativeMethodReturningResolvedJsonObjectDeferred() = GlobalScope.async {
+                JsonObjectWrapper("""
+                    {"returnKey1": 1, "returnKey2": "returnValue2"}
+                """
+                )
             }
 
-            override fun nativeMethodReturningRejectedDeferred(): Deferred<String> {
-                val deferred = CompletableDeferred<String>()
-                deferred.completeExceptionally(Exception("returned deferred error"))
-                return deferred
+            override fun nativeMethodReturningRejectedJsonObjectDeferred() = GlobalScope.async {
+                throw Exception("returned deferred object error")
+            }
+
+            override fun nativeMethodReturningResolvedStringDeferred(): Deferred<String> = GlobalScope.async {
+                "returned deferred string"
+            }
+
+            override fun nativeMethodReturningRejectedStringDeferred(): Deferred<String> = GlobalScope.async {
+                throw Exception("returned deferred string error")
             }
 
             override fun nativeMethodWithBool(b: Boolean?) {
@@ -1089,17 +1105,29 @@ class JsBridgeTest {
             var retBool2 = $testNativeApi.nativeMethodReturningFalse();
             var retString = $testNativeApi.nativeMethodReturningString();
             var retObject = $testNativeApi.nativeMethodReturningJsonObject();
-            var retPromise = $testNativeApi.nativeMethodReturningResolvedDeferred();
-            retPromise.then(function(deferredValue) {
-              $jsExpectationsJsValue.addExpectation("resolvedDeferredValue", deferredValue);
+            var retObjectPromise = $testNativeApi.nativeMethodReturningResolvedJsonObjectDeferred();
+            retObjectPromise.then(function(deferredValue) {
+              $jsExpectationsJsValue.addExpectation("resolvedDeferredJson", JSON.stringify(deferredValue));
             }).catch(function(e) {
               $jsExpectationsJsValue.addExpectation("unexpected", true);
             });
-            retPromise = $testNativeApi.nativeMethodReturningRejectedDeferred();
-            retPromise.then(function(deferredValue) {
+            retObjectPromise = $testNativeApi.nativeMethodReturningRejectedJsonObjectDeferred();
+            retObjectPromise.then(function(deferredValue) {
               $jsExpectationsJsValue.addExpectation("unexpected", true);
             }).catch(function(e) {
-              $jsExpectationsJsValue.addExpectation("rejectedDeferredError", e);
+              $jsExpectationsJsValue.addExpectation("rejectedDeferredJsonError", e.message);
+            });
+            var retStringPromise = $testNativeApi.nativeMethodReturningResolvedStringDeferred();
+            retStringPromise.then(function(deferredValue) {
+              $jsExpectationsJsValue.addExpectation("resolvedDeferredString", deferredValue);
+            }).catch(function(e) {
+              $jsExpectationsJsValue.addExpectation("unexpected", true);
+            });
+            retStringPromise = $testNativeApi.nativeMethodReturningRejectedStringDeferred();
+            retStringPromise.then(function(deferredValue) {
+              $jsExpectationsJsValue.addExpectation("unexpected", true);
+            }).catch(function(e) {
+              $jsExpectationsJsValue.addExpectation("rejectedDeferredStringError", e.message);
             });
             $testNativeApi.nativeMethodWithBool(retBool1);
             $testNativeApi.nativeMethodWithBool(retBool2);
@@ -1135,8 +1163,10 @@ class JsBridgeTest {
         runBlocking { waitForDone(subject) }
 
         jsExpectations.checkDoesNotExist("unexpected")
-        jsExpectations.checkEquals("resolvedDeferredValue", "returned deferred value")
-        jsExpectations.checkEquals("rejectedDeferredError", "returned deferred error")
+        jsExpectations.checkEquals("resolvedDeferredJson", """{"returnKey1":1,"returnKey2":"returnValue2"}""")
+        jsExpectations.checkEquals("rejectedDeferredJsonError", "returned deferred object error")
+        jsExpectations.checkEquals("resolvedDeferredString", "returned deferred string")
+        jsExpectations.checkEquals("rejectedDeferredStringError", "returned deferred string error")
         jsExpectations.checkEquals("cbString", "cbString")
         jsExpectations.checkBlock("cbObj") { value: JsonObjectWrapper? ->
             assertEquals(value?.toPayload(), """{"cbKey1": 1, "cbKey2": "cbValue2"}""".toPayload())
@@ -1147,6 +1177,41 @@ class JsBridgeTest {
         jsExpectations.checkEquals("cbDouble", 16.64)
         assertNotNull(jsExpectations.takeExpectation<Any>("nativeException"))
         assertTrue(jsExpectations.isEmpty)
+        assertTrue(errors.isEmpty())
+    }
+
+    @Test
+    fun testRegisterNativeToJsInterfaceWithSuspendMethods() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        val jsExpectations = JsExpectations()
+        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+
+        val testJsApi = JsValue(subject, """({
+            jsMethodWithString: function(msg) {
+              $jsExpectationsJsValue.addExpectation("stringArg", msg);
+            },
+            jsMethodReturningJsonObject: function() {
+              return { key: "value" };
+            }
+        })""")
+
+
+        // WHEN
+        val jsApi: TestJsApiInterfaceWithSuspend = testJsApi.mapToNativeObjectBlocking()
+        runBlocking {
+            jsApi.jsMethodWithString("Hello JS!")
+            val result = jsApi.jsMethodReturningJsonObject()
+            assertEquals("value", result.toPayloadObject()?.getString("key"))
+
+            waitForDone(subject)
+        }
+
+        // THEN
+        jsExpectations.checkEquals("stringArg", "Hello JS!")
+        assertTrue(jsExpectations.isEmpty)
+
         assertTrue(errors.isEmpty())
     }
 
@@ -1416,6 +1481,34 @@ class JsBridgeTest {
     }
 
     @Test
+    fun testSetTimeoutWithArgs() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+        val jsExpectations = JsExpectations()
+        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+
+        // WHEN
+        val js = """
+            setTimeout(function(a, b, c) {
+                $jsExpectationsJsValue.addExpectation("a", a);
+                $jsExpectationsJsValue.addExpectation("b", b);
+                $jsExpectationsJsValue.addExpectation("c", c);
+            }, 100, "aString", null, 69);
+        """.trimIndent()
+
+        subject.evaluateNoRetVal(js)
+
+        runBlocking { delay(1000); waitForDone(subject) }
+
+        // THEN
+        jsExpectations.checkEquals("a", "aString")
+        jsExpectations.checkEquals("b", JsonObjectWrapper("null"))
+        jsExpectations.checkEquals("c", 69)
+
+        assertTrue(errors.isEmpty())
+    }
+
+    @Test
     fun testClearTimeout() {
         val events = mutableListOf<String>()
 
@@ -1604,7 +1697,7 @@ class JsBridgeTest {
         }
 
         inline fun <reified T: Any> checkEquals(name: String, value: T?) {
-            assertEquals(takeExpectation<T>(name), value)
+            assertEquals(value, takeExpectation(name))
         }
 
         inline fun <reified T: Any> checkBlock(name: String, block: (T?) -> Unit) {

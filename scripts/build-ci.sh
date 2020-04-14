@@ -34,8 +34,8 @@ if [[ ${CI_COMMIT_REF_NAME} == ${GIT_TAG} ]]; then
 
     export S3_BUCKET=${AWS_S3_NATIVE_PLAYER_BUCKET}
     export S3_PATH="${AWS_S3_NATIVE_PLAYER_COMPONENT_PATH}/oasis-native-android"
-	export S3_ACCESS_KEY=${AWS_ACCESS_KEY_ID}
-	export S3_SECRET_KEY=${AWS_SECRET_ACCESS_KEY}
+	export S3_ACCESS_KEY=${GROUP_AWS_ACCESS_KEY_ID}
+	export S3_SECRET_KEY=${GROUP_AWS_SECRET_ACCESS_KEY}
 
 	if [ -z ${S3_ACCESS_KEY} ]; then
 	    echo "S3_ACCESS_KEY envvar is empty. Exiting the script."

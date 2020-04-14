@@ -106,7 +106,7 @@ void JsBridgeContext::init(JniContext *jniContext, const JniLocalRef<jobject> &j
   duk_console_init(m_ctx, 0 /*flags*/);
 }
 
-void JsBridgeContext::initDebugger() {
+void JsBridgeContext::startDebugger() {
 
   // Call Java onDebuggerPending()
   m_jniCache->getJsBridgeInterface().onDebuggerPending();

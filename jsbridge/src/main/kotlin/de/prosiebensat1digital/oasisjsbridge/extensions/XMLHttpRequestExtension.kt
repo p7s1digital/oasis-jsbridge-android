@@ -95,6 +95,8 @@ class XMLHttpRequestExtension(
                     RequestBody.create(MediaType.parse(contentType), data)
                 }
 
+                Timber.d("Performing XHR request (query: $url)...")
+
                 // Send request via OkHttp
                 lateinit var request: Request
                 val httpUrl = HttpUrl.parse(url) ?: throw Throwable("Cannot parse URL: $url")
@@ -106,7 +108,18 @@ class XMLHttpRequestExtension(
                 val response = okHttpClient.newCall(request).execute()
 
                 // Convert header mutlimap (key -> [value1, value2, ...]) into a list of [key, value] arrays
-                val headerKeyValues = response.headers().toMultimap().flatMap { (key, values) -> values.map { arrayOf(key, it.replace("\"", "\\\"")) } }
+                val headerKeyValues = response
+                    .headers()
+                    .toMultimap()
+                    .flatMap { (key, values) ->
+                        values
+                            .map { value ->
+                                arrayOf(
+                                    key,
+                                    value.replace("""([^\])"""", """$1\"""")
+                                )
+                            }
+                    }
 
                 responseInfo = JsonObjectWrapper(
                     "statusCode" to response.code(),

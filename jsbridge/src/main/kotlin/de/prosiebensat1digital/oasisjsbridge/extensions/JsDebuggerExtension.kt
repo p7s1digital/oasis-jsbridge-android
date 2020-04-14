@@ -29,10 +29,15 @@ import java.math.BigInteger
 import java.net.InetAddress
 import java.nio.ByteOrder
 
-class JsDebuggerExtension(private val jsBridge: JsBridge, activity: Activity?) {
+class JsDebuggerExtension(private val jsBridge: JsBridge) {
     // Activity (only needed to display the debugging dialog)
-    private var activityRef = WeakReference(activity)
+    private var activityRef = WeakReference<Activity?>(null)
+    var activity: Activity?
+        get() = activityRef.get()
+        set(value) { activityRef = WeakReference(value) }
 
+    var isActive = false
+        private set
     private var debuggerDialog: Dialog? = null
 
     fun release() {
@@ -43,10 +48,6 @@ class JsDebuggerExtension(private val jsBridge: JsBridge, activity: Activity?) {
     }
 
     private fun getLocalIpAddress(): String? {
-        if (!BuildConfig.DEBUG) {
-            return "<device-ip-address>"
-        }
-
         val activity = this.activityRef.get() ?: return null
 
         val wifiManager = activity.applicationContext.getSystemService(WIFI_SERVICE) as WifiManager
@@ -67,11 +68,15 @@ class JsDebuggerExtension(private val jsBridge: JsBridge, activity: Activity?) {
         }
     }
 
-    @Suppress("UNUSED")  // Called from JNI
-    private fun onDebuggerPending() {
+    internal fun onDebuggerPending() {
+        Timber.v("onDebuggerPending")
+
+        isActive = true
         val activity = this.activityRef.get() ?: return
 
         jsBridge.launch(Dispatchers.Main) {
+            Timber.v("onDebuggerPending - launch")
+
             val builder = AlertDialog.Builder(activity)
             val port = BuildConfig.DUKTAPE_DEBUGGER_SERVER_PORT
 
@@ -100,13 +105,15 @@ class JsDebuggerExtension(private val jsBridge: JsBridge, activity: Activity?) {
                     debuggerDialog?.cancel()
                     debuggerDialog = null
                 }
+
+            Timber.v("onDebuggerPending - show dialog")
             debuggerDialog = builder.create()
             debuggerDialog?.show()
         }
     }
 
     @Suppress("UNUSED")  // Called from JNI
-    private fun onDebuggerReady() {
+    internal fun onDebuggerReady() {
         jsBridge.launch(Dispatchers.Main) {
             debuggerDialog?.cancel()
             debuggerDialog = null

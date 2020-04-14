@@ -52,7 +52,7 @@ public:
   // Must be called immediately after the constructor
   void init(JniContext *jniContext, const JniLocalRef<jobject> &jsBridgeObject);
 
-  void initDebugger();
+  void startDebugger();
   void cancelDebug();
 
   JValue evaluateString(const JStringLocalRef &strSourceCode, const JniLocalRef<jsBridgeParameter> &returnParameter,

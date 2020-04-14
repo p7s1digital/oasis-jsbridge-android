@@ -27,23 +27,20 @@ import de.prosiebensat1digital.oasisjsbridge.extensions.JsDebuggerExtension
 import de.prosiebensat1digital.oasisjsbridge.extensions.PromisePolyfillExtension
 import de.prosiebensat1digital.oasisjsbridge.extensions.SetTimeoutExtension
 import de.prosiebensat1digital.oasisjsbridge.extensions.XMLHttpRequestExtension
+import kotlinx.coroutines.*
+import okhttp3.OkHttpClient
+import timber.log.Timber
 import java.io.FileNotFoundException
 import java.io.InputStream
-import java.lang.reflect.Method as JavaMethod
 import java.lang.reflect.Proxy
 import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.Function
-import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.coroutines.*
 import kotlin.reflect.*
-import kotlin.reflect.KClass
-import kotlin.reflect.full.declaredMemberFunctions
-import kotlinx.coroutines.*
-import okhttp3.OkHttpClient
-import timber.log.Timber
 import kotlin.reflect.full.createType
+import kotlin.reflect.full.declaredMemberFunctions
+import java.lang.reflect.Method as JavaMethod
 
 
 // Execute JS code via Duktape or QuickJS and handle the bi-directional communication between native
@@ -54,7 +51,7 @@ import kotlin.reflect.full.createType
 // Most basic types are supported, as well as lambda parameters. More complex objects can be
 // transferred using the JsonObjectWrapper class.
 //
-// JS values which do not need to be converted to native code can be encapsulated into a
+// JS values which do not need to be converted to native values can be encapsulated into a
 // JsValue object.
 //
 // Note: all the public methods are asynchronous and will not block the caller threads. They
@@ -102,6 +99,8 @@ class JsBridge(context: Context): CoroutineScope {
 
     private var internalCounter = AtomicInteger(0)
 
+    val isJsDebuggerActive: Boolean get() = jsDebuggerExtension?.isActive == true
+
 
     init {
         launch {
@@ -118,8 +117,8 @@ class JsBridge(context: Context): CoroutineScope {
     // - create the Duktape context via JNI
     // - set up the interpreter with polyfills and helpers (e.g. support for setTimeout)
     @JvmOverloads
-    fun start(useDebugger: Boolean = false, activity: Activity? = null, okHttpClient: OkHttpClient? = null) {
-        Timber.d("Starting JsBridge - useDebugger = $useDebugger")
+    fun start(okHttpClient: OkHttpClient? = null) {
+        Timber.d("Starting JsBridge")
 
         // Pending -> Starting1
         if (!state.compareAndSet(State.Pending.intValue, State.Starting1.intValue)) {
@@ -135,7 +134,7 @@ class JsBridge(context: Context): CoroutineScope {
             }
 
             try {
-                val jniJsContext = createJniJsContext(useDebugger)
+                val jniJsContext = createJniJsContext()
 
                 assert(this@JsBridge.jniJsContext == null)
                 this@JsBridge.jniJsContext = jniJsContext
@@ -149,7 +148,7 @@ class JsBridge(context: Context): CoroutineScope {
         }
 
         // Extensions (TODO: use a Configuration data class)
-        jsDebuggerExtension = JsDebuggerExtension(this@JsBridge, activity)
+        jsDebuggerExtension = JsDebuggerExtension(this)
         if (!BuildConfig.HAS_BUILTIN_PROMISE) promisePolyfillExtension = PromisePolyfillExtension(this@JsBridge)
         setTimeoutExtension = SetTimeoutExtension(this@JsBridge)
         xmlHttpRequestExtension = XMLHttpRequestExtension(this@JsBridge, okHttpClient)
@@ -217,6 +216,19 @@ class JsBridge(context: Context): CoroutineScope {
 
     fun unregisterErrorListener(listener: ErrorListener) {
         errorListeners.remove(listener)
+    }
+
+    fun startDebugger(activity: Activity? = null) {
+        val jsDebuggerExtension = jsDebuggerExtension ?: run {
+            Timber.w("Cannot start debugger: JS debugger extension has not been created!")
+            return
+        }
+
+        jsDebuggerExtension.activity = activity
+
+        launch {
+            jniStartDebugger(jniJsContextOrThrow())
+        }
     }
 
     // Evaluate a local JS file which should be bundled as an asset.
@@ -366,8 +378,6 @@ class JsBridge(context: Context): CoroutineScope {
     // - function parameters are supported (with the same limitations as in registerJsToNativeInterface)
     // - native methods returning a "Kotlin coroutine" Deferred are mapped to a JS Promise
     // - if the JS value is a promise, you need to resolve it first with jsValue.await() or jsValue.awaitAsync()
-    //
-    // TODO: support for suspend methods!
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
     suspend fun <T : NativeToJsInterface> registerNativeToJsInterface(jsValue: JsValue, type: KClass<T>, check: Boolean): T {
         return registerNativeToJsInterfaceHelper(jsValue, type, check, false)
@@ -556,7 +566,7 @@ class JsBridge(context: Context): CoroutineScope {
 
     // Create the JNI/JS context and return a Deferred which is rejected with a
     // JsBridgeError in case of error
-    private fun createJniJsContext(useDebugger: Boolean): Long {
+    private fun createJniJsContext(): Long {
         checkJsThread()
 
         if (!isLibraryLoaded) {
@@ -573,7 +583,7 @@ class JsBridge(context: Context): CoroutineScope {
             isLibraryLoaded = true
         }
 
-        return jniCreateContext(useDebugger)
+        return jniCreateContext()
     }
 
     @Throws
@@ -608,7 +618,7 @@ class JsBridge(context: Context): CoroutineScope {
                 ?: throw JsToNativeRegistrationError(this::class, customMessage = "Cannot map native object to JS because it does not implement any JsToNativeInterface-based interface")
 
         if (!type.isInstance(obj)) {
-            throw JsToNativeRegistrationError(type, Throwable("$obj.javaClass.name is not an instance of $type"))
+            throw JsToNativeRegistrationError(type, Throwable("${obj.javaClass.name} is not an instance of $type"))
         }
 
         val methods = linkedMapOf<String, Method>()
@@ -760,6 +770,20 @@ class JsBridge(context: Context): CoroutineScope {
         }
     }
 
+    @Suppress("UNUSED")  // Called from JNI
+    private fun onDebuggerPending() {
+        checkJsThread()
+
+        jsDebuggerExtension?.onDebuggerPending()
+    }
+
+    @Suppress("UNUSED")  // Called from JNI
+    private fun onDebuggerReady() {
+        checkJsThread()
+
+        jsDebuggerExtension?.onDebuggerReady()
+    }
+
     // Create a native proxy to a JS function defined by a reflected (lambda) Method. The function
     // will be called from Java/Kotlin and will trigger execution of the JS lambda.
     //
@@ -826,16 +850,18 @@ class JsBridge(context: Context): CoroutineScope {
         launch {
             val jniJsContext = jniJsContextOrThrow()
 
-            try {
-                val result = deferred.await()
+            var isFulfilled: Boolean = false
 
-                // Resolve promise
-                jniCompleteJsPromise(jniJsContext, id, true, result)
+            val promiseValue = try {
+                val result = deferred.await()
+                isFulfilled = true
+                result
             } catch (t: Throwable) {
                 // Reject promise
-                jniCompleteJsPromise(jniJsContext, id, false, t.message ?: "Deferred error")
+                t
             }
 
+            jniCompleteJsPromise(jniJsContext, id, isFulfilled, promiseValue)
             processPromiseQueue()
         }
     }
@@ -870,7 +896,8 @@ class JsBridge(context: Context): CoroutineScope {
 
 
     // JNI functions
-    private external fun jniCreateContext(doDebug: Boolean): Long
+    private external fun jniCreateContext(): Long
+    private external fun jniStartDebugger(context: Long)
     private external fun jniCancelDebug(context: Long)
 
     private external fun jniDeleteContext(context: Long)
@@ -926,11 +953,18 @@ class JsBridge(context: Context): CoroutineScope {
                 method.name == "equals" -> jsValue.toString() == args?.firstOrNull()?.toString()
                 method.name == "toString" -> jsValue.toString()
 
-                method.returnType == Unit::class ||
-                method.returnType == Void::class ||
+                method.returnType == Unit::class.java ||
+                method.returnType == Void::class.java ||
                 method.returnType == Void::class.javaPrimitiveType -> {
                     callJsMethodWithoutRetVal(method, args)
                     CompletableDeferred(Unit)
+                }
+
+                args?.lastOrNull() is Continuation<*> -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val continuation = args.last() as Continuation<Any?>
+                    val jsArgs = args.copyOfRange(0, args.size - 1)
+                    callJsMethodSuspended(method, jsArgs, continuation)
                 }
 
                 method.returnType.isAssignableFrom(Deferred::class.java) -> callJsMethodAsync(method, args)
@@ -949,6 +983,19 @@ class JsBridge(context: Context): CoroutineScope {
                         .also(::notifyErrorListeners)
                 }
             }
+        }
+
+        private fun callJsMethodSuspended(method: JavaMethod, args: Array<Any?>, continuation: Continuation<Any?>): Any {
+            launch {
+                try {
+                    val result = callJsMethod(jsValue.associatedJsName, method, args)
+                    continuation.resume(result)
+                } catch (t: Throwable) {
+                    continuation.resumeWithException(t)
+                }
+            }
+
+            return kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
         }
 
         private fun callJsMethodAsync(method: JavaMethod, args: Array<Any?>?): Deferred<Any?> {

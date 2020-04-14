@@ -89,12 +89,12 @@ duk_ret_t JsonObjectWrapper::push(const JValue &value) const {
   }
 
   duk_push_string(m_ctx, str);
-  strRef.release();
 
   if (duk_safe_call(m_ctx, tryJsonDecode, nullptr, 1, 1) != DUK_EXEC_SUCCESS) {
     CHECK_STACK_NOW();
     duk_pop(m_ctx);
-    throw std::invalid_argument(std::string("Error while reading JsonObjectWrapper value (\"") + str + "\")");
+    auto msg = std::string() + "Error while reading JsonObjectWrapper value (\"" + str + "\")";
+    throw std::invalid_argument(msg);
   }
 
   return 1;

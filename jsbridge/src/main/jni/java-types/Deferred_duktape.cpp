@@ -338,7 +338,16 @@ void Deferred::completeJsPromise(const JsBridgeContext *jsBridgeContext, const s
   duk_get_prop_string(ctx, -1, isFulfilled ? "resolve" : "reject");
 
   // Call it with the Promise value
-  componentType->push(JValue(value));
+  if (isFulfilled) {
+    try {
+      componentType->push(JValue(value));
+    } catch (const std::exception &e) {
+      duk_pop_2(ctx);  // resolve/reject function
+      throw;
+    }
+  } else {
+    jsBridgeContext->getExceptionHandler()->pushJavaException(value.staticCast<jthrowable>());
+  }
   if (duk_pcall(ctx, 1) != DUK_EXEC_SUCCESS) {
     alog("Could not complete Promise with id %s", strId.c_str());
   }
