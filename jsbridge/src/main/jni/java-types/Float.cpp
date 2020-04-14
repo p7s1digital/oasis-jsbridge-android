@@ -116,7 +116,7 @@ duk_ret_t Float::pushArray(const JniLocalRef<jarray> &values, bool expand) const
 
 namespace {
   inline jfloat getFloat(JSValue v) {
-    if (JS_IsInteger(v)) {
+    if (JS_IsBigInt(NULL, v)) {
       return JS_VALUE_GET_INT(v);
     }
 

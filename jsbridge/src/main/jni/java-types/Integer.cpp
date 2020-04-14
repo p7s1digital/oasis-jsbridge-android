@@ -119,7 +119,7 @@ duk_ret_t Integer::pushArray(const JniLocalRef<jarray> &values, bool expand) con
 
 namespace {
   inline jint getInt(JSValue v) {
-    if (JS_IsInteger(v)) {
+    if (JS_IsBigInt(NULL, v)) {
       return JS_VALUE_GET_INT(v);
     }
 
