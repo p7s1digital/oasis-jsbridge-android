@@ -70,10 +70,10 @@ JNIEXPORT jlong JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniC
 }
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniStartDebugger
-    (JNIEnv *env, jobject, jlong lctx) {
+    (JNIEnv *env, jobject, jlong lctx, jint port) {
 
   auto jsBridgeContext = getJsBridgeContext(env, lctx);
-  jsBridgeContext->startDebugger();
+  jsBridgeContext->startDebugger(port);
 }
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCancelDebug

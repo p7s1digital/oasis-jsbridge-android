@@ -30,7 +30,6 @@ import org.junit.BeforeClass
 import org.junit.Ignore
 import org.junit.Test
 import timber.log.Timber
-import kotlin.coroutines.coroutineContext
 import kotlin.test.*
 
 interface TestNativeApiInterface : JsToNativeInterface {
@@ -761,7 +760,8 @@ class JsBridgeTest {
     private fun stressTestHelper() {
         val subject = JsBridge(InstrumentationRegistry.getInstrumentation().context)
 
-        subject.start(okHttpClient = okHttpClient)
+        val config = JsBridgeConfig(xmlHttpRequestConfig = JsBridgeConfig.XMLHttpRequestConfig(true, okHttpClient))
+        subject.start(config)
 
         val jsExpectations = JsExpectations()
         val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
@@ -1093,7 +1093,8 @@ class JsBridgeTest {
         }
 
         val subject = JsBridge(InstrumentationRegistry.getInstrumentation().context)
-        subject.start(okHttpClient = okHttpClient)
+        val config = JsBridgeConfig(xmlHttpRequestConfig = JsBridgeConfig.XMLHttpRequestConfig(true, okHttpClient))
+        subject.start(config)
 
         val jsExpectations = JsExpectations()
         val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
@@ -1719,7 +1720,8 @@ class JsBridgeTest {
             this@JsBridgeTest.jsBridge = jsBridge
 
             jsBridge.registerErrorListener(errorListener)
-            jsBridge.start(okHttpClient = okHttpClient)
+            val config = JsBridgeConfig(xmlHttpRequestConfig = JsBridgeConfig.XMLHttpRequestConfig(true, okHttpClient))
+            jsBridge.start(config)
 
             // Map "jsToNativeFunctionMock" to JS as a global var "NativeFunctionMock"
             JsValue.fromNativeFunction1(jsBridge, jsToNativeFunctionMock).assignToGlobal("nativeFunctionMock")

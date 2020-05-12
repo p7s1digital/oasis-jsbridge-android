@@ -15,7 +15,6 @@
  */
 package de.prosiebensat1digital.oasisjsbridge.extensions
 
-import com.jaredrummler.android.device.DeviceName
 import de.prosiebensat1digital.oasisjsbridge.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -27,9 +26,9 @@ import java.util.*
 
 class XMLHttpRequestExtension(
     private val jsBridge: JsBridge,
-    okHttpClient: OkHttpClient?
+    val config: JsBridgeConfig.XMLHttpRequestConfig
 ) {
-    private var okHttpClient = okHttpClient ?: OkHttpClient.Builder().build()
+    private var okHttpClient = config.okHttpClient ?: OkHttpClient.Builder().build()
 
     init {
         // Register XMLHttpRequestNativeHelper_send()
@@ -59,13 +58,6 @@ class XMLHttpRequestExtension(
                     else -> throw Throwable("Unsupported http method: $httpMethod")
                 }
 
-                // User agent
-                val userAgent = withContext(Dispatchers.Default) {
-                    val deviceInfo = DeviceName.getDeviceInfo(jsBridge.context)
-                    "${deviceInfo.manufacturer} ${deviceInfo.model} Android ${android.os.Build.VERSION.RELEASE}"
-                }
-                Timber.v("User agent is $userAgent")
-
                 val requestHeadersBuilder = Headers.Builder()
 
                 // Add each request header (given as [key, value] arrays)
@@ -85,7 +77,7 @@ class XMLHttpRequestExtension(
 
                 // Add user argent header if not set
                 if (requestHeadersBuilder.get("user-agent") == null) {
-                    requestHeadersBuilder.add("User-Agent", userAgent)
+                    config.userAgent?.let { requestHeadersBuilder.add("User-Agent", it) }
                 }
                 val requestHeaders = requestHeadersBuilder.build()
 

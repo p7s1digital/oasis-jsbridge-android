@@ -21,14 +21,13 @@ package de.prosiebensat1digital.oasisjsbridge
 import android.app.Activity
 import android.content.Context
 import android.os.Looper
-import android.support.annotation.VisibleForTesting
+import androidx.annotation.VisibleForTesting
 import de.prosiebensat1digital.oasisjsbridge.JsBridgeError.*
 import de.prosiebensat1digital.oasisjsbridge.extensions.JsDebuggerExtension
 import de.prosiebensat1digital.oasisjsbridge.extensions.PromisePolyfillExtension
 import de.prosiebensat1digital.oasisjsbridge.extensions.SetTimeoutExtension
 import de.prosiebensat1digital.oasisjsbridge.extensions.XMLHttpRequestExtension
 import kotlinx.coroutines.*
-import okhttp3.OkHttpClient
 import timber.log.Timber
 import java.io.FileNotFoundException
 import java.io.InputStream
@@ -99,9 +98,6 @@ class JsBridge(context: Context): CoroutineScope {
 
     private var internalCounter = AtomicInteger(0)
 
-    val isJsDebuggerActive: Boolean get() = jsDebuggerExtension?.isActive == true
-
-
     init {
         launch {
             jsThreadId = Thread.currentThread().id
@@ -117,7 +113,7 @@ class JsBridge(context: Context): CoroutineScope {
     // - create the Duktape context via JNI
     // - set up the interpreter with polyfills and helpers (e.g. support for setTimeout)
     @JvmOverloads
-    fun start(okHttpClient: OkHttpClient? = null) {
+    fun start(config: JsBridgeConfig = JsBridgeConfig.Default) {
         Timber.d("Starting JsBridge")
 
         // Pending -> Starting1
@@ -136,7 +132,9 @@ class JsBridge(context: Context): CoroutineScope {
             try {
                 val jniJsContext = createJniJsContext()
 
-                assert(this@JsBridge.jniJsContext == null)
+                if (this@JsBridge.jniJsContext != null) {
+                    throw InternalError("Cannot create a second JNI context!")
+                }
                 this@JsBridge.jniJsContext = jniJsContext
             } catch (t: Throwable) {
                 throw StartError(t)
@@ -147,11 +145,15 @@ class JsBridge(context: Context): CoroutineScope {
             }
         }
 
-        // Extensions (TODO: use a Configuration data class)
-        jsDebuggerExtension = JsDebuggerExtension(this)
-        if (!BuildConfig.HAS_BUILTIN_PROMISE) promisePolyfillExtension = PromisePolyfillExtension(this@JsBridge)
-        setTimeoutExtension = SetTimeoutExtension(this@JsBridge)
-        xmlHttpRequestExtension = XMLHttpRequestExtension(this@JsBridge, okHttpClient)
+        // Extensions
+        if (config.jsDebuggerConfig.enabled)
+            jsDebuggerExtension = JsDebuggerExtension(this, config.jsDebuggerConfig)
+        if (config.promisePolyfillConfig.enabled)
+            promisePolyfillExtension = PromisePolyfillExtension(this@JsBridge)
+        if (config.setTimeoutConfig.enabled)
+            setTimeoutExtension = SetTimeoutExtension(this@JsBridge)
+        if (config.xmlHttpRequestConfig.enabled)
+            xmlHttpRequestExtension = XMLHttpRequestExtension(this@JsBridge, config.xmlHttpRequestConfig)
     }
 
     // Destroy the JsBridge
@@ -220,14 +222,14 @@ class JsBridge(context: Context): CoroutineScope {
 
     fun startDebugger(activity: Activity? = null) {
         val jsDebuggerExtension = jsDebuggerExtension ?: run {
-            Timber.w("Cannot start debugger: JS debugger extension has not been created!")
+            Timber.w("Cannot start JS debugger: Please enable it in JsBridgeConfig.jsDebuggerConfig.")
             return
         }
 
         jsDebuggerExtension.activity = activity
 
         launch {
-            jniStartDebugger(jniJsContextOrThrow())
+            jniStartDebugger(jniJsContextOrThrow(), jsDebuggerExtension.config.port)
         }
     }
 
@@ -897,7 +899,7 @@ class JsBridge(context: Context): CoroutineScope {
 
     // JNI functions
     private external fun jniCreateContext(): Long
-    private external fun jniStartDebugger(context: Long)
+    private external fun jniStartDebugger(context: Long, port: Int)
     private external fun jniCancelDebug(context: Long)
 
     private external fun jniDeleteContext(context: Long)

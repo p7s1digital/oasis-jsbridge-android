@@ -7,9 +7,9 @@
 extern "C" {
 #endif
 
-void duk_trans_socket_init(void);
+void duk_trans_socket_init(int port);
 void duk_trans_socket_finish(void);
-void duk_trans_socket_waitconn(void);
+void duk_trans_socket_waitconn(int port);
 duk_size_t duk_trans_socket_read_cb(void *udata, char *buffer, duk_size_t length);
 duk_size_t duk_trans_socket_write_cb(void *udata, const char *buffer, duk_size_t length);
 duk_size_t duk_trans_socket_peek_cb(void *udata);
