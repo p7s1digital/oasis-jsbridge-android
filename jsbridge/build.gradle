@@ -64,16 +64,14 @@ android {
         duktape {
             dimension "jsInterpreter"
 
-            def serverPort=9092
             def jniLibName="duktape-jni-lib"
 
             buildConfigField "String", "JNI_LIB_NAME", "\"$jniLibName\""
             buildConfigField "Boolean", "HAS_BUILTIN_PROMISE", "false"
-            buildConfigField "Integer", "DUKTAPE_DEBUGGER_SERVER_PORT", "$serverPort"
 
             externalNativeBuild {
                 cmake {
-                    arguments "-DFLAVOR=DUKTAPE", "-DJNI_LIB_NAME=$jniLibName", "-DDEBUGGER_SERVER_PORT=$serverPort"  // , "-DCMAKE_BUILD_TYPE=Release"
+                    arguments "-DFLAVOR=DUKTAPE", "-DJNI_LIB_NAME=$jniLibName", "-DCMAKE_BUILD_TYPE=Release"
                 }
             }
         }
@@ -90,7 +88,7 @@ android {
 
             externalNativeBuild {
                 cmake {
-                    arguments "-DFLAVOR=QUICKJS", "-DJNI_LIB_NAME=$jniLibName"  // , "-DCMAKE_BUILD_TYPE=Release"
+                    arguments "-DFLAVOR=QUICKJS", "-DJNI_LIB_NAME=$jniLibName", "-DCMAKE_BUILD_TYPE=Release"
                 }
             }
         }
@@ -115,8 +113,9 @@ dependencies {
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:$versions.kotlin.coroutines"
 
     implementation 'com.jakewharton.timber:timber:4.7.1'
-    implementation 'com.jaredrummler:android-device-names:1.1.7'
     implementation 'com.squareup.okhttp3:okhttp:3.11.0'  // Note: support for Android 4 removed in okhttp 3.13!
+
+    implementation "androidx.annotation:annotation:1.1.0"
 
     testImplementation 'junit:junit:4.12'
     testImplementation 'org.json:json:20180813'

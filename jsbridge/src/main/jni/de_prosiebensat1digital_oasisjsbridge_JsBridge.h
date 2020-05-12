@@ -29,7 +29,7 @@ JNIEXPORT jlong JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniC
   (JNIEnv *, jobject);
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniStartDebug
-    (JNIEnv *, jobject, jlong);
+    (JNIEnv *, jobject, jlong, jint);
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCancelDebug
     (JNIEnv *, jobject, jlong);

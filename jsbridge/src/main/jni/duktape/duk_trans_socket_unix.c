@@ -22,8 +22,6 @@
 #include "duktape.h"
 #include "duk_trans_socket.h"
 
-#define DUK_DEBUG_PORT DEBUGGER_SERVER_PORT
-
 #if 0
 #define DEBUG_PRINTS
 #endif
@@ -35,7 +33,7 @@ static int client_sock = -1;
  *  Transport init and finish
  */
 
-void duk_trans_socket_init(void) {
+void duk_trans_socket_init(int port) {
 	struct sockaddr_in addr;
 	int on;
 
@@ -56,7 +54,7 @@ void duk_trans_socket_init(void) {
 	memset((void *) &addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
 	addr.sin_addr.s_addr = INADDR_ANY;
-	addr.sin_port = htons(DUK_DEBUG_PORT);
+	addr.sin_port = htons(port);
 
 	if (bind(server_sock, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
 		alog("%s: failed to bind server socket: %s",
@@ -92,7 +90,7 @@ void duk_trans_socket_finish(void) {
     }
 }
 
-void duk_trans_socket_waitconn(void) {
+void duk_trans_socket_waitconn(int port) {
 	struct sockaddr_in addr;
 	socklen_t sz;
 
@@ -106,7 +104,7 @@ void duk_trans_socket_waitconn(void) {
 		client_sock = -1;
 	}
 
-	alog("Waiting for debug connection on port %d", (int) DUK_DEBUG_PORT);
+	alog("Waiting for debug connection on port %d", (int) port);
 
 	sz = (socklen_t) sizeof(addr);
 	client_sock = accept(server_sock, (struct sockaddr *) &addr, &sz);

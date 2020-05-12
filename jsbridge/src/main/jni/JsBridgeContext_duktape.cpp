@@ -106,14 +106,14 @@ void JsBridgeContext::init(JniContext *jniContext, const JniLocalRef<jobject> &j
   duk_console_init(m_ctx, 0 /*flags*/);
 }
 
-void JsBridgeContext::startDebugger() {
+void JsBridgeContext::startDebugger(int port) {
 
   // Call Java onDebuggerPending()
   m_jniCache->getJsBridgeInterface().onDebuggerPending();
 
   alog_info("Debugger enabled, create socket and wait for connection\n");
-  duk_trans_socket_init();
-  duk_trans_socket_waitconn();
+  duk_trans_socket_init(port);
+  duk_trans_socket_waitconn(port);
   alog_info("Debugger connected, call duk_debugger_attach() and then execute requested file(s)/eval\n");
 
   // Call Java onDebuggerReady()
