@@ -119,7 +119,7 @@ duk_ret_t Long::pushArray(const JniLocalRef<jarray> &values, bool expand) const 
 
 namespace {
   inline jlong getLong(JSContext *ctx, JSValue v) {
-    if (JS_IsBigInt(NULL, v)) {
+    if (JS_VALUE_GET_TAG(v) == JS_TAG_INT) {
       int64_t i64;
       JS_ToInt64(ctx, &i64, v);
       return i64;
