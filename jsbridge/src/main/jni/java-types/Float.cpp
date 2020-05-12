@@ -116,15 +116,16 @@ duk_ret_t Float::pushArray(const JniLocalRef<jarray> &values, bool expand) const
 
 namespace {
   inline jfloat getFloat(JSValue v) {
-    if (JS_VALUE_GET_TAG(v) == JS_TAG_INT) {
+    int tag = JS_VALUE_GET_TAG(v);
+    if (tag == JS_TAG_INT) {
       return JS_VALUE_GET_INT(v);
     }
 
-    if (JS_IsNumber(v)) {
+    if (JS_TAG_IS_FLOAT64(tag)) {
       return static_cast<jfloat>(JS_VALUE_GET_FLOAT64(v));
     }
 
-    alog_warn("Cannot get int from JS: returning 0");  // TODO: proper exception handling
+    alog_warn("Cannot get float from JS: returning 0");  // TODO: proper exception handling
     return jfloat();
   }
 }

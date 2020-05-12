@@ -115,11 +115,12 @@ duk_ret_t Double::pushArray(const JniLocalRef<jarray> &values, bool expand) cons
 
 namespace {
   inline jdouble getDouble(JSValue v) {
-    if (JS_VALUE_GET_TAG(v) == JS_TAG_INT) {
+    int tag = JS_VALUE_GET_TAG(v);
+    if (tag == JS_TAG_INT) {
         return JS_VALUE_GET_INT(v);
     }
 
-    if (JS_TAG_IS_FLOAT64(v)) {
+    if (JS_TAG_IS_FLOAT64(tag)) {
       return static_cast<jdouble>(JS_VALUE_GET_FLOAT64(v));
     }
 

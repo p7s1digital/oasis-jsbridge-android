@@ -119,11 +119,12 @@ duk_ret_t Integer::pushArray(const JniLocalRef<jarray> &values, bool expand) con
 
 namespace {
   inline jint getInt(JSValue v) {
-    if (JS_VALUE_GET_TAG(v) == JS_TAG_INT) {
+    int tag = JS_VALUE_GET_TAG(v);
+    if (tag == JS_TAG_INT) {
       return JS_VALUE_GET_INT(v);
     }
 
-    if (JS_IsNumber(v)) {
+    if (JS_TAG_IS_FLOAT64(tag)) {
       return jint(JS_VALUE_GET_FLOAT64(v));
     }
 
