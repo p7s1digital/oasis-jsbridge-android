@@ -27,19 +27,21 @@ import de.prosiebensat1digital.oasisjsbridge.extensions.JsDebuggerExtension
 import de.prosiebensat1digital.oasisjsbridge.extensions.PromisePolyfillExtension
 import de.prosiebensat1digital.oasisjsbridge.extensions.SetTimeoutExtension
 import de.prosiebensat1digital.oasisjsbridge.extensions.XMLHttpRequestExtension
-import kotlinx.coroutines.*
-import timber.log.Timber
 import java.io.FileNotFoundException
 import java.io.InputStream
+import java.lang.reflect.Method as JavaMethod
 import java.lang.reflect.Proxy
 import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 import kotlin.coroutines.*
 import kotlin.reflect.*
 import kotlin.reflect.full.createType
 import kotlin.reflect.full.declaredMemberFunctions
-import java.lang.reflect.Method as JavaMethod
+import kotlinx.coroutines.*
+import timber.log.Timber
 
 
 // Execute JS code via Duktape or QuickJS and handle the bi-directional communication between native
@@ -74,6 +76,7 @@ class JsBridge(context: Context): CoroutineScope {
         Pending(0), AboutToStart(1), Starting(2), Started(3),
         Releasing(4), Released(5);
     }
+    private val startReleaseLock = ReentrantLock()
     private var state = AtomicInteger(State.Pending.intValue)
     private val currentState get() = State.values().firstOrNull { it.intValue == state.get() }
 
@@ -110,10 +113,10 @@ class JsBridge(context: Context): CoroutineScope {
 
     // Start and initialize the JS interpreter
     //
-    // - create the Duktape context via JNI
+    // - create the JS context via JNI
     // - set up the interpreter with polyfills and helpers (e.g. support for setTimeout)
     @JvmOverloads
-    fun start(config: JsBridgeConfig = JsBridgeConfig.Default) {
+    fun start(config: JsBridgeConfig = JsBridgeConfig.Default): Unit = startReleaseLock.withLock {
         Timber.d("Starting JsBridge")
 
         // Pending -> AboutToStart
@@ -161,7 +164,7 @@ class JsBridge(context: Context): CoroutineScope {
     // - Cancel (and join) all the active jobs
     // - Destroy the JS context via JNI
     // - Clean up resources
-    fun release() {
+    fun release(): Unit = startReleaseLock.withLock {
         if (state.get() == State.Releasing.intValue || state.get() == State.Released.intValue) {
             Timber.w("JsBridge is already in state $currentState and does not need to be released again!")
             return
@@ -803,7 +806,7 @@ class JsBridge(context: Context): CoroutineScope {
     // When JS code calls "myNativeMethod()", the cb parameter will be passed to the native after being
     // created via createJsLambdaProxy().
     //
-    // Note: as it triggers a JS function running in the Duktape thread, the lambda needs to be started
+    // Note: as it triggers a JS function running in the JS thread, the lambda needs to be started
     // asynchronously and shall not block the current thread. As a result, only JS lambdas without
     // return value are supported (which is usually fine for callbacks).
     @Suppress("UNUSED")  // Called from JNI
