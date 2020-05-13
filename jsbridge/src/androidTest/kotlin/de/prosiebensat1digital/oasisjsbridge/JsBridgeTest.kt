@@ -1449,9 +1449,6 @@ class JsBridgeTest {
             assertFalse(callbackCalled)
             verify(inverse = true) { jsToNativeFunctionMock(any()) }
         }
-        if (!errors.isEmpty()) {
-            throw Exception("TODO: found errors: $errors")
-        }
         assertTrue(errors.isEmpty())
 
         jsBridge = null  // avoid another release() in cleanUp()
@@ -1790,7 +1787,6 @@ class JsBridgeTest {
     }
 
     // Wait until the JS queue is empty
-    // TODO: remove the delay workaround and make it reliable
     private suspend fun waitForDone(jsBridge: JsBridge) {
        try {
            yield()
