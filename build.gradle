@@ -25,7 +25,7 @@ buildscript {
             junit: '1.1.0',
         ],
 
-        mockk: '1.9.3'
+        mockk: '1.10.0'
     ]
 
     repositories {

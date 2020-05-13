@@ -11,12 +11,14 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Test
-        run: ./gradlew build
+        run: ./gradlew test
 
   android:
     runs-on: macos-latest
 
     strategy:
+      fail-fast: false
+
       matrix:
         api-level:
           - 21

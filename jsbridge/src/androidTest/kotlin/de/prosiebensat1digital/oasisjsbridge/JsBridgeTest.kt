@@ -799,7 +799,10 @@ class JsBridgeTest {
         }
 
         runBlocking {
-            verify(exactly = 100, timeout = 15000L) { nativeCbMock(any()) }
+            // Note: mockk verify with timeout has some issues on API < 24
+            if (android.os.Build.VERSION.SDK_INT >= 24) {
+                verify(exactly = 100, timeout = 15000L) { nativeCbMock(any()) }
+            }
         }
 
 
@@ -990,7 +993,10 @@ class JsBridgeTest {
             |  nativeFunctionMock(true);
             |}, 200);
         """.trimMargin())
-        verify(timeout = 3000L) { jsToNativeFunctionMock(eq(true)) }
+        // Note: mockk verify with timeout has some issues on API < 24
+        if (android.os.Build.VERSION.SDK_INT >= 24) {
+            verify(timeout = 3000L) { jsToNativeFunctionMock(eq(true)) }
+        }
     }
 
     // Port of similar test in Duktape Android
@@ -1412,7 +1418,10 @@ class JsBridgeTest {
         }
 
         // THEN
-        verify(timeout = 1000) { jsToNativeFunctionMock(eq("Hello JS!")) }
+        // Note: mockk verify with timeout has some issues on API < 24
+        if (android.os.Build.VERSION.SDK_INT >= 24) {
+            verify(timeout = 1000) { jsToNativeFunctionMock(eq("Hello JS!")) }
+        }
         assertTrue(errors.isEmpty())
     }
 
@@ -1472,9 +1481,12 @@ class JsBridgeTest {
 
         // AND THEN
         // events are sent in the right order
-        verify(ordering = Ordering.SEQUENCE, timeout = initialDelay + timeoutCount * 10L * 2) {
-            for (i in 1..timeoutCount) {
-                jsToNativeFunctionMock("timeout$i")
+        // Note: mockk verify with timeout has some issues on API < 24
+        if (android.os.Build.VERSION.SDK_INT >= 24) {
+            verify(ordering = Ordering.SEQUENCE, timeout = initialDelay + timeoutCount * 10L * 2) {
+                for (i in 1..timeoutCount) {
+                    jsToNativeFunctionMock("timeout$i")
+                }
             }
         }
 
@@ -1573,14 +1585,20 @@ class JsBridgeTest {
         runBlocking { waitForDone(subject) }
 
         // THEN
-        verify(ordering = Ordering.SEQUENCE, timeout = 1000) {
-            jsToNativeFunctionMock(eq("interval1"))
-            jsToNativeFunctionMock(eq("interval2"))
-            jsToNativeFunctionMock(eq("interval3"))
+        // Note: mockk verify with ordering currently has some issues on API < 24
+        if (android.os.Build.VERSION.SDK_INT >= 24) {
+            verify(ordering = Ordering.SEQUENCE, timeout = 1000) {
+                jsToNativeFunctionMock(eq("interval1"))
+                jsToNativeFunctionMock(eq("interval2"))
+                jsToNativeFunctionMock(eq("interval3"))
+            }
         }
 
         // Stop *after* interval3
-        verify(inverse = true, timeout = 1000) { jsToNativeFunctionMock(eq("interval4")) }
+        // Note: mockk verify with timeout has some issues on API < 24
+        if (android.os.Build.VERSION.SDK_INT >= 24) {
+            verify(inverse = true, timeout = 1000) { jsToNativeFunctionMock(eq("interval4")) }
+        }
 
         assertTrue(errors.isEmpty())
     }
@@ -1618,31 +1636,34 @@ class JsBridgeTest {
         subject.evaluateNoRetVal(js)
 
         // THEN
-        verify(timeout = 2000, ordering = Ordering.SEQUENCE) {
-            jsToNativeFunctionMock(match { responseJson ->
-                assertNotNull(responseJson)
-                val responseObject = PayloadObject.fromJsonString(responseJson as String)
-                assertNotNull(responseObject)
-                assertEquals(responseObject.keyCount, 2)
-                assertEquals(responseObject.getString("testKey1"), "testValue1")
-                assertEquals(responseObject.getString("testKey2"), "testValue2")
-                true
-            })
+        // Note: mockk verify with ordering currently has some issues on API < 24
+        if (android.os.Build.VERSION.SDK_INT >= 24) {
+            verify(timeout = 2000, ordering = Ordering.SEQUENCE) {
+                jsToNativeFunctionMock(match { responseJson ->
+                    assertNotNull(responseJson)
+                    val responseObject = PayloadObject.fromJsonString(responseJson as String)
+                    assertNotNull(responseObject)
+                    assertEquals(responseObject.keyCount, 2)
+                    assertEquals(responseObject.getString("testKey1"), "testValue1")
+                    assertEquals(responseObject.getString("testKey2"), "testValue2")
+                    true
+                })
 
-            jsToNativeFunctionMock(match { headersJson ->
-                val responseHeadersObject = PayloadObject.fromJsonString(headersJson as String)
-                assertNotNull(responseHeadersObject)
-                assertEquals(responseHeadersObject.keyCount, 2)
-                assertEquals(
-                    responseHeadersObject.getString("testresponseheaderkey1"),
-                    "testResponseHeaderValue1"
-                )
-                assertEquals(
-                    responseHeadersObject.getString("testresponseheaderkey2"),
-                    "testResponseHeaderValue2"
-                )
-                true
-            })
+                jsToNativeFunctionMock(match { headersJson ->
+                    val responseHeadersObject = PayloadObject.fromJsonString(headersJson as String)
+                    assertNotNull(responseHeadersObject)
+                    assertEquals(responseHeadersObject.keyCount, 2)
+                    assertEquals(
+                        responseHeadersObject.getString("testresponseheaderkey1"),
+                        "testResponseHeaderValue1"
+                    )
+                    assertEquals(
+                        responseHeadersObject.getString("testresponseheaderkey2"),
+                        "testResponseHeaderValue2"
+                    )
+                    true
+                })
+            }
         }
         assertTrue(errors.isEmpty())
     }
@@ -1672,7 +1693,10 @@ class JsBridgeTest {
         subject.evaluateNoRetVal(js)
 
         // THEN
-        verify(timeout = 2000) { jsToNativeFunctionMock(eq("aborted"))}
+        // Note: mockk verify with timeout has some issues on API < 24
+        if (android.os.Build.VERSION.SDK_INT >= 24) {
+            verify(timeout = 2000) { jsToNativeFunctionMock(eq("aborted")) }
+        }
         verify(inverse = true) { jsToNativeFunctionMock(eq("loaded")) }
         assertTrue(errors.isEmpty())
     }
