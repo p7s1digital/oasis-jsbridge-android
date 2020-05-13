@@ -71,7 +71,7 @@ class JsBridge(context: Context): CoroutineScope {
 
     // State
     private enum class State(val intValue: Int) {
-        Pending(0), Starting1(1), Starting2(2), Started(3),
+        Pending(0), AboutToStart(1), Starting(2), Started(3),
         Releasing(4), Released(5);
     }
     private var state = AtomicInteger(State.Pending.intValue)
@@ -116,16 +116,16 @@ class JsBridge(context: Context): CoroutineScope {
     fun start(config: JsBridgeConfig = JsBridgeConfig.Default) {
         Timber.d("Starting JsBridge")
 
-        // Pending -> Starting1
-        if (!state.compareAndSet(State.Pending.intValue, State.Starting1.intValue)) {
+        // Pending -> AboutToStart
+        if (!state.compareAndSet(State.Pending.intValue, State.AboutToStart.intValue)) {
             throw StartError(null, "Cannot start the JsBridge because its current state is $currentState")
                 .also(::notifyErrorListeners)
         }
 
         launch {
-            // Starting1 -> Starting2
+            // AboutToStart -> Starting
             // From now on, a release() call is allowed to interrupt the start
-            if (!state.compareAndSet(State.Starting1.intValue, State.Starting2.intValue)) {
+            if (!state.compareAndSet(State.AboutToStart.intValue, State.Starting.intValue)) {
                 return@launch  // Start interrupted by a Destroy
             }
 
@@ -140,7 +140,7 @@ class JsBridge(context: Context): CoroutineScope {
                 throw StartError(t)
             }
 
-            if (state.compareAndSet(State.Starting2.intValue, State.Started.intValue)) {
+            if (state.compareAndSet(State.Starting.intValue, State.Started.intValue)) {
                 Timber.d("JsBridge successfully started!")
             }
         }
@@ -167,9 +167,9 @@ class JsBridge(context: Context): CoroutineScope {
             return
         }
 
-        // Started or Starting2 -> Releasing
-        if (!state.compareAndSet(State.Started.intValue, State.Releasing.intValue) &&
-            !state.compareAndSet(State.Starting2.intValue, State.Releasing.intValue)) {
+        if (!state.compareAndSet(State.AboutToStart.intValue, State.Releasing.intValue) &&
+            !state.compareAndSet(State.Starting.intValue, State.Releasing.intValue) &&
+            !state.compareAndSet(State.Started.intValue, State.Releasing.intValue)) {
             throw DestroyError(null, "Cannot destroy the JsBridge because its current state is $currentState}")
                 .also(::notifyErrorListeners)
         }
@@ -179,9 +179,14 @@ class JsBridge(context: Context): CoroutineScope {
                 .also(::notifyErrorListeners)
         }
 
+        rootJob.cancel()
+
         // As we are at the end of the lifecycle, we use here the GlobalScope
         GlobalScope.launch(jsDispatcher + coroutineExceptionHandler) {
-            rootJob.cancelAndJoin()
+            try {
+                rootJob.join()
+            } catch (c: CancellationException) {
+            }
 
             try {
                 jniJsContext?.let { jniDeleteContext(it) }

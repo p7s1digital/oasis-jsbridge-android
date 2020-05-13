@@ -23,12 +23,9 @@ import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
-import org.junit.After
+import org.junit.*
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.fail
-import org.junit.BeforeClass
-import org.junit.Ignore
-import org.junit.Test
 import timber.log.Timber
 import kotlin.test.*
 
@@ -73,13 +70,8 @@ class JsBridgeTest {
     private val httpInterceptor = TestHttpInterceptor()
     private val okHttpClient = OkHttpClient.Builder().addInterceptor(httpInterceptor).build()
     private val jsToNativeFunctionMock = mockk<(p: Any) -> Unit>(relaxed = true)
-    private val errorListener = object: JsBridge.ErrorListener(Dispatchers.Main) {
-        override fun onError(error: JsBridgeError) {
-            handleJsBridgeError(error)
-        }
-    }
-    private var errors = mutableListOf<JsBridgeError>()
-    private var unhandledPromiseErrors = mutableListOf<UnhandledJsPromiseError>()
+    private lateinit var errors: MutableList<JsBridgeError>
+    private lateinit var unhandledPromiseErrors: MutableList<UnhandledJsPromiseError>
 
     companion object {
         const val ITERATION_COUNT = 1000  // for miniBenchmark
@@ -91,12 +83,14 @@ class JsBridgeTest {
         }
     }
 
+    @Before
+    fun setUp() {
+        errors = mutableListOf()
+        unhandledPromiseErrors = mutableListOf()
+    }
+
     @After
     fun cleanUp() {
-        printErrors()
-        errors.clear()
-        unhandledPromiseErrors.clear()
-
         jsBridge?.let {
             runBlocking {
                 waitForDone(it)
@@ -104,6 +98,8 @@ class JsBridgeTest {
                 waitForDone(it)
             }
         }
+
+        printErrors()
     }
 
     @Test
@@ -112,7 +108,7 @@ class JsBridgeTest {
         val subject = JsBridge(
             InstrumentationRegistry.getInstrumentation().context
         )
-        subject.registerErrorListener(errorListener)
+        subject.registerErrorListener(createErrorListener())
         subject.start()
 
         runBlocking { waitForDone(subject) }
@@ -1453,6 +1449,9 @@ class JsBridgeTest {
             assertFalse(callbackCalled)
             verify(inverse = true) { jsToNativeFunctionMock(any()) }
         }
+        if (!errors.isEmpty()) {
+            throw Exception("TODO: found errors: $errors")
+        }
         assertTrue(errors.isEmpty())
 
         jsBridge = null  // avoid another release() in cleanUp()
@@ -1743,7 +1742,7 @@ class JsBridgeTest {
         return JsBridge(InstrumentationRegistry.getInstrumentation().context).also { jsBridge ->
             this@JsBridgeTest.jsBridge = jsBridge
 
-            jsBridge.registerErrorListener(errorListener)
+            jsBridge.registerErrorListener(createErrorListener())
             val config = JsBridgeConfig(xmlHttpRequestConfig = JsBridgeConfig.XMLHttpRequestConfig(true, okHttpClient))
             jsBridge.start(config)
 
@@ -1752,12 +1751,23 @@ class JsBridgeTest {
         }
     }
 
-    private fun handleJsBridgeError(e: JsBridgeError) {
-        if (e is UnhandledJsPromiseError) {
-            unhandledPromiseErrors.add(e)
-        } else {
-            errors.add(e)
+    private fun createErrorListener(): JsBridge.ErrorListener {
+        // ensure we are not messing up the errors instance
+        val errors = this.errors
+        val unhandledPromiseErrors = unhandledPromiseErrors
+
+        return object: JsBridge.ErrorListener(Dispatchers.Main) {
+            override fun onError(error: JsBridgeError) {
+                if (error is UnhandledJsPromiseError) {
+                    unhandledPromiseErrors.add(error)
+                } else {
+                    errors.add(error)
+                }
+            }
         }
+    }
+
+    private fun handleJsBridgeError(e: JsBridgeError) {
     }
 
     @Suppress("UNUSED")  // Only for debugging
@@ -1780,15 +1790,18 @@ class JsBridgeTest {
     }
 
     // Wait until the JS queue is empty
+    // TODO: remove the delay workaround and make it reliable
     private suspend fun waitForDone(jsBridge: JsBridge) {
        try {
-            withContext(jsBridge.coroutineContext) {
-                // ensure that triggered coroutines are processed
-                yield()
-                yield()
-                yield()
-            }
-        } catch (e: CancellationException) {
+           yield()
+
+           // ensure that triggered coroutines are processed
+           withContext(jsBridge.coroutineContext) {
+               delay(100)
+           }
+
+           yield()
+       } catch (e: CancellationException) {
             // Ignore cancellation
         }
     }
