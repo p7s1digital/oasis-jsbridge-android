@@ -56,7 +56,6 @@ private:
   std::unique_ptr<const JavaType> m_returnValueType;
   JniGlobalRef<jsBridgeParameter> m_returnValueParameter;
   std::vector<std::unique_ptr<const JavaType>> m_argumentTypes;
-  bool m_isVarArgs;
   bool m_isLambda;
 };
 

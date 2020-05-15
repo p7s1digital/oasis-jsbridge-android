@@ -46,8 +46,6 @@ JavaScriptMethod::JavaScriptMethod(const JsBridgeContext *jsBridgeContext, const
     m_returnValueParameter = JniGlobalRef<jsBridgeParameter>(returnParameter);
   }
 
-  m_isVarArgs = (bool) methodInterface.isVarArgs();
-
   JObjectArrayLocalRef parameters = methodInterface.getParameters();
   const auto numParameters = (size_t) parameters.getLength();
 
@@ -59,12 +57,6 @@ JavaScriptMethod::JavaScriptMethod(const JsBridgeContext *jsBridgeContext, const
   // Create ArgumentLoader instances
   for (jsize i = 0; i < numParameters; ++i) {
     JniLocalRef<jsBridgeParameter> parameter = parameters.getElement<jsBridgeParameter >(i);
-
-    if (m_isVarArgs && i == numParameters - 1) {
-        auto javaType = javaTypeProvider.makeUniqueType(parameter, false /*boxed*/);
-        m_argumentTypes[i] = std::move(javaType);
-        break;
-    }
 
     // Always load the boxed type instead of the primitive type (e.g. Integer vs int)
     // because we are going to a Proxy object
@@ -78,7 +70,6 @@ JavaScriptMethod::JavaScriptMethod(JavaScriptMethod &&other) noexcept
  , m_returnValueType(std::move(other.m_returnValueType))
  , m_returnValueParameter(std::move(other.m_returnValueParameter))
  , m_argumentTypes(std::move(other.m_argumentTypes))
- , m_isVarArgs(other.m_isVarArgs)
  , m_isLambda(other.m_isLambda) {
 }
 
@@ -87,7 +78,6 @@ JavaScriptMethod &JavaScriptMethod::operator=(JavaScriptMethod &&other) noexcept
   m_returnValueType = std::move(other.m_returnValueType);
   m_returnValueParameter = std::move(other.m_returnValueParameter);
   m_argumentTypes = std::move(other.m_argumentTypes);
-  m_isVarArgs = other.m_isVarArgs;
   m_isLambda = other.m_isLambda;
 
   return *this;
@@ -120,10 +110,6 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, void *js
     JValue arg(args.getElement(i));
     const auto &argumentType = m_argumentTypes[i];
     try {
-      if (m_isVarArgs && i == numArguments - 1) {
-        numArguments = i + argumentType->pushArray(arg.getLocalRef().staticCast<jarray>(), true /*expand*/);
-        break;
-      }
       argumentType->push(arg);
     } catch (const std::exception &) {
       duk_pop_n(ctx, (m_isLambda ? 1 : 2) + i);  // lambda: func + previous args, method: obj + methodName + previous args
@@ -170,11 +156,6 @@ JValue JavaScriptMethod::invoke(const JsBridgeContext *jsBridgeContext, JSValueC
     JValue javaArg(javaArgs.getElement(i));
     const auto &argumentType = m_argumentTypes[i];
     try {
-      if (m_isVarArgs && i == numArguments - 1) {
-        // TODO: QuickJS varargs
-        //numArguments = i + argumentLoader->pushArray(arg.getLocalRef().staticCast<jarray>(), true);
-        break;
-      }
       jsArgs[i] = argumentType->fromJava(javaArg);
     } catch (const std::exception &) {
       // Free all the JSValue instances which had been added until now

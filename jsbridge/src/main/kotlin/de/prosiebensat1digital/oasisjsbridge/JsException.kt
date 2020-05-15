@@ -41,6 +41,9 @@ class JsException(val jsonValue: String? = null, detailedMessage: String, jsStac
         // e.g.: "   at functionName (file.js:13)"
         private val STACK_TRACE_FUNCTION_FILE: Regex = "\\s*at\\s+([^\\]\\s]+)\\s+\\(([^:\\s\\)]+):(\\d+)\\).*".toRegex()
 
+        // e.g.: "   at methodName (object3)"
+        private val STACK_TRACE_METHOD_OBJECT: Regex = "\\s*at\\s+([^\\]\\s]+)\\s+\\(([^\\s\\)]+)\\).*".toRegex()
+
         // e.g.: "   at file.js:13"
         private val STACK_TRACE_FILE: Regex = "\\s*at\\s+([^:\\s]+):([^\\s]+).*".toRegex()
 
@@ -48,12 +51,14 @@ class JsException(val jsonValue: String? = null, detailedMessage: String, jsStac
         private const val STACK_TRACE_CLASS_NAME = "JavaScript"
 
         private fun toStackTraceElement(s: String): StackTraceElement? {
+            var className: String? = null
             val methodName: String
             val fileName: String
             val lineNumber: Int
 
             val methodFileGroups by lazy { STACK_TRACE_METHOD_FILE.matchEntire(s)?.groups }
             val functionFileGroups by lazy { STACK_TRACE_FUNCTION_FILE.matchEntire(s)?.groups }
+            val methodObjectGroups by lazy { STACK_TRACE_METHOD_OBJECT.matchEntire(s)?.groups }
             val fileGroups by lazy { STACK_TRACE_FILE.matchEntire(s)?.groups }
 
             if (methodFileGroups != null) {
@@ -66,6 +71,12 @@ class JsException(val jsonValue: String? = null, detailedMessage: String, jsStac
                 methodName = groups[1]?.value ?: "<unknown func>"
                 fileName = groups[2]?.value ?: "<unknown file>"
                 lineNumber = groups[3]?.value?.toIntOrNull() ?: 0
+            } else if (methodObjectGroups != null) {
+                val groups = methodObjectGroups!!
+                methodName = groups[1]?.value ?: "<unknown func>"
+                className = groups[2]?.value ?: "<unknown file>"
+                fileName = "eval"
+                lineNumber = 0
             } else if (fileGroups != null) {
                 val groups = fileGroups!!
                 methodName = "global"
@@ -80,7 +91,8 @@ class JsException(val jsonValue: String? = null, detailedMessage: String, jsStac
                 return null
             }
 
-            return StackTraceElement(STACK_TRACE_CLASS_NAME, methodName, fileName, lineNumber)
+            val stackTraceClassName = if (className == null) STACK_TRACE_CLASS_NAME else "$STACK_TRACE_CLASS_NAME/$className"
+            return StackTraceElement(stackTraceClassName, methodName, fileName, lineNumber)
         }
     }
 }

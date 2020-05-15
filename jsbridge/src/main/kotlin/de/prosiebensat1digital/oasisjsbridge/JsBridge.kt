@@ -771,11 +771,11 @@ class JsBridge(context: Context): CoroutineScope {
 
     // Call a JS method registered via registerNativeToJsInterface()
     @Throws
-    private fun callJsMethod(name: String, method: JavaMethod, args: Array<Any?>): Any? {
+    private fun callJsMethod(name: String, method: JavaMethod, args: Array<Any?>, awaitJsPromise: Boolean): Any? {
         checkJsThread()
 
         val jniJsContext = jniJsContextOrThrow()
-        val retVal = jniCallJsMethod(jniJsContext, name, method, args)
+        val retVal = jniCallJsMethod(jniJsContext, name, method, args, awaitJsPromise)
 
         processPromiseQueue()
         return retVal
@@ -953,7 +953,7 @@ class JsBridge(context: Context): CoroutineScope {
         name: String,
         method: Any
     )
-    private external fun jniCallJsMethod(context: Long, objectName: String, javaMethod: JavaMethod, args: Array<Any?>): Any?
+    private external fun jniCallJsMethod(context: Long, objectName: String, javaMethod: JavaMethod, args: Array<Any?>, awaitJsPromise: Boolean): Any?
     private external fun jniCallJsLambda(context: Long, objectName: String, args: Array<Any?>, awaitJsPromise: Boolean): Any?
     private external fun jniAssignJsValue(context: Long, globalName: String, jsCode: String)
     private external fun jniNewJsFunction(context: Long, globalName: String, functionArgs: Array<String>, jsCode: String)
@@ -1004,7 +1004,7 @@ class JsBridge(context: Context): CoroutineScope {
             runInJsThread {
                 try {
                     Timber.v("Calling (void) JS method ${type.canonicalName}/$jsValue.${method.name}...")
-                    callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf())
+                    callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf(), false)
                 } catch (t: Throwable) {
                     throw NativeToJsCallError("${type.canonicalName}/$jsValue.${method.name}", t)
                         .also(::notifyErrorListeners)
@@ -1014,11 +1014,25 @@ class JsBridge(context: Context): CoroutineScope {
 
         private fun callJsMethodSuspended(method: JavaMethod, args: Array<Any?>, continuation: Continuation<Any?>): Any {
             launch {
-                try {
-                    val result = callJsMethod(jsValue.associatedJsName, method, args)
-                    continuation.resume(result)
+                val retVal = try {
+                    Timber.v("Calling (suspend) JS method ${type.canonicalName}/$jsValue.${method.name}...")
+                    callJsMethod(jsValue.associatedJsName, method, args, true)
                 } catch (t: Throwable) {
+                    // Throw JS exception (which must be directly caught by the caller)
                     continuation.resumeWithException(t)
+                    return@launch
+                }
+
+                if (retVal is Deferred<*>) {
+                    try {
+                        continuation.resume(retVal.await())
+                    } catch (t: Throwable) {
+                        // For deferred, don't apply the generic JsBridge exception handling
+                        // but directly add the exception into the returned Deferred
+                        continuation.resumeWithException(t)
+                    }
+                } else {
+                    continuation.resume(retVal)
                 }
             }
 
@@ -1031,7 +1045,7 @@ class JsBridge(context: Context): CoroutineScope {
             launch {
                 val retVal = try {
                     Timber.v("Calling (deferred) JS method ${type.canonicalName}/$jsValue.${method.name}...")
-                    callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf())
+                    callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf(), false)
                 } catch (t: Throwable) {
                     // Reject the deferred with the JS exception (which must be directly caught by the caller)
                     deferred.completeExceptionally(t)
@@ -1062,7 +1076,7 @@ class JsBridge(context: Context): CoroutineScope {
 
             return runBlocking(coroutineContext) {
                 // Exceptions must be directly caught by the caller
-                callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf())
+                callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf(), false)
             }
         }
     }

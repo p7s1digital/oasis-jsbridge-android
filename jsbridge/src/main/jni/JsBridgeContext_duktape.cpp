@@ -308,7 +308,8 @@ void JsBridgeContext::registerJsLambda(const std::string &strName,
 
 JValue JsBridgeContext::callJsMethod(const std::string &objectName,
                                      const JniLocalRef<jobject> &javaMethod,
-                                     const JObjectArrayLocalRef &args) {
+                                     const JObjectArrayLocalRef &args,
+                                     bool awaitJsPromise) {
   CHECK_STACK(m_ctx);
 
   // Get the JS object
@@ -327,7 +328,7 @@ JValue JsBridgeContext::callJsMethod(const std::string &objectName,
   }
 
   duk_pop(m_ctx);
-  return cppJsObject->call(javaMethod, args);
+  return cppJsObject->call(javaMethod, args, awaitJsPromise);
 }
 
 JValue JsBridgeContext::callJsLambda(const std::string &strFunctionName,

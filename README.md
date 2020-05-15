@@ -149,8 +149,8 @@ A JS value can be evaluated via:
 - `JsValue.evaluateBlocking<T>()`  // blocking
 - `JsValue.evaluateBlocking(Class<*> javaClass)`  // from Java
 
-A JS function can be [mapped to a Kotlin proxy function](#using-js-functions-from-native) via `JsValue.mapToNativeObject()`.
-A JS object can be [mapped to a Java/Kotlin proxy object](#using-js-objects-from-native) via `JsValue.mapToNativeObject()`.
+A JS function can be [mapped to a Kotlin proxy function](#calling-js-functions-from-kotlin) via `JsValue.mapToNativeObject()`.
+A JS object can be [mapped to a Java/Kotlin proxy object](#using-js-objects-from-javakotlin) via `JsValue.mapToNativeObject()`.
 
 
 ### 3. Calling JS functions from Kotlin
@@ -196,26 +196,33 @@ JS object and mapped to a native object via:
 
 ```kotlin
 interface JsApi: NativeToJsInterface {
-  fun calcSum(a: Int, b: Int): Deferred<Int>
+  suspend fun calcSum1(a: Int, b: Int): Int
+  suspend fun calcSum2(a: Int, b: Int): Int
+  fun calcSumDeferred(a: Int, b: Int): Deferred<Int>
   fun setCallback(cb: (payload: JsonObjectWrapper) -> Unit)
   fun triggerEvent()
 }
 
 val jsApi: JsApi = JsValue(jsBridge, """({
-    calcSum: function(a, b) { return a + b; },
+    calcSum1: function(a, b) { return a + b; },
+    calcSum2: function(a, b) { return new Promise(function(resolve) { resolve(a + b); }); },
+    calcSumDeferred: function(a, b) { return a + b; },
     setCallback: function(cb) { this._cb = cb; },
-    triggerEvent: function() { if (_cb) cb({ value: 12 }); } 
+    triggerEvent: function() { if (_cb) cb({ value: 12 }); }
 })""".trimIndent()).mapToNativeObject()
 
-val result = jsApi.calcSum(1, 2).await()
+val sum1 = jsApi.calcSum(1, 2)
+val sum2 = jsApi.calcSumAsync(1, 2)
+val sumDeferred = jsApi.calcSumDeferred(1, 2).await()
 jsApi.setCallback { payload -> println("Got JS event with payload $payload") }
 jsApi.triggerEvent()
 ```
 
 Note:
 - the JS methods are running asynchronously in the "JS" thread
-- Kotlin: the return value of the methods may only be `Unit`/`void` or a `Deferred`. Suspending methods will
-be supported in the future.
+- Kotlin: the return value of the methods may only be `Unit`/`void` or a `Deferred`.
+- When the method is suspending and the JS method returns a Promise, the call will suspend until the
+JS promise has been fulfilled (or rejected).
 - Java: calling the method will block the caller thread (if it is not a `void` method) until the result has
 been returned.
 

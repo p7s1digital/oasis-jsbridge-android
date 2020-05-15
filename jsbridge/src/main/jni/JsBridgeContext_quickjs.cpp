@@ -230,7 +230,8 @@ void JsBridgeContext::registerJsLambda(const std::string &strName,
 
 JValue JsBridgeContext::callJsMethod(const std::string &objectName,
                                      const JniLocalRef<jobject> &javaMethod,
-                                     const JObjectArrayLocalRef &args) {
+                                     const JObjectArrayLocalRef &args,
+                                     bool awaitJsPromise) {
 
   // Get the JS object
   JSValue globalObj = JS_GetGlobalObject(m_ctx);
@@ -250,7 +251,7 @@ JValue JsBridgeContext::callJsMethod(const std::string &objectName,
                                 " because it does not exist or has been deleted!");
   }
 
-  return cppJsObject->call(jsObjectValue, javaMethod, args);
+  return cppJsObject->call(jsObjectValue, javaMethod, args, awaitJsPromise);
 }
 
 JValue JsBridgeContext::callJsLambda(const std::string &strFunctionName,

@@ -66,7 +66,7 @@ public:
   void registerJsObject(const std::string &strName, const JObjectArrayLocalRef &methods, bool check);
   void registerJsLambda(const std::string &strName, const JniLocalRef<jsBridgeMethod> &method);
   JValue callJsMethod(const std::string &objectName, const JniLocalRef<jobject> &javaMethod,
-                              const JObjectArrayLocalRef &args);
+                              const JObjectArrayLocalRef &args, bool awaitJsPromise);
   JValue callJsLambda(const std::string &strFunctionName, const JObjectArrayLocalRef &args,
                               bool awaitJsPromise);
 

@@ -59,6 +59,9 @@ interface TestJsApiInterface : NativeToJsInterface {
 interface TestJsApiInterfaceWithSuspend : NativeToJsInterface {
     suspend fun jsMethodWithString(msg: String)
     suspend fun jsMethodReturningJsonObject(): JsonObjectWrapper
+    suspend fun jsMethodThrowingException(): String
+    suspend fun jsMethodReturningFulfilledPromise(): String
+    suspend fun jsMethodReturningRejectedPromise(): String
 }
 
 interface JsExpectationsNativeApi : JsToNativeInterface {
@@ -1253,6 +1256,19 @@ class JsBridgeTest {
             },
             jsMethodReturningJsonObject: function() {
               return { key: "value" };
+            },
+            jsMethodThrowingException: function() {
+              throw new Error("js exception");
+            },
+            jsMethodReturningFulfilledPromise: function() {
+              return new Promise(function(resolve) {
+                resolve("fulfilled promise");
+              });
+            },
+            jsMethodReturningRejectedPromise: function() {
+              return new Promise(function(resolve, reject) {
+                reject(new Error("rejected promise"));
+              });
             }
         })""")
 
@@ -1261,8 +1277,22 @@ class JsBridgeTest {
         val jsApi: TestJsApiInterfaceWithSuspend = testJsApi.mapToNativeObjectBlocking()
         runBlocking {
             jsApi.jsMethodWithString("Hello JS!")
+
             val result = jsApi.jsMethodReturningJsonObject()
             assertEquals("value", result.toPayloadObject()?.getString("key"))
+
+            val exception = assertFailsWith<JsException> {
+                jsApi.jsMethodThrowingException()
+            }
+            assertEquals(exception.message?.contains("js exception"), true)
+
+            val promiseResult = jsApi.jsMethodReturningFulfilledPromise()
+            assertEquals(promiseResult, "fulfilled promise")
+
+            val promiseException = assertFailsWith<JsException> {
+                jsApi.jsMethodReturningRejectedPromise()
+            }
+            assertEquals(promiseException.message?.contains("rejected promise"), true)
 
             waitForDone(subject)
         }

@@ -205,7 +205,7 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
 }
 
 JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCallJsMethod
-    (JNIEnv *env, jobject, jlong lctx, jstring objectName, jobject javaMethod, jobjectArray args) {
+    (JNIEnv *env, jobject, jlong lctx, jstring objectName, jobject javaMethod, jobjectArray args, jboolean awaitJsPromise) {
 
   //alog("jniCallJsMethod()");
 
@@ -219,7 +219,8 @@ JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jn
   try {
     value = jsBridgeContext->callJsMethod(strObjectName,
                                           JniLocalRef<jobject>(jniContext, javaMethod, JniLocalRefMode::Borrowed),
-                                          JObjectArrayLocalRef(jniContext, args, JniLocalRefMode::Borrowed));
+                                          JObjectArrayLocalRef(jniContext, args, JniLocalRefMode::Borrowed),
+                                          awaitJsPromise);
   } catch (const std::exception &e) {
     jsBridgeContext->getExceptionHandler()->jniThrow(e);
   }

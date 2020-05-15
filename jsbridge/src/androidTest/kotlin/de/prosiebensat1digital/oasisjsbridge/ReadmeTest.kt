@@ -140,7 +140,9 @@ class ReadmeTest {
     }
 
     interface JsApi: NativeToJsInterface {
-        fun calcSum(a: Int, b: Int): Deferred<Int>
+        suspend fun calcSum1(a: Int, b: Int): Int
+        suspend fun calcSum2(a: Int, b: Int): Int
+        fun calcSumDeferred(a: Int, b: Int): Deferred<Int>
         fun setCallback(cb: (payload: JsonObjectWrapper) -> Unit)
         fun triggerEvent()
     }
@@ -149,13 +151,21 @@ class ReadmeTest {
     fun testNativeToJsInterface() {
         runBlocking {
             val jsApi: JsApi = JsValue(jsBridge, """({
-                calcSum: function(a, b) { return a + b; },
+                calcSum1: function(a, b) { return a + b; },
+                calcSum2: function(a, b) { return new Promise(function(resolve) { resolve(a + b); }); },
+                calcSumDeferred: function(a, b) { return a + b; },
                 setCallback: function(cb) { this._cb = cb; },
-                triggerEvent: function() { if (_cb) cb({ value: 12 }); } 
+                triggerEvent: function() { if (_cb) cb({ value: 12 }); }
             })""".trimIndent()).mapToNativeObject()
 
-            val result = jsApi.calcSum(1, 2).await()
-            println("sum is = $result")
+            val sum1 = jsApi.calcSum1(1, 2)
+            val sum2 = jsApi.calcSum2(1, 2)
+            val sumDeferred = jsApi.calcSumDeferred(1, 2).await()
+
+            println("sum1 is = $sum1")
+            println("sum2 is = $sum2")
+            println("sumDeferred is = $sumDeferred")
+
             jsApi.setCallback { payload -> println("Got JS event with payload $payload") }
             jsApi.triggerEvent()
         }

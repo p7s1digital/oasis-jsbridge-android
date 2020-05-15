@@ -56,7 +56,7 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
     (JNIEnv *, jobject, jlong, jstring, jobject);
 
 JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCallJsMethod
-    (JNIEnv *, jobject, jlong, jstring, jobject, jobjectArray);
+    (JNIEnv *, jobject, jlong, jstring, jobject, jobjectArray, jboolean awaitJsPromise);
 
 JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCallJsLambda
     (JNIEnv *, jobject, jlong, jstring, jobjectArray, jboolean);
