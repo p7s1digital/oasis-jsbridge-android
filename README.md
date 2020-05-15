@@ -149,8 +149,8 @@ A JS value can be evaluated via:
 - `JsValue.evaluateBlocking<T>()`  // blocking
 - `JsValue.evaluateBlocking(Class<*> javaClass)`  // from Java
 
-A JS function can be [mapped to a Kotlin proxy function](#calling-js-functions-from-kotlin) via `JsValue.mapToNativeObject()`.
-A JS object can be [mapped to a Java/Kotlin proxy object](#using-js-objects-from-javakotlin) via `JsValue.mapToNativeObject()`.
+A JS function can be [mapped to a Kotlin proxy function](#3-calling-js-functions-from-kotlin) via `JsValue.mapToNativeObject()`.
+A JS object can be [mapped to a Java/Kotlin proxy object](#5-using-js-objects-from-javakotlin) via `JsValue.mapToNativeObject()`.
 
 
 ### 3. Calling JS functions from Kotlin
