@@ -21,13 +21,13 @@ import io.mockk.Ordering
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlin.test.*
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import org.junit.*
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.fail
 import timber.log.Timber
-import kotlin.test.*
 
 interface TestNativeApiInterface : JsToNativeInterface {
     fun nativeMethodReturningTrue(): Boolean
@@ -293,7 +293,7 @@ class JsBridgeTest {
     }
 
     @Test
-    fun testEvaluateLocalFileWithError() {
+    fun testEvaluateLocalFileNonExisting() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
 
@@ -306,6 +306,62 @@ class JsBridgeTest {
         val fileEvaluationError = errors.firstOrNull() as? JsFileEvaluationError
         assertNotNull(fileEvaluationError)
         assertEquals(fileEvaluationError.fileName, "non-existing/file.js")
+    }
+
+    @Test
+    fun testEvaluateLocalFileWithJsError() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        subject.evaluateLocalFile("js/test_with_error.js")
+
+        runBlocking { waitForDone(subject) }
+
+        // THEN
+        val jsException = errors.firstOrNull()?.jsException
+        assertNotNull(jsException)
+        assertTrue(jsException.stackTrace.isNotEmpty())
+        jsException.stackTrace[0].let { e ->
+            assertEquals(e.fileName, "test_with_error.js")
+            assertEquals(e.lineNumber, 1)
+        }
+    }
+
+    @Test
+    fun testEvaluateFileContent() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        val content = """nativeFunctionMock("fileContentString");"""
+        subject.evaluateFileContent(content, "file.js")
+
+        runBlocking { waitForDone(subject) }
+
+        // THEN
+        assertTrue(errors.isEmpty())
+        verify { jsToNativeFunctionMock(eq("fileContentString")) }
+    }
+
+    @Test
+    fun testEvaluateFileContentWithError() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        subject.evaluateFileContent("this will obviously fail", "file.js")
+
+        runBlocking { waitForDone(subject) }
+
+        // THEN
+        val jsException = errors.firstOrNull()?.jsException
+        assertNotNull(jsException)
+        assertTrue(jsException.stackTrace.isNotEmpty())
+        jsException.stackTrace[0].let { e ->
+            assertEquals(e.fileName, "file.js")
+            assertEquals(e.lineNumber, 1)
+        }
     }
 
     @Test

@@ -253,7 +253,24 @@ class JsBridge(context: Context): CoroutineScope {
                 val (inputStream, jsFileName) = getInputStream(filename, useMaxJs)
                 val jsString = inputStream.bufferedReader().use { it.readText() }
                 jniEvaluateFileContent(jniJsContext, jsString, jsFileName)
-                Timber.d("-> $filename has been successfully evaluated!")
+                Timber.d("-> $filename ($jsFileName) has been successfully evaluated!")
+            } catch (t: Throwable) {
+                throw JsFileEvaluationError(filename, t)
+                    .also(::notifyErrorListeners)
+            }
+
+            processPromiseQueue()
+        }
+    }
+
+    // Evaluate the content of a JavaScript file (e.g. fetched from the network).
+    fun evaluateFileContent(content: String, filename: String) {
+        launch {
+            val jniJsContext = jniJsContextOrThrow()
+
+            try {
+                jniEvaluateFileContent(jniJsContext, content, filename)
+                Timber.d("-> file content ($filename) has been successfully evaluated!")
             } catch (t: Throwable) {
                 throw JsFileEvaluationError(filename, t)
                     .also(::notifyErrorListeners)
