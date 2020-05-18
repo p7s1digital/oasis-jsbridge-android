@@ -16,13 +16,13 @@
 package de.prosiebensat1digital.oasisjsbridge.extensions
 
 import de.prosiebensat1digital.oasisjsbridge.*
+import java.net.SocketTimeoutException
+import java.util.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.*
 import timber.log.Timber
-import java.net.SocketTimeoutException
-import java.util.*
 
 class XMLHttpRequestExtension(
     private val jsBridge: JsBridge,
@@ -124,10 +124,10 @@ class XMLHttpRequestExtension(
                 Timber.v("-> responseInfo = $responseInfo")
                 Timber.v("-> request headers = $requestHeaders")
             } catch (e: SocketTimeoutException) {
-                JsBridgeError.XhrError("$httpMethod $url", e).let { jsBridge.notifyErrorListeners(it) }
+                Timber.d("XHR timeout ($httpMethod $url): $e")
                 errorString = "timeout"
             } catch (t: Throwable) {
-                JsBridgeError.XhrError("$httpMethod $url", t).let { jsBridge.notifyErrorListeners(it) }
+                Timber.d("XHR error ($httpMethod $url): $t")
                 errorString = t.message ?: "unknown XHR error"
             }
 

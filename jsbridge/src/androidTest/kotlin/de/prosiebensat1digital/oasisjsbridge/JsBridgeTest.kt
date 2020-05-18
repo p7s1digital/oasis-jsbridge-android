@@ -1783,6 +1783,34 @@ class JsBridgeTest {
         assertTrue(errors.isEmpty())
     }
 
+    @Test
+    fun testXmlHttpRequest_error() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        val js = """
+            var req = new XMLHttpRequest();
+            req.open("GET", "invalid url");
+            req.send();
+            req.onload = function() {
+                nativeFunctionMock("loaded");
+            }
+            req.onerror = function() {
+                nativeFunctionMock("XHR error: " + req.responseText);
+            }
+            """
+        subject.evaluateNoRetVal(js)
+
+        // THEN
+        // Note: mockk verify with timeout has some issues on API < 24
+        if (android.os.Build.VERSION.SDK_INT >= 24) {
+            verify(timeout = 2000) { jsToNativeFunctionMock(eq("XHR error: Cannot parse URL: invalid url")) }
+        }
+        verify(inverse = true) { jsToNativeFunctionMock(eq("loaded")) }
+        assertTrue(errors.isEmpty())
+    }
+
 
     // JsExpectations
     // ---
