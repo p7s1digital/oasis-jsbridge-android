@@ -27,7 +27,6 @@
 #include "StackChecker.h"
 #include "custom_stringify.h"
 #include "log.h"
-#include "duk_console.h"
 #include "exceptions/JsException.h"
 #include "java-types/Deferred.h"
 #include "jni-helpers/JniGlobalRef.h"
@@ -101,9 +100,6 @@ void JsBridgeContext::init(JniContext *jniContext, const JniLocalRef<jobject> &j
   // See also https://wiki.duktape.org/howtoglobalobjectreference
   static const char *str1 = "var global = this; var window = this; window.open = function() {};\n";
   duk_eval_string_noresult(m_ctx, str1);
-
-  // Console
-  duk_console_init(m_ctx, 0 /*flags*/);
 }
 
 void JsBridgeContext::startDebugger(int port) {

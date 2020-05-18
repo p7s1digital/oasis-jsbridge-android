@@ -57,7 +57,6 @@ if (FLAVOR STREQUAL "DUKTAPE")
     target_sources(${JNI_LIB_NAME} PUBLIC
         src/main/jni/DuktapeUtils.cpp
         src/main/jni/JsBridgeContext_duktape.cpp
-        src/main/jni/duk_console.cpp
         src/main/jni/duktape/duk_trans_socket_unix.c
         src/main/jni/duktape/duktape.cpp
         src/main/jni/java-types/Deferred_duktape.cpp
@@ -71,7 +70,6 @@ elseif (FLAVOR STREQUAL "QUICKJS")
     target_sources(${JNI_LIB_NAME} PUBLIC
         src/main/jni/JsBridgeContext_quickjs.cpp
         src/main/jni/QuickJsUtils.cpp
-        src/main/jni/quickjs_console.cpp
         src/main/jni/quickjs/cutils.c
         src/main/jni/quickjs/libregexp.c
         src/main/jni/quickjs/libunicode.c

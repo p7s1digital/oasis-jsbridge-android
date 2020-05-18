@@ -15,6 +15,7 @@
  */
 package de.prosiebensat1digital.oasisjsbridge
 
+import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
 import de.prosiebensat1digital.oasisjsbridge.JsBridgeError.*
 import io.mockk.Ordering
@@ -1841,6 +1842,84 @@ class JsBridgeTest {
         assertTrue(errors.isEmpty())
     }
 
+    @Test
+    fun testConsole_asString() {
+        // GIVEN
+        val messages = mutableListOf<Pair<Int, String>>()
+        val config = JsBridgeConfig(
+            consoleConfig = JsBridgeConfig.ConsoleConfig(
+                enabled = true,
+                mode = JsBridgeConfig.ConsoleConfig.Mode.AsString,
+                appendMessage = { priority, message ->
+                    messages.add(priority to message)
+                }
+            )
+        )
+        val subject = JsBridge(InstrumentationRegistry.getInstrumentation().context)
+        subject.start(config)
+
+        // WHEN
+        val js = """
+            console.log("This is a log with undefined and null:", undefined, "-", null);
+            console.info("This is an info with 2 integers:", 1664, "and", 69);
+            console.warn("This is a warning with an object:", { one: 1, two: "two" });
+            console.err("This is an error:", new Error("completely wrong"));
+            console.assert(1 == 1, "should not be displayed");
+            console.assert(1 == 2, "should be displayed");
+            """
+        subject.evaluateNoRetVal(js)
+
+        runBlocking { waitForDone(subject) }
+
+        // THEN
+        // Note: with Mode.AsString, undefined is currently displayed as "null"...
+        assertEquals(messages, listOf(
+            Log.DEBUG to "This is a log with undefined and null: null - null",
+            Log.INFO to "This is an info with 2 integers: 1664 and 69",
+            Log.WARN to """This is a warning with an object: [object Object]""",
+            Log.ERROR to """This is an error: Error: completely wrong""",
+            Log.ASSERT to """Assertion failed: should be displayed"""
+        ))
+    }
+    @Test
+    fun testConsole_asJson() {
+        // GIVEN
+        val messages = mutableListOf<Pair<Int, String>>()
+        val config = JsBridgeConfig(
+            consoleConfig = JsBridgeConfig.ConsoleConfig(
+                enabled = true,
+                mode = JsBridgeConfig.ConsoleConfig.Mode.AsJson,
+                appendMessage = { priority, message ->
+                    messages.add(priority to message)
+                }
+            )
+        )
+        val subject = JsBridge(InstrumentationRegistry.getInstrumentation().context)
+        subject.start(config)
+
+        // WHEN
+        val js = """
+            console.log("This is a log with undefined and null:", undefined, "-", null);
+            console.info("This is an info with 2 integers:", 1664, "and", 69);
+            console.warn("This is a warning with an object:", { one: 1, two: "two" });
+            console.err("This is an error:", new Error("completely wrong"));
+            console.assert(1 == 1, "should not be displayed");
+            console.assert(1 == 2, "should be displayed");
+            """
+        subject.evaluateNoRetVal(js)
+
+        runBlocking { waitForDone(subject) }
+
+        // THEN
+        assertEquals(messages, listOf(
+            Log.DEBUG to "This is a log with undefined and null: undefined - null",
+            Log.INFO to "This is an info with 2 integers: 1664 and 69",
+            Log.WARN to """This is a warning with an object: {"one":1,"two":"two"}""",
+            Log.ERROR to """This is an error: {"message":"completely wrong"}""",
+            Log.ASSERT to """Assertion failed: should be displayed"""
+        ))
+    }
+
 
     // JsExpectations
     // ---
@@ -1910,9 +1989,6 @@ class JsBridgeTest {
                 }
             }
         }
-    }
-
-    private fun handleJsBridgeError(e: JsBridgeError) {
     }
 
     @Suppress("UNUSED")  // Only for debugging
