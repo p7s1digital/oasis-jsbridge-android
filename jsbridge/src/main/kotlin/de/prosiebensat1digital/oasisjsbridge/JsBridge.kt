@@ -23,10 +23,7 @@ import android.content.Context
 import android.os.Looper
 import androidx.annotation.VisibleForTesting
 import de.prosiebensat1digital.oasisjsbridge.JsBridgeError.*
-import de.prosiebensat1digital.oasisjsbridge.extensions.JsDebuggerExtension
-import de.prosiebensat1digital.oasisjsbridge.extensions.PromisePolyfillExtension
-import de.prosiebensat1digital.oasisjsbridge.extensions.SetTimeoutExtension
-import de.prosiebensat1digital.oasisjsbridge.extensions.XMLHttpRequestExtension
+import de.prosiebensat1digital.oasisjsbridge.extensions.*
 import java.io.FileNotFoundException
 import java.io.InputStream
 import java.lang.reflect.Method as JavaMethod
@@ -97,6 +94,7 @@ class JsBridge(context: Context): CoroutineScope {
     private var jsDebuggerExtension: JsDebuggerExtension? = null
     private var promisePolyfillExtension: PromisePolyfillExtension? = null
     private var setTimeoutExtension: SetTimeoutExtension? = null
+    private var consoleExtension: ConsoleExtension? = null
     private var xmlHttpRequestExtension: XMLHttpRequestExtension? = null
 
     private var internalCounter = AtomicInteger(0)
@@ -155,6 +153,8 @@ class JsBridge(context: Context): CoroutineScope {
             promisePolyfillExtension = PromisePolyfillExtension(this@JsBridge)
         if (config.setTimeoutConfig.enabled)
             setTimeoutExtension = SetTimeoutExtension(this@JsBridge)
+        if (config.consoleConfig.enabled)
+            consoleExtension = ConsoleExtension(this@JsBridge, config.consoleConfig)
         if (config.xmlHttpRequestConfig.enabled)
             xmlHttpRequestExtension = XMLHttpRequestExtension(this@JsBridge, config.xmlHttpRequestConfig)
     }

@@ -26,7 +26,6 @@
 #include "QuickJsUtils.h"
 #include "custom_stringify.h"
 #include "log.h"
-#include "quickjs_console.h"
 #include "exceptions/JsException.h"
 #include "java-types/Deferred.h"
 #include "java-types/Object.h"
@@ -87,8 +86,6 @@ void JsBridgeContext::init(JniContext *jniContext, const JniLocalRef<jobject> &j
   static const char *str1 = "var global = this; var window = this; window.open = function() {};\n";
   JSValue e = JS_Eval(m_ctx, str1, strlen(str1), "JsBridgeContext.cpp", 0);
   JS_FreeValue(m_ctx, e);
-
-  quickjs_console_init(m_ctx);
 }
 
 void JsBridgeContext::startDebugger(int /*port*/) {

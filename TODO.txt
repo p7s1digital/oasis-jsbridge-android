@@ -1,7 +1,4 @@
 Features:
-- pure Kotlin version of console (.log, .warn, ...) with
-  * varargs JsonObjectWrapper (debug)
-  * varargs String (release)
 - test exceptions:
   * array too large (how?)
 - JsValue.fromNativeValue<T: Any?>(v: T)
