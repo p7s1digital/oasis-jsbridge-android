@@ -18,19 +18,17 @@ package de.prosiebensat1digital.oasisjsbridge.extensions
 import android.util.Log
 import de.prosiebensat1digital.oasisjsbridge.*
 
-// Note: because we use the standard JS->Java conversion for String, there is currently
-// no way to distinguish undefined from null. As a result, undefined args will be displayed
-// as "null".
 // Still missing: trace functionality (currently: alias to debug)
+
 interface StringConsole : JsToNativeInterface {
-    fun log(vararg args: String)
-    fun debug(vararg args: String)
-    fun assert(assertion: Boolean, vararg args: String)
-    fun trace(vararg args: String)
-    fun info(vararg args: String)
-    fun warn(vararg args: String)
-    fun err(vararg args: String)
-    fun exception(vararg args: String)
+    fun log(vararg args: DebugString)
+    fun debug(vararg args: DebugString)
+    fun assert(assertion: Boolean, vararg args: DebugString)
+    fun trace(vararg args: DebugString)
+    fun info(vararg args: DebugString)
+    fun warn(vararg args: DebugString)
+    fun err(vararg args: DebugString)
+    fun exception(vararg args: DebugString)
 }
 
 interface JsonConsole : JsToNativeInterface {
@@ -44,6 +42,17 @@ interface JsonConsole : JsToNativeInterface {
     fun exception(vararg args: JsonObjectWrapper)
 }
 
+interface EmptyConsole : JsToNativeInterface {
+    fun log()
+    fun debug()
+    fun assert()
+    fun trace()
+    fun info()
+    fun warn()
+    fun err()
+    fun exception()
+}
+
 class ConsoleExtension(
     private val jsBridge: JsBridge,
     val config: JsBridgeConfig.ConsoleConfig
@@ -54,6 +63,7 @@ class ConsoleExtension(
         consoleJsValue = when (config.mode) {
             JsBridgeConfig.ConsoleConfig.Mode.AsString -> createStringConsole()
             JsBridgeConfig.ConsoleConfig.Mode.AsJson -> createJsonConsole()
+            JsBridgeConfig.ConsoleConfig.Mode.Empty -> createEmptyConsole()
         }
 
         consoleJsValue.assignToGlobal("console")
@@ -61,17 +71,17 @@ class ConsoleExtension(
 
     private fun createStringConsole(): JsValue {
         val consoleNativeObject = object: StringConsole {
-            override fun log(vararg args: String) = message(Log.DEBUG, args)
-            override fun debug(vararg args: String) = message(Log.DEBUG, args)
-            override fun trace(vararg args: String) = message(Log.DEBUG, args)
-            override fun info(vararg args: String) = message(Log.INFO, args)
-            override fun warn(vararg args: String) = message(Log.WARN, args)
-            override fun err(vararg args: String) = message(Log.ERROR, args)
-            override fun exception(vararg args: String) = message(Log.ERROR, args)
+            override fun log(vararg args: DebugString) = message(Log.DEBUG, ds2s(args))
+            override fun debug(vararg args: DebugString) = message(Log.DEBUG, ds2s(args))
+            override fun trace(vararg args: DebugString) = message(Log.DEBUG, ds2s(args))
+            override fun info(vararg args: DebugString) = message(Log.INFO, ds2s(args))
+            override fun warn(vararg args: DebugString) = message(Log.WARN, ds2s(args))
+            override fun err(vararg args: DebugString) = message(Log.ERROR, ds2s(args))
+            override fun exception(vararg args: DebugString) = message(Log.ERROR, ds2s(args))
 
-            override fun assert(assertion: Boolean, vararg args: String) {
+            override fun assert(assertion: Boolean, vararg args: DebugString) {
                 if (!assertion) {
-                    message(Log.ASSERT, arrayOf("Assertion failed:", *args))
+                    message(Log.ASSERT, arrayOf("Assertion failed:", *ds2s(args)))
                 }
             }
         }
@@ -99,11 +109,30 @@ class ConsoleExtension(
         return JsValue.fromNativeObject(jsBridge, consoleNativeObject)
     }
 
+    private fun createEmptyConsole(): JsValue {
+        val consoleNativeObject = object: EmptyConsole {
+            override fun log() = Unit
+            override fun debug() = Unit
+            override fun trace() = Unit
+            override fun info() = Unit
+            override fun warn() = Unit
+            override fun err() = Unit
+            override fun exception() = Unit
+            override fun assert() = Unit
+        }
+
+        return JsValue.fromNativeObject(jsBridge, consoleNativeObject)
+    }
+
     private fun j2s(json: Array<out JsonObjectWrapper>): Array<out String> {
         return json.map {
             val jsonString = if (it == JsonObjectWrapper.Undefined) "undefined" else it.toString()
             jsonString.replace("^\"(.*)\"$".toRegex(), "$1")  // remove quotes of simple strings
         }.toTypedArray()
+    }
+
+    private fun ds2s(ds: Array<out DebugString>): Array<out String> {
+        return ds.map { it.string }.toTypedArray()
     }
 
     private fun message(priority: Int, args: Array<out String>) {

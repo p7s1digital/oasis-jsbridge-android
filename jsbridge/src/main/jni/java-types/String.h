@@ -26,7 +26,7 @@ namespace JavaTypes {
 class String : public JavaType {
 
 public:
-  explicit String(const JsBridgeContext *);
+  explicit String(const JsBridgeContext *, bool forDebug);
 
 #if defined(DUKTAPE)
   JValue pop() const override;
@@ -35,6 +35,9 @@ public:
   JValue toJava(JSValueConst) const override;
   JSValue fromJava(const JValue &) const override;
 #endif
+
+private:
+  bool m_forDebug;
 };
 
 }  // namespace JavaTypes

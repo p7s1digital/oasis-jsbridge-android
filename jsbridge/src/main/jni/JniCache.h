@@ -58,6 +58,11 @@ public:
   // JavaReflectedMethod (java.lang.reflect.Method)
   JStringLocalRef getJavaReflectedMethodName(const JniLocalRef<jobject> &javaMethod) const;
 
+  // DebugString (de.prosiebensat1digital.oasisjsbridge.DebugString)
+  JniLocalRef<jobject> newDebugString(const char *s) const;
+  JniLocalRef<jobject> newDebugString(const JStringLocalRef &s) const;
+  JStringLocalRef getDebugStringString(const JniRef<jobject> &debugString) const;
+
   // JsValue (de.prosiebensat1digital.oasisjsbridge.JsValue)
   JniLocalRef<jobject> newJsValue(const JStringLocalRef &name) const;
   JStringLocalRef getJsValueName(const JniRef<jobject> &jsValue) const;
@@ -83,6 +88,7 @@ private:
   JniGlobalRef<jclass> m_jsBridgeMethodClass;
   JniGlobalRef<jclass> m_jsBridgeParameterClass;
 
+  JniGlobalRef<jclass> m_jsBridgeDebugStringClass;
   JniGlobalRef<jclass> m_jsBridgeJsValueClass;
   JniGlobalRef<jclass> m_jsonObjectWrapperClass;
 

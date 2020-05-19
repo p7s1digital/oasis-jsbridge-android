@@ -42,7 +42,7 @@ data class JsBridgeConfig(
         val appendMessage: (priority: Int, message: String) -> Unit
     ) {
         enum class Mode {
-            AsString, AsJson
+            AsString, AsJson, Empty
         }
 
         companion object {

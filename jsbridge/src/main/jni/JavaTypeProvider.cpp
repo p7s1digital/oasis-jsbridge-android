@@ -92,7 +92,9 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
       return createPrimitive<Double>(m_jsBridgeContext, true);
 
     case JavaTypeId::String:
-      return new String(m_jsBridgeContext);
+      return new String(m_jsBridgeContext, false);
+    case JavaTypeId::DebugString:
+      return new String(m_jsBridgeContext, true);
     case JavaTypeId::Object:
       return new Object(m_jsBridgeContext);
 
