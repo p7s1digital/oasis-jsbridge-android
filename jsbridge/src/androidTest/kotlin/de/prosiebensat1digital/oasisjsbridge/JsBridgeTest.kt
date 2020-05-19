@@ -116,6 +116,7 @@ class JsBridgeTest {
         val subject = JsBridge(
             InstrumentationRegistry.getInstrumentation().context
         )
+        jsBridge = subject
         subject.registerErrorListener(createErrorListener())
         subject.start()
 
@@ -1856,6 +1857,7 @@ class JsBridgeTest {
             )
         )
         val subject = JsBridge(InstrumentationRegistry.getInstrumentation().context)
+        jsBridge = subject
         subject.start(config)
 
         // WHEN
@@ -1879,6 +1881,7 @@ class JsBridgeTest {
             Log.ERROR to """This is an error: Error: completely wrong""",
             Log.ASSERT to """Assertion failed: should be displayed"""
         ))
+        assertTrue(errors.isEmpty())
     }
 
     @Test
@@ -1895,6 +1898,7 @@ class JsBridgeTest {
             )
         )
         val subject = JsBridge(InstrumentationRegistry.getInstrumentation().context)
+        jsBridge = subject
         subject.start(config)
 
         // WHEN
@@ -1918,6 +1922,7 @@ class JsBridgeTest {
             Log.ERROR to """This is an error: {"message":"completely wrong"}""",
             Log.ASSERT to """Assertion failed: should be displayed"""
         ))
+        assertTrue(errors.isEmpty())
     }
 
     @Test
@@ -1934,6 +1939,7 @@ class JsBridgeTest {
             )
         )
         val subject = JsBridge(InstrumentationRegistry.getInstrumentation().context)
+        jsBridge = subject
         subject.start(config)
 
         // WHEN
@@ -1951,6 +1957,7 @@ class JsBridgeTest {
 
         // THEN
         assertEquals(hasMessage, false)
+        assertTrue(errors.isEmpty())
     }
 
 
@@ -2000,7 +2007,10 @@ class JsBridgeTest {
             this@JsBridgeTest.jsBridge = jsBridge
 
             jsBridge.registerErrorListener(createErrorListener())
-            val config = JsBridgeConfig(xmlHttpRequestConfig = JsBridgeConfig.XMLHttpRequestConfig(true, okHttpClient))
+            val config = JsBridgeConfig(
+                xmlHttpRequestConfig = JsBridgeConfig.XMLHttpRequestConfig(true, okHttpClient),
+                consoleConfig = JsBridgeConfig.ConsoleConfig(true, JsBridgeConfig.ConsoleConfig.Mode.Empty, { _, _ -> Unit })
+            )
             jsBridge.start(config)
 
             // Map "jsToNativeFunctionMock" to JS as a global var "NativeFunctionMock"

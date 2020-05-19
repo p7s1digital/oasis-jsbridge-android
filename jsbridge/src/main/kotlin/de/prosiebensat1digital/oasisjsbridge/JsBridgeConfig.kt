@@ -39,7 +39,9 @@ data class JsBridgeConfig(
     data class ConsoleConfig(
         val enabled: Boolean,
         val mode: Mode,
-        val appendMessage: (priority: Int, message: String) -> Unit
+        val appendMessage: (priority: Int, message: String) -> Unit = { priority, message ->
+            Log.println(priority, "JavaScript", message)
+        }
     ) {
         enum class Mode {
             AsString, AsJson, Empty
@@ -56,7 +58,7 @@ data class JsBridgeConfig(
 
     data class JsDebuggerConfig(
         val enabled: Boolean,
-        val port: Int
+        val port: Int = 9092
     ) {
         companion object {
             val Default = JsDebuggerConfig(true, 9092)

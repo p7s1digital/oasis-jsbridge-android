@@ -47,7 +47,8 @@ JValue Void::pop() const {
 JValue Void::popArray(uint32_t count, bool expanded) const {
   expanded ? duk_pop_n(m_ctx, count) : duk_pop(m_ctx);
 
-  throw std::invalid_argument("Cannot pop an array of Void values!");
+  JObjectArrayLocalRef objectArray(m_jniContext, count, getJavaClass());
+  return JValue(objectArray);
 }
 
 duk_ret_t Void::push(const JValue &) const {
@@ -78,8 +79,14 @@ JValue Void::toJava(JSValueConst) const {
   return JValue();
 }
 
-JValue Void::toJavaArray(JSValueConst) const {
-  throw std::invalid_argument("Cannot transfer from JS to Java an array of Void values");
+JValue Void::toJavaArray(JSValueConst jsValue) const {
+  JSValue lengthValue = JS_GetPropertyStr(m_ctx, jsValue, "length");
+  assert(JS_IsNumber(lengthValue));
+  uint32_t count = JS_VALUE_GET_INT(lengthValue);
+  JS_FreeValue(m_ctx, lengthValue);
+
+  JObjectArrayLocalRef objectArray(m_jniContext, count, getJavaClass());
+  return JValue(objectArray);
 }
 
 JSValue Void::fromJava(const JValue &) const {

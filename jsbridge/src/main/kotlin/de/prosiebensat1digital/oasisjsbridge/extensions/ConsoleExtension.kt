@@ -43,14 +43,14 @@ interface JsonConsole : JsToNativeInterface {
 }
 
 interface EmptyConsole : JsToNativeInterface {
-    fun log()
-    fun debug()
-    fun assert()
-    fun trace()
-    fun info()
-    fun warn()
-    fun err()
-    fun exception()
+    fun log(vararg args: Unit)
+    fun debug(vararg args: Unit)
+    fun assert(assertion: Boolean, vararg args: Unit)
+    fun trace(vararg args: Unit)
+    fun info(vararg args: Unit)
+    fun warn(vararg args: Unit)
+    fun err(vararg args: Unit)
+    fun exception(vararg args: Unit)
 }
 
 class ConsoleExtension(
@@ -111,14 +111,14 @@ class ConsoleExtension(
 
     private fun createEmptyConsole(): JsValue {
         val consoleNativeObject = object: EmptyConsole {
-            override fun log() = Unit
-            override fun debug() = Unit
-            override fun trace() = Unit
-            override fun info() = Unit
-            override fun warn() = Unit
-            override fun err() = Unit
-            override fun exception() = Unit
-            override fun assert() = Unit
+            override fun log(vararg args: Unit) = Unit
+            override fun debug(vararg args: Unit) = Unit
+            override fun trace(vararg args: Unit) = Unit
+            override fun info(vararg args: Unit) = Unit
+            override fun warn(vararg args: Unit) = Unit
+            override fun err(vararg args: Unit) = Unit
+            override fun exception(vararg args: Unit) = Unit
+            override fun assert(assertion: Boolean, vararg args: Unit) = Unit
         }
 
         return JsValue.fromNativeObject(jsBridge, consoleNativeObject)
