@@ -71,7 +71,7 @@ android {
 
             externalNativeBuild {
                 cmake {
-                    arguments "-DFLAVOR=DUKTAPE", "-DJNI_LIB_NAME=$jniLibName", "-DCMAKE_BUILD_TYPE=Release"
+                    arguments "-DFLAVOR=DUKTAPE", "-DJNI_LIB_NAME=$jniLibName"//, "-DCMAKE_BUILD_TYPE=Release"
                 }
             }
         }
@@ -88,7 +88,7 @@ android {
 
             externalNativeBuild {
                 cmake {
-                    arguments "-DFLAVOR=QUICKJS", "-DJNI_LIB_NAME=$jniLibName", "-DCMAKE_BUILD_TYPE=Release"
+                    arguments "-DFLAVOR=QUICKJS", "-DJNI_LIB_NAME=$jniLibName"//, "-DCMAKE_BUILD_TYPE=Release"
                 }
             }
         }
