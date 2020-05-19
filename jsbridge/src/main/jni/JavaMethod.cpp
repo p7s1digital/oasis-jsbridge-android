@@ -153,7 +153,7 @@ JSValue JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRef<
 
   std::vector<JValue> args(m_argumentTypes.size());
 
-  // Load arguments off the stack and convert to Java types
+  // Load arguments and convert to Java types
   for (int i = 0; i < minArgs; ++i) {
     const auto &argumentType = m_argumentTypes[i];
     JValue value = argumentType->toJava(argv[i]);
@@ -166,9 +166,10 @@ JSValue JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRef<
     int varArgCount = argc - minArgs;
     JSValue varArgArray = JS_NewArray(ctx);
     for (int i = 0; i < varArgCount; ++i) {
-      JS_SetPropertyUint32(ctx, varArgArray, static_cast<uint32_t>(i), argv[minArgs + i]);
+      JS_SetPropertyUint32(ctx, varArgArray, static_cast<uint32_t>(i), JS_DupValue(ctx, argv[minArgs + i]));
     }
     args[args.size() - 1] = argumentType->toJavaArray(varArgArray);
+    JS_FreeValue(ctx, varArgArray);
   }
 
 
