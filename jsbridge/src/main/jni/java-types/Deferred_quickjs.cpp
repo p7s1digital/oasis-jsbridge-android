@@ -74,7 +74,7 @@ namespace {
       const JniContext *jniContext = jsBridgeContext->getJniContext();
       const JniCache *jniCache = jsBridgeContext->getJniCache();
 
-      JsException jsException(jsBridgeContext, argc > 0 ? *argv : JS_NULL);
+      JsException jsException(jsBridgeContext, argc > 0 ? JS_DupValue(ctx, *argv) : JS_NULL);
       JValue value(exceptionHandler->getJavaException(jsException));
 
       // Reject the native Deferred

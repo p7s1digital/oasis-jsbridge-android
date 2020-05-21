@@ -25,7 +25,6 @@
 #include "JavaScriptObject.h"
 #include "JniCache.h"
 #include "StackChecker.h"
-#include "custom_stringify.h"
 #include "log.h"
 #include "exceptions/JsException.h"
 #include "java-types/Deferred.h"

@@ -40,7 +40,7 @@ public:
 
   void pushError() const;
 #elif defined(QUICKJS)
-  JsException(const JsBridgeContext *, JSValueConst);
+  JsException(const JsBridgeContext *, JSValue);
 
   JSValueConst getValue() const { return m_value; }
 #endif

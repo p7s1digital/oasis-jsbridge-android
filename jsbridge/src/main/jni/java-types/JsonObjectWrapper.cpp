@@ -53,7 +53,7 @@ JValue JsonObjectWrapper::pop() const {
   }
 
   if (custom_stringify(m_ctx, -1) != DUK_EXEC_SUCCESS) {
-    duk_pop(m_ctx);
+    duk_remove(m_ctx, -2);
     throw getExceptionHandler()->getCurrentJsException();
   }
 
@@ -109,7 +109,6 @@ JValue JsonObjectWrapper::toJava(JSValueConst v) const {
 
   JSValue jsonValue = custom_stringify(m_ctx, v);
   if (JS_IsException(jsonValue)) {
-    JS_GetException(m_ctx);
     throw getExceptionHandler()->getCurrentJsException();
   }
 
