@@ -98,6 +98,24 @@ class ReadmeTest {
             val result3: Int = jsBridge.evaluate("1+2")  // suspending call
             println("result3 = $result3")
         }
+
+        // Exception handling
+        GlobalScope.launch {
+            try {
+                jsBridge.evaluate<Unit>("""
+                    |function buggy() {
+                    |  throw new Error('wrong')
+                    |}
+                    |buggy();
+                """.trimMargin())
+            } catch (jse: JsException) {
+                println("Exception: $jse")
+                println("Stacktrace: ${jse.stackTrace.asList()}")
+                // detailedMessage = wrong
+                // jsStackTrace = at buggy (eval:2)
+                //                at <eval> (eval:4)
+            }
+        }
     }
 
     interface JsToNativeApi: JsToNativeInterface
