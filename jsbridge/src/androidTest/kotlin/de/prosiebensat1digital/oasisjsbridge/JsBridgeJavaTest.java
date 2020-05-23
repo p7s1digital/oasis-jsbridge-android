@@ -15,7 +15,6 @@
  */
 package de.prosiebensat1digital.oasisjsbridge;
 
-import androidx.test.platform.app.InstrumentationRegistry;
 import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -121,9 +120,8 @@ public final class JsBridgeJavaTest {
     // ---
 
     private JsBridge createAndSetUpJsBridge() {
-        JsBridge jsBridge = new JsBridge(InstrumentationRegistry.getInstrumentation().getContext());
+        JsBridge jsBridge = new JsBridge(JsBridgeConfig.standardConfig());
         this.jsBridge = jsBridge;
-        jsBridge.start();
         return jsBridge;
     }
 }

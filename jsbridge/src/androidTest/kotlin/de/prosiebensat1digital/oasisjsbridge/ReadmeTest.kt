@@ -16,6 +16,7 @@
 package de.prosiebensat1digital.oasisjsbridge
 
 import androidx.test.platform.app.InstrumentationRegistry
+import kotlin.test.assertEquals
 import kotlinx.coroutines.*
 import org.junit.After
 import org.junit.Before
@@ -36,8 +37,7 @@ class ReadmeTest {
 
     @Before
     fun setUp() {
-        jsBridge = JsBridge(InstrumentationRegistry.getInstrumentation().context)
-        jsBridge.start()
+        jsBridge = JsBridge(JsBridgeConfig.standardConfig())
     }
 
     @After
@@ -52,33 +52,49 @@ class ReadmeTest {
 
     @Test
     fun testUsageMinimal() {
-        jsBridge.evaluateNoRetVal("console.log('Hello world!');")
+        runBlocking {
+            val msg: String = jsBridge.evaluate("'Hello world!'.toUpperCase()")
+            assertEquals(msg, "HELLO WORLD!")
+        }
+    }
+
+    interface JsApi : NativeToJsInterface {
+        suspend fun createMessage(): String
+        suspend fun calcSum(a: Int, b: Int): Int
+    }
+
+    interface NativeApi : JsToNativeInterface {
+        fun getPlatformName(): String
+        fun getTemperatureCelcius(): Deferred<Float>
     }
 
     @Test
     fun testUsageAdvanced() {
+        jsBridge.evaluateLocalFile(InstrumentationRegistry.getInstrumentation().context, "js/api.js")
+
+        // Implement native API
+        val nativeApi = object: NativeApi {
+            override fun getPlatformName() = "Android"
+            override fun getTemperatureCelcius() = GlobalScope.async {
+                // Getting current temperature from sensor or via network service
+                37.2f
+            }
+        }
+        val nativeApiJsValue = JsValue.fromNativeObject(jsBridge, nativeApi)
+
+        // Create JS API
+        val config = JsonObjectWrapper("debug" to true, "useFahrenheit" to false)  // {debug: true, useFahrenheit: false}
         runBlocking {
-            // Create a Kotlin proxy to a JS function
-            val helloJs: suspend (String) -> Unit = JsValue.newFunction(jsBridge, "s",
-                "console.log('Hello ' + s + '!');"
-            ).mapToNativeFunction1()
+            val createJsApi: suspend (JsValue, JsonObjectWrapper) -> JsValue
+                    = JsValue(jsBridge, "createApi").mapToNativeFunction2()  // JS: global.createApi(nativeApi, config)
+            val jsApi: JsApi = createJsApi(nativeApiJsValue, config).mapToNativeObject()
 
-            // Create a JS proxy to a Kotlin function
-            val toUpperCaseNative = JsValue.fromNativeFunction1(jsBridge) { s: String -> s.toUpperCase() }
+// Call JS API methods
+            val msg = jsApi.createMessage()  // (suspending) "Hello Android, the temperature is 37.2 degrees C."
+            val sum = jsApi.calcSum(3, 2)  // (suspending) 5
 
-            // Evaluate JS promise calling Kotlin function "toUpperCaseNative()"
-            // (suspend function call) -> returns "WORLD" after 1s timeout
-            val world: String = jsBridge.evaluate("""new Promise(function(resolve) {
-              setTimeout(function() {
-                resolve($toUpperCaseNative('world'));
-              }, 1000);
-            })""".trimIndent())
-
-            // Manually release the JsValue after usage (otherwise handled by garbage collector)
-            toUpperCaseNative.release()
-
-            // Call JS function "helloJs()" -> displays "Hello WORLD!"
-            helloJs(world)
+            assertEquals(msg, "Hello Android! The temperature is 37.2 degrees C.")
+            assertEquals(sum, 5)
         }
     }
 

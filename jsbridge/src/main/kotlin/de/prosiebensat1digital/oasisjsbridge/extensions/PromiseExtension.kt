@@ -1,4 +1,102 @@
 /*
+ * Copyright (C) 2019 ProSiebenSat1.Digital GmbH.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package de.prosiebensat1digital.oasisjsbridge.extensions
+
+import de.prosiebensat1digital.oasisjsbridge.*
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlin.reflect.typeOf
+
+@UseExperimental(ExperimentalStdlibApi::class)
+internal class PromiseExtension(
+    private val jsBridge: JsBridge,
+    val config: JsBridgeConfig.PromiseConfig
+) {
+    private var processPolyfillQueueJsValue: Deferred<JsValue>? = null
+    private var onUnhandledPromiseRejectedJsValue: JsValue? = null
+
+    init {
+        if (config.needsPolyfill) {
+            setUpPolyfill()
+        }
+    }
+
+    private fun setUpPolyfill() {
+        onUnhandledPromiseRejectedJsValue = JsValue.fromNativeFunction3(jsBridge) { json: JsonObjectWrapper, message: String, stacktrace: String ->
+            val e = JsBridgeError.UnhandledJsPromiseError(JsException(json.jsonString, message, stacktrace, null))
+            jsBridge.notifyErrorListeners(e)
+        }
+
+        jsBridge.evaluateNoRetVal(promiseJsCode)
+
+        // Detect unhandled Promise rejections
+        jsBridge.evaluateNoRetVal("""
+            Promise.unhandledRejection = function (args) {
+              if (args.event === 'reject') {
+                var value = args.reason;
+                var msg;
+                var stack;
+                if (value instanceof Error) {
+                  msg = value.message;
+                  json = Object.getOwnPropertyNames(value).reduce(function(acc, key) {
+                    acc[key] = value[key];
+                    return acc;
+                  }, {});
+                  stack = value.stack;
+                } else {
+                  msg = value;
+                  json = JSON.stringify(value);
+                }
+                $onUnhandledPromiseRejectedJsValue(json, msg, stack);
+              } else if (args.event === 'handle') {
+                //console.log('Previous unhandled rejection got handled:', args.reason);
+              }
+            };""".trimIndent()
+        )
+
+        val jsValue = JsValue.newFunction(jsBridge, "Promise.runQueue();")
+        processPolyfillQueueJsValue = jsBridge.async {
+            jsBridge.registerJsLambda(jsValue, listOf(typeOf<Unit>()), true)
+        }
+    }
+
+    fun release() {
+        onUnhandledPromiseRejectedJsValue = null
+    }
+
+    @UseExperimental(ExperimentalCoroutinesApi::class)
+    fun processPolyfillQueue() {
+        val processQueueJsValue = processPolyfillQueueJsValue ?: return
+        if (!processQueueJsValue.isCompleted) {
+            return
+        }
+
+        try {
+            jsBridge.callJsLambdaUnsafe(processQueueJsValue.getCompleted(), arrayOf(), false)
+        } catch (t: Throwable) {
+            val errorMessage = "Error while processing promise queue: ${t.message}"
+            val jsException = JsException(detailedMessage = errorMessage, jsStackTrace = null, cause = t)
+            jsBridge.notifyErrorListeners(JsBridgeError.UnhandledJsPromiseError(jsException))
+        }
+    }
+}
+
+const val promiseJsCode: String = """
+/*
  *  Taken from https://github.com/svaarala/duktape/blob/master/polyfills/promise.js
  *
  *  Minimal ES2015+ Promise polyfill
@@ -89,7 +187,7 @@
 
     // Helper for Duktape specific object compaction.
     var compact = (typeof Duktape === 'object' && Duktape.compact) ||
-                  function (v) { return v; };
+    function (v) { return v; };
 
     // Shared no-op function.
     var nop = function nop() {};
@@ -210,44 +308,44 @@
         };
         reject.prototype = null;  // drop .prototype object
         var resolve = function (val) {
-            if (new.target) { throw new TypeError('resolve is not constructable'); }
-            if (alreadyResolved) { return; }
-            alreadyResolved = true;  // neutralize resolve/reject
-            if (p.state !== void 0) { return; }
-            if (val === p) {
-                return doReject(p, new TypeError('self resolution'));
-            }
-            try {
-                var then = (val !== null && typeof val === 'object' &&
-                            val.then);
-                if (typeof then === 'function') {
-                    var t = createResolutionFunctions(p);
-                    var optimized = allowOptimization;
-                    if (optimized) {
-                        // XXX: this optimization may not be useful because the
-                        // job entry runs usually very quickly, and as part of
-                        // running the job, the resolve/reject function must be
-                        // created for the then() call.
-                        return enqueueJob({
-                            thenable: val,
-                            then: then,
-                            target: p
-                        });
-                    } else {
-                        return enqueueJob({
-                            thenable: val,
-                            then: then,
-                            resolve: t.resolve,
-                            reject: t.reject
-                        });
-                    }
-                    // old resolve/reject is neutralized, only new pair is live
+        if (new.target) { throw new TypeError('resolve is not constructable'); }
+        if (alreadyResolved) { return; }
+        alreadyResolved = true;  // neutralize resolve/reject
+        if (p.state !== void 0) { return; }
+        if (val === p) {
+        return doReject(p, new TypeError('self resolution'));
+    }
+        try {
+            var then = (val !== null && typeof val === 'object' &&
+            val.then);
+            if (typeof then === 'function') {
+                var t = createResolutionFunctions(p);
+                var optimized = allowOptimization;
+                if (optimized) {
+                    // XXX: this optimization may not be useful because the
+                    // job entry runs usually very quickly, and as part of
+                    // running the job, the resolve/reject function must be
+                    // created for the then() call.
+                    return enqueueJob({
+                        thenable: val,
+                        then: then,
+                        target: p
+                    });
+                } else {
+                    return enqueueJob({
+                        thenable: val,
+                        then: then,
+                        resolve: t.resolve,
+                        reject: t.reject
+                    });
                 }
-                return doFulfill(p, val);
-            } catch (e) {
-                return doReject(p, e);
+                // old resolve/reject is neutralized, only new pair is live
             }
-        };
+            return doFulfill(p, val);
+        } catch (e) {
+            return doReject(p, e);
+        }
+    };
         resolve.prototype = null;  // drop .prototype object
         return { resolve: resolve, reject: reject };
     }
@@ -317,8 +415,8 @@
             throw new TypeError('Promise must be called as a constructor');
         }
         if (typeof executor !== 'function') {
-            throw new TypeError('executor must be callable');
-        }
+        throw new TypeError('executor must be callable');
+    }
         var _this = this;
         def(this, promiseMarker, true, '');
         def(this, 'state', void 0);   // undefined (pending), true/false
@@ -428,61 +526,61 @@
         if (typeof onRejected !== 'function') { onRejected = 'Thrower'; }
 
         if (this.state === void 0) {  // pending
-            if (optimized) {
-                this.fulfillReactions.push({
+        if (optimized) {
+            this.fulfillReactions.push({
                     handler: onFulfilled,
                     target: p
-                });
-                this.rejectReactions.push({
+            });
+            this.rejectReactions.push({
                     handler: onRejected,
                     target: p
-                });
-            } else {
-                this.fulfillReactions.push({
+            });
+        } else {
+            this.fulfillReactions.push({
                     handler: onFulfilled,
                     resolve: resolveFn,
                     reject: rejectFn
-                });
-                this.rejectReactions.push({
+            });
+            this.rejectReactions.push({
                     handler: onRejected,
                     resolve: resolveFn,
                     reject: rejectFn
-                });
-            }
-        } else if (this.state) {  // fulfilled
-            if (optimized) {
-                enqueueJob({
-                    handler: onFulfilled,
-                    target: p,
-                    value: this.value
-                });
-            } else {
-                enqueueJob({
-                    handler: onFulfilled,
-                    resolve: resolveFn,
-                    reject: rejectFn,
-                    value: this.value
-                });
-            }
-        } else {  // rejected
-            if (!this.isHandled) {
-                rejectionTracker(this, 'handle');
-            }
-            if (optimized) {
-                enqueueJob({
-                    handler: onRejected,
-                    target: p,
-                    value: this.value
-                });
-            } else {
-                enqueueJob({
-                    handler: onRejected,
-                    resolve: resolveFn,
-                    reject: rejectFn,
-                    value: this.value
-                });
-            }
+            });
         }
+    } else if (this.state) {  // fulfilled
+        if (optimized) {
+            enqueueJob({
+                handler: onFulfilled,
+                target: p,
+                value: this.value
+            });
+        } else {
+            enqueueJob({
+                handler: onFulfilled,
+                resolve: resolveFn,
+                reject: rejectFn,
+                value: this.value
+            });
+        }
+    } else {  // rejected
+        if (!this.isHandled) {
+            rejectionTracker(this, 'handle');
+        }
+        if (optimized) {
+            enqueueJob({
+                handler: onRejected,
+                target: p,
+                value: this.value
+            });
+        } else {
+            enqueueJob({
+                handler: onRejected,
+                resolve: resolveFn,
+                reject: rejectFn,
+                value: this.value
+            });
+        }
+    }
         this.isHandled = true;
         return p;
     }
@@ -491,27 +589,27 @@
     // result to a target Promise unless its already settled.
     function optimizedThen(source, target) {
         if (source.state === void 0) {  // pending
-            source.fulfillReactions.push({
+        source.fulfillReactions.push({
                 target: target
-            });
-            source.rejectReactions.push({
+        });
+        source.rejectReactions.push({
                 target: target
-            });
-        } else if (source.state) {  // fulfilled
-            enqueueJob({
+        });
+    } else if (source.state) {  // fulfilled
+        enqueueJob({
                 target: target,
                 value: source.value
-            });
-        } else {  // rejected
-            if (!source.isHandled) {
-                rejectionTracker(source, 'handle');
-            }
-            enqueueJob({
+        });
+    } else {  // rejected
+        if (!source.isHandled) {
+            rejectionTracker(source, 'handle');
+        }
+        enqueueJob({
                 target: target,
                 value: source.value,
                 rejected: true
-            });
-        }
+        });
+    }
         source.isHandled = true;
     }
 
@@ -553,24 +651,24 @@
         // state does not.
 
         for (idx = 0; idx < cons.potentiallyUnhandled.length; idx++) {
-            var p = cons.potentiallyUnhandled[idx];
-            cons.potentiallyUnhandled[idx] = null;
+        var p = cons.potentiallyUnhandled[idx];
+        cons.potentiallyUnhandled[idx] = null;
 
-            // For consistency with hook calls from HostPromiseRejectionTracker
-            // errors from user callback are silently eaten.  If a process exit
-            // is desirable, user callback may call a custom native binding to
-            // do that ("process.exit(1)" or similar).
-            //
-            // Use a custom object argument convention for flexibility.
+        // For consistency with hook calls from HostPromiseRejectionTracker
+        // errors from user callback are silently eaten.  If a process exit
+        // is desirable, user callback may call a custom native binding to
+        // do that ("process.exit(1)" or similar).
+        //
+        // Use a custom object argument convention for flexibility.
 
-            if (p.unhandled === 1) {
-                safeCallUnhandledRejection({ promise: p, event: 'reject', reason: p.value });
-                def(p, 'unhandled', 2);
-            } else if (p.unhandled === 3) {
-                safeCallUnhandledRejection({ promise: p, event: 'handle', reason: p.value });
-                delete p.unhandled;
-            }
+        if (p.unhandled === 1) {
+            safeCallUnhandledRejection({ promise: p, event: 'reject', reason: p.value });
+            def(p, 'unhandled', 2);
+        } else if (p.unhandled === 3) {
+            safeCallUnhandledRejection({ promise: p, event: 'handle', reason: p.value });
+            delete p.unhandled;
         }
+    }
 
         cons.potentiallyUnhandled.length = 0;
 
@@ -607,3 +705,4 @@
         compact(this); compact(cons); compact(proto);
     }());
 }());
+"""

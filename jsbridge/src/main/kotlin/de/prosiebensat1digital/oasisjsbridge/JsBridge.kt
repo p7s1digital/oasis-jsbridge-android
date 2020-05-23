@@ -55,7 +55,9 @@ import timber.log.Timber
 // Note: all the public methods are asynchronous and will not block the caller threads. They
 // can be safely called in a "synchronous" way. though, because their executions are guaranteed
 // to be performed sequentially (via an internal queue).
-class JsBridge(context: Context): CoroutineScope {
+class JsBridge
+@JvmOverloads
+constructor(config: JsBridgeConfig): CoroutineScope {
 
     companion object {
         private const val CONSOLE_TAG = "JsBridgeConsole"
@@ -65,8 +67,6 @@ class JsBridge(context: Context): CoroutineScope {
     abstract class ErrorListener(val coroutineContext: CoroutineContext? = null) {
         abstract fun onError(error: JsBridgeError)
     }
-
-    internal val context = context.applicationContext
 
     // State
     private enum class State(val intValue: Int) {
@@ -92,72 +92,77 @@ class JsBridge(context: Context): CoroutineScope {
 
     // Extensions
     private var jsDebuggerExtension: JsDebuggerExtension? = null
-    private var promisePolyfillExtension: PromisePolyfillExtension? = null
+    private var promiseExtension: PromiseExtension? = null
     private var setTimeoutExtension: SetTimeoutExtension? = null
     private var consoleExtension: ConsoleExtension? = null
-    private var xmlHttpRequestExtension: XMLHttpRequestExtension? = null
+    private var xhrExtension: XMLHttpRequestExtension? = null
 
     private var internalCounter = AtomicInteger(0)
 
+    // Initialize the JS interpreter
+    // - create the JS context via JNI
+    // - set up the interpreter with polyfills and helpers (e.g. support for setTimeout)
     init {
         launch {
             jsThreadId = Thread.currentThread().id
         }
+
+        startReleaseLock.withLock {
+            Timber.d("Starting JsBridge")
+
+            // Pending -> AboutToStart
+            if (!state.compareAndSet(State.Pending.intValue, State.AboutToStart.intValue)) {
+                throw StartError(
+                    null,
+                    "Cannot start the JsBridge because its current state is $currentState"
+                )
+                    .also(::notifyErrorListeners)
+            }
+
+            launch {
+                // AboutToStart -> Starting
+                // From now on, a release() call is allowed to interrupt the start
+                if (!state.compareAndSet(State.AboutToStart.intValue, State.Starting.intValue)) {
+                    return@launch  // Start interrupted by a Destroy
+                }
+
+                try {
+                    val jniJsContext = createJniJsContext()
+
+                    if (this@JsBridge.jniJsContext != null) {
+                        throw InternalError("Cannot create a second JNI context!")
+                    }
+                    this@JsBridge.jniJsContext = jniJsContext
+                } catch (t: Throwable) {
+                    throw StartError(t)
+                }
+
+                if (state.compareAndSet(State.Starting.intValue, State.Started.intValue)) {
+                    Timber.d("JsBridge successfully started!")
+                }
+            }
+
+            // Extensions
+            if (config.jsDebuggerConfig.enabled)
+                jsDebuggerExtension = JsDebuggerExtension(this, config.jsDebuggerConfig)
+            if (config.promiseConfig.enabled)
+                promiseExtension = PromiseExtension(this@JsBridge, config.promiseConfig)
+            if (config.setTimeoutConfig.enabled)
+                setTimeoutExtension = SetTimeoutExtension(this@JsBridge)
+            if (config.consoleConfig.enabled)
+                consoleExtension = ConsoleExtension(this@JsBridge, config.consoleConfig)
+            if (config.xhrConfig.enabled)
+                xhrExtension = XMLHttpRequestExtension(this@JsBridge, config.xhrConfig)
+        }
+    }
+
+    protected fun finalize() {
+        release()
     }
 
 
     // Public methods
     // ---
-
-    // Start and initialize the JS interpreter
-    //
-    // - create the JS context via JNI
-    // - set up the interpreter with polyfills and helpers (e.g. support for setTimeout)
-    @JvmOverloads
-    fun start(config: JsBridgeConfig = JsBridgeConfig.Default): Unit = startReleaseLock.withLock {
-        Timber.d("Starting JsBridge")
-
-        // Pending -> AboutToStart
-        if (!state.compareAndSet(State.Pending.intValue, State.AboutToStart.intValue)) {
-            throw StartError(null, "Cannot start the JsBridge because its current state is $currentState")
-                .also(::notifyErrorListeners)
-        }
-
-        launch {
-            // AboutToStart -> Starting
-            // From now on, a release() call is allowed to interrupt the start
-            if (!state.compareAndSet(State.AboutToStart.intValue, State.Starting.intValue)) {
-                return@launch  // Start interrupted by a Destroy
-            }
-
-            try {
-                val jniJsContext = createJniJsContext()
-
-                if (this@JsBridge.jniJsContext != null) {
-                    throw InternalError("Cannot create a second JNI context!")
-                }
-                this@JsBridge.jniJsContext = jniJsContext
-            } catch (t: Throwable) {
-                throw StartError(t)
-            }
-
-            if (state.compareAndSet(State.Starting.intValue, State.Started.intValue)) {
-                Timber.d("JsBridge successfully started!")
-            }
-        }
-
-        // Extensions
-        if (config.jsDebuggerConfig.enabled)
-            jsDebuggerExtension = JsDebuggerExtension(this, config.jsDebuggerConfig)
-        if (config.promisePolyfillConfig.enabled)
-            promisePolyfillExtension = PromisePolyfillExtension(this@JsBridge)
-        if (config.setTimeoutConfig.enabled)
-            setTimeoutExtension = SetTimeoutExtension(this@JsBridge)
-        if (config.consoleConfig.enabled)
-            consoleExtension = ConsoleExtension(this@JsBridge, config.consoleConfig)
-        if (config.xmlHttpRequestConfig.enabled)
-            xmlHttpRequestExtension = XMLHttpRequestExtension(this@JsBridge, config.xmlHttpRequestConfig)
-    }
 
     // Destroy the JsBridge
     //
@@ -201,14 +206,14 @@ class JsBridge(context: Context): CoroutineScope {
             jsDebuggerExtension?.release()
             jsDebuggerExtension = null
 
-            promisePolyfillExtension?.release()
-            promisePolyfillExtension = null
+            promiseExtension?.release()
+            promiseExtension = null
 
             setTimeoutExtension?.release()
             setTimeoutExtension = null
 
-            xmlHttpRequestExtension?.release()
-            xmlHttpRequestExtension = null
+            xhrExtension?.release()
+            xhrExtension = null
 
             errorListeners.clear()
             jsDispatcher.close()
@@ -245,12 +250,12 @@ class JsBridge(context: Context): CoroutineScope {
     //
     // If the given file has a corresponding .max file, this one will be used in debug mode.
     // e.g.: "myfile.js" / "myfile.max.js"
-    fun evaluateLocalFile(filename: String, useMaxJs: Boolean = false) {
+    fun evaluateLocalFile(context: Context, filename: String, useMaxJs: Boolean = false) {
         launch {
             val jniJsContext = jniJsContextOrThrow()
 
             try {
-                val (inputStream, jsFileName) = getInputStream(filename, useMaxJs)
+                val (inputStream, jsFileName) = getInputStream(context, filename, useMaxJs)
                 val jsString = inputStream.bufferedReader().use { it.readText() }
                 jniEvaluateFileContent(jniJsContext, jsString, jsFileName)
                 Timber.d("-> $filename ($jsFileName) has been successfully evaluated!")
@@ -632,17 +637,16 @@ class JsBridge(context: Context): CoroutineScope {
 
     // Simulate a "Promise" tick. Needs to be manually triggered as we don't use an event loop.
     internal fun processPromiseQueue() {
+        val promiseExtension = promiseExtension ?: return
+
         checkJsThread()
 
-        val jniJsContext = jniJsContext ?: return
-
-        promisePolyfillExtension?.let { promisePolyfillExtension ->
-            promisePolyfillExtension.processQueue()
-            return
-        }
-
-        if (BuildConfig.HAS_BUILTIN_PROMISE) {
-            jniProcessPromiseQueue(jniJsContext)
+        if (promiseExtension.config.needsPolyfill) {
+            // Manually process promise queue of the polyfill
+            promiseExtension.processPolyfillQueue()
+        } else {
+            // Run pending jobs of the JS engine with built-in promise support
+            jniJsContext?.let { jniProcessPromiseQueue(it) }
         }
     }
 
@@ -693,7 +697,7 @@ class JsBridge(context: Context): CoroutineScope {
     }
 
     @Throws
-    private fun getInputStream(filename: String, useMaxJs: Boolean): Pair<InputStream, String> {
+    private fun getInputStream(context: Context, filename: String, useMaxJs: Boolean): Pair<InputStream, String> {
         if (filename.contains("""\.max\.js$""".toRegex())) {
             throw Throwable(".max.js file should not be directly set, use .js and set useMaxJs parameter to true instead!")
         }
@@ -799,7 +803,7 @@ class JsBridge(context: Context): CoroutineScope {
                 }
 
                 // Continue until it is the NativeToJsInterface
-                .takeIf { it !=  NativeToJsInterface::class }
+                .takeIf { it != NativeToJsInterface::class }
         }
 
         val methods = interfaces

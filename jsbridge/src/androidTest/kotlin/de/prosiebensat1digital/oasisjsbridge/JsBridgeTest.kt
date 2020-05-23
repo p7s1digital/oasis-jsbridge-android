@@ -15,6 +15,7 @@
  */
 package de.prosiebensat1digital.oasisjsbridge
 
+import android.content.Context
 import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
 import de.prosiebensat1digital.oasisjsbridge.JsBridgeError.*
@@ -75,6 +76,7 @@ interface JsExpectationsNativeApi : JsToNativeInterface {
 
 class JsBridgeTest {
     private var jsBridge: JsBridge? = null
+    private val context: Context = InstrumentationRegistry.getInstrumentation().context
     private val httpInterceptor = TestHttpInterceptor()
     private val okHttpClient = OkHttpClient.Builder().addInterceptor(httpInterceptor).build()
     private val jsToNativeFunctionMock = mockk<(p: Any) -> Unit>(relaxed = true)
@@ -108,22 +110,6 @@ class JsBridgeTest {
         }
 
         printErrors()
-    }
-
-    @Test
-    fun testStart() {
-        // WHEN
-        val subject = JsBridge(
-            InstrumentationRegistry.getInstrumentation().context
-        )
-        jsBridge = subject
-        subject.registerErrorListener(createErrorListener())
-        subject.start()
-
-        runBlocking { waitForDone(subject) }
-
-        // THEN
-        assertTrue(errors.isEmpty())
     }
 
     @Test
@@ -292,7 +278,7 @@ class JsBridgeTest {
         // androidTestDuktape asset file "test.js"
         // - content:
         // nativeFunctionMock("localFileString");
-        subject.evaluateLocalFile("js/test.js")
+        subject.evaluateLocalFile(context, "js/test.js")
 
         runBlocking { waitForDone(subject) }
 
@@ -307,7 +293,7 @@ class JsBridgeTest {
         val subject = createAndSetUpJsBridge()
 
         // WHEN
-        subject.evaluateLocalFile("non-existing/file.js")
+        subject.evaluateLocalFile(context, "non-existing/file.js")
 
         runBlocking { waitForDone(subject) }
 
@@ -323,7 +309,7 @@ class JsBridgeTest {
         val subject = createAndSetUpJsBridge()
 
         // WHEN
-        subject.evaluateLocalFile("js/test_with_error.js")
+        subject.evaluateLocalFile(context, "js/test_with_error.js")
 
         runBlocking { waitForDone(subject) }
 
@@ -895,10 +881,10 @@ class JsBridgeTest {
     }
 
     private fun stressTestHelper() {
-        val subject = JsBridge(InstrumentationRegistry.getInstrumentation().context)
-
-        val config = JsBridgeConfig(xmlHttpRequestConfig = JsBridgeConfig.XMLHttpRequestConfig(true, okHttpClient))
-        subject.start(config)
+        val config = JsBridgeConfig.standardConfig().apply {
+            xhrConfig.okHttpClient = okHttpClient
+        }
+        val subject = JsBridge(config)
 
         val jsExpectations = JsExpectations()
         val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
@@ -1246,9 +1232,10 @@ class JsBridgeTest {
             }
         }
 
-        val subject = JsBridge(InstrumentationRegistry.getInstrumentation().context)
-        val config = JsBridgeConfig(xmlHttpRequestConfig = JsBridgeConfig.XMLHttpRequestConfig(true, okHttpClient))
-        subject.start(config)
+        val config = JsBridgeConfig.standardConfig().apply {
+            xhrConfig.okHttpClient = okHttpClient
+        }
+        val subject = JsBridge(config)
 
         val jsExpectations = JsExpectations()
         val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
@@ -1928,18 +1915,15 @@ class JsBridgeTest {
     fun testConsole_asString() {
         // GIVEN
         val messages = mutableListOf<Pair<Int, String>>()
-        val config = JsBridgeConfig(
-            consoleConfig = JsBridgeConfig.ConsoleConfig(
-                enabled = true,
-                mode = JsBridgeConfig.ConsoleConfig.Mode.AsString,
-                appendMessage = { priority, message ->
-                    messages.add(priority to message)
-                }
-            )
-        )
-        val subject = JsBridge(InstrumentationRegistry.getInstrumentation().context)
+        val config = JsBridgeConfig.bareConfig().apply {
+            consoleConfig.enabled = true
+            consoleConfig.mode = JsBridgeConfig.ConsoleConfig.Mode.AsString
+            consoleConfig.appendMessage = { priority, message ->
+                messages.add(priority to message)
+            }
+        }
+        val subject = JsBridge(config)
         jsBridge = subject
-        subject.start(config)
 
         // WHEN
         val js = """
@@ -1969,18 +1953,15 @@ class JsBridgeTest {
     fun testConsole_asJson() {
         // GIVEN
         val messages = mutableListOf<Pair<Int, String>>()
-        val config = JsBridgeConfig(
-            consoleConfig = JsBridgeConfig.ConsoleConfig(
-                enabled = true,
-                mode = JsBridgeConfig.ConsoleConfig.Mode.AsJson,
-                appendMessage = { priority, message ->
-                    messages.add(priority to message)
-                }
-            )
-        )
-        val subject = JsBridge(InstrumentationRegistry.getInstrumentation().context)
+        val config = JsBridgeConfig.bareConfig().apply {
+            consoleConfig.enabled = true
+            consoleConfig.mode = JsBridgeConfig.ConsoleConfig.Mode.AsJson
+            consoleConfig.appendMessage = { priority, message ->
+                messages.add(priority to message)
+            }
+        }
+        val subject = JsBridge(config)
         jsBridge = subject
-        subject.start(config)
 
         // WHEN
         val js = """
@@ -2010,18 +1991,15 @@ class JsBridgeTest {
     fun testConsole_empty() {
         // GIVEN
         var hasMessage = false
-        val config = JsBridgeConfig(
-            consoleConfig = JsBridgeConfig.ConsoleConfig(
-                enabled = true,
-                mode = JsBridgeConfig.ConsoleConfig.Mode.Empty,
-                appendMessage = { _, _ ->
-                    hasMessage = true
-                }
-            )
-        )
-        val subject = JsBridge(InstrumentationRegistry.getInstrumentation().context)
+        val config = JsBridgeConfig.bareConfig().apply {
+            consoleConfig.enabled = true
+            consoleConfig.mode = JsBridgeConfig.ConsoleConfig.Mode.Empty
+            consoleConfig.appendMessage = { priority, message ->
+                hasMessage = true
+            }
+        }
+        val subject = JsBridge(config)
         jsBridge = subject
-        subject.start(config)
 
         // WHEN
         val js = """
@@ -2084,15 +2062,14 @@ class JsBridgeTest {
     // ---
 
     private fun createAndSetUpJsBridge(): JsBridge {
-        return JsBridge(InstrumentationRegistry.getInstrumentation().context).also { jsBridge ->
+        val config = JsBridgeConfig.standardConfig().apply {
+            xhrConfig.okHttpClient = okHttpClient
+        }
+
+        return JsBridge(config).also { jsBridge ->
             this@JsBridgeTest.jsBridge = jsBridge
 
             jsBridge.registerErrorListener(createErrorListener())
-            val config = JsBridgeConfig(
-                xmlHttpRequestConfig = JsBridgeConfig.XMLHttpRequestConfig(true, okHttpClient),
-                consoleConfig = JsBridgeConfig.ConsoleConfig(true, JsBridgeConfig.ConsoleConfig.Mode.Empty, { _, _ -> Unit })
-            )
-            jsBridge.start(config)
 
             // Map "jsToNativeFunctionMock" to JS as a global var "NativeFunctionMock"
             JsValue.fromNativeFunction1(jsBridge, jsToNativeFunctionMock).assignToGlobal("nativeFunctionMock")
