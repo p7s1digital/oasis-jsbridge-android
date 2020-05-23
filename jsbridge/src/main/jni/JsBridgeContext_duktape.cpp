@@ -94,11 +94,6 @@ void JsBridgeContext::init(JniContext *jniContext, const JniLocalRef<jobject> &j
   duk_push_pointer(m_ctx, this);
   duk_put_prop_string(m_ctx, -2, JSBRIDGE_CPP_CLASS_PROP_NAME);
   duk_pop(m_ctx);
-
-  // Set global + window (TODO)
-  // See also https://wiki.duktape.org/howtoglobalobjectreference
-  static const char *str1 = "var global = this; var window = this; window.open = function() {};\n";
-  duk_eval_string_noresult(m_ctx, str1);
 }
 
 void JsBridgeContext::startDebugger(int port) {

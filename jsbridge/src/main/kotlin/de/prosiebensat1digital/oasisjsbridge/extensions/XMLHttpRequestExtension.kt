@@ -40,7 +40,7 @@ internal class XMLHttpRequestExtension(
     }
 
     fun release() {
-        jsBridge.evaluateNoRetVal("""delete global["XMLHttpRequestExtension_send_native"]""")
+        jsBridge.evaluateNoRetVal("""delete globalThis["XMLHttpRequestExtension_send_native"]""")
     }
 
     private fun nativeSend(httpMethod: String, url: String, headers: JsonObjectWrapper, data: String?, cb: (JsonObjectWrapper, String, String) -> Unit) {
@@ -357,5 +357,6 @@ XMLHttpRequest.prototype.overrideMimeType = function() {
   // TODO
 };
 
-global.XMLHttpRequest = XMLHttpRequest;
+globalThis.XMLHttpRequest = XMLHttpRequest;
 """
+

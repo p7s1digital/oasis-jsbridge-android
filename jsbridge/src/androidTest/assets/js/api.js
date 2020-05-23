@@ -1,4 +1,4 @@
-global.createApi = function(nativeApi, config) {
+globalThis.createApi = function(nativeApi, config) {
   return {
     createMessage: function(name) {
       const platformName = nativeApi.getPlatformName();
