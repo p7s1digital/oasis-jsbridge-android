@@ -3,18 +3,18 @@ package de.prosiebensat1digital.oasisjsbridge
 import android.util.Log
 import okhttp3.OkHttpClient
 
-data class JsBridgeConfig(
-    val setTimeoutConfig: SetTimeoutExtensionConfig = SetTimeoutExtensionConfig.Default,
-    val xmlHttpRequestConfig: XMLHttpRequestConfig = XMLHttpRequestConfig.Default,
-    val promisePolyfillConfig: PromisePolyfillConfig = PromisePolyfillConfig.Default,
-    val consoleConfig: ConsoleConfig = ConsoleConfig.Default,
-    val jsDebuggerConfig: JsDebuggerConfig = JsDebuggerConfig.Default
-) {
-    data class SetTimeoutExtensionConfig(
-        val enabled: Boolean
-    ) {
-        companion object {
-            val Default = SetTimeoutExtensionConfig(true)
+class JsBridgeConfig
+private constructor() {
+    companion object {
+        @JvmStatic
+        fun bareConfig() = JsBridgeConfig()
+
+        @JvmStatic
+        fun standardConfig() = JsBridgeConfig().apply {
+            setTimeoutConfig.enabled = true
+            xhrConfig.enabled = true
+            promiseConfig.enabled = true
+            consoleConfig.enabled = true
         }
     }
 

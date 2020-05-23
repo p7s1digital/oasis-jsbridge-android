@@ -155,6 +155,7 @@ JavaTypeId JavaTypeProvider::getJavaTypeId(const JniRef<jsBridgeParameter> &para
 
   JavaTypeId id = getJavaTypeIdByJavaName(javaName.getUtf16View());
   if (id == JavaTypeId::Unknown) {
+    // TODO: check if implements NativeToJsInterface or JsToNativeInterface
     throw std::invalid_argument(std::string("Unsupported Java type: ") + javaName.toUtf8Chars());
   }
 
