@@ -148,7 +148,7 @@ class ReadmeTest {
             val sum: Int = jsBridge.evaluate("$calcSumJs(2, 3)")
             println("Sum is $sum")
 
-            jsBridge.evaluate<Unit>("global['nativeApi'] = $nativeObjectJs")
+            jsBridge.evaluate<Unit>("globalThis['nativeApi'] = $nativeObjectJs")
         }
 
         nativeObjectJs.assignToGlobal("nativeApi")

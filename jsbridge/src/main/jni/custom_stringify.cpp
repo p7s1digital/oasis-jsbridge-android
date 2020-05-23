@@ -18,7 +18,7 @@
 static const char *customStringifyJs = R"(
 // Custom stringify which probably handles Error instances
 // See https://stackoverflow.com/questions/18391212/is-it-not-possible-to-stringify-an-error-using-json-stringify
-global.__jsBridge__stringify = function(value) {
+globalThis.__jsBridge__stringify = function(value) {
   if (value === undefined) return "";
 
   var replaceErrors = function(_key, value) {

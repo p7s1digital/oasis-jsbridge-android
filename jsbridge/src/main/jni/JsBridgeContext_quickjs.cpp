@@ -80,12 +80,6 @@ void JsBridgeContext::init(JniContext *jniContext, const JniLocalRef<jobject> &j
   JS_SetPropertyStr(m_ctx, globalObj, JSBRIDGE_CPP_CLASS_PROP_NAME, cppWrapperObj);
   // No JS_FreeValue(m_ctx, cppWrapperObj) after JS_SetPropertyStr()
   JS_FreeValue(m_ctx, globalObj);
-
-  // Set global + window (TODO)
-  // See also https://wiki.duktape.org/howtoglobalobjectreference
-  static const char *str1 = "var global = this; var window = this; window.open = function() {};\n";
-  JSValue e = JS_Eval(m_ctx, str1, strlen(str1), "JsBridgeContext.cpp", 0);
-  JS_FreeValue(m_ctx, e);
 }
 
 void JsBridgeContext::startDebugger(int /*port*/) {

@@ -293,7 +293,7 @@ duk_ret_t Deferred::push(const JValue &value) const {
   // new Promise(promiseFunction)
   if (!duk_get_global_string(m_ctx, "Promise")) {
     duk_pop_2(m_ctx);  // (undefined) "Promise" + promiseFunction
-    throw std::invalid_argument("Cannot push Deferred: global.Promise is undefined");
+    throw std::invalid_argument("Cannot push Deferred: globalThis.Promise is undefined");
   }
   duk_dup(m_ctx, -2 /*promiseFunction*/);
   duk_new(m_ctx, 1);  // [... "Promise" promiseFunction] => [... Promise]

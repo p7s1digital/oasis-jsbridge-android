@@ -297,7 +297,7 @@ interface NativeApi : JsToNativeInterface {
 
 JavaScript (js/api.js):
 ```js
-global.createApi = function(nativeApi, config) {
+globalThis.createApi = function(nativeApi, config) {
   return {
     createMessage: function(name) {
       const platformName = nativeApi.getPlatformName();
@@ -332,7 +332,7 @@ val nativeApiJsValue = JsValue.fromNativeObject(jsBridge, nativeApi)
 // Create JS API
 val config = JsonObjectWrapper("debug" to true, "useFahrenheit" to false)  // {debug: true, useFahrenheit: false}
 val createJsApi: suspend (JsValue, JsonObjectWrapper) -> JsValue
-    = JsValue(jsBridge, "createApi").mapToNativeFunction2()  // JS: global.createApi(nativeApi, config)
+    = JsValue(jsBridge, "createApi").mapToNativeFunction2()  // JS: globalThis.createApi(nativeApi, config)
 val jsApi: JsApi = createJsApi(nativeApiJsValue, config).mapToNativeObject()
 
 // Call JS API methods

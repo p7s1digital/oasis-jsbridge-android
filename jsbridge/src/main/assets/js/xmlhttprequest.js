@@ -216,4 +216,4 @@ XMLHttpRequest.prototype.overrideMimeType = function() {
   // TODO
 };
 
-global.XMLHttpRequest = XMLHttpRequest;
+globalThis.XMLHttpRequest = XMLHttpRequest;

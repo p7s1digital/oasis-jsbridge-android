@@ -204,7 +204,7 @@ internal constructor(
     // the JsValue instance exists. If the string is evaluated after JsValue has been garbage-collected,
     // the JS variable returned by toString() will be deleted before the evaluation!
     // To ensure that a JsValue still exists, you can for example use JsValue.hold()
-    override fun toString() = """global["$associatedJsName"]"""
+    override fun toString() = """globalThis["$associatedJsName"]"""
 
     override fun equals(other: Any?): Boolean {
         if (other !is JsValue) return false
@@ -218,7 +218,11 @@ internal constructor(
     }
 
     fun assignToGlobal(globalName: String) {
-        jsBridge?.copyJsValue(globalName, this@JsValue)
+        jsBridge?.launch {
+            codeEvaluationDeferred?.await()
+            jsBridge?.evaluate<Unit>("""globalThis["$globalName"] = $associatedJsName;""")  // TODO: via jniCopyJsValue
+            this@JsValue.hold()
+        }
     }
 
     @UseExperimental(ExperimentalStdlibApi::class)
