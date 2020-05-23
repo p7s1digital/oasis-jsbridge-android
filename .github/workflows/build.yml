@@ -2,9 +2,9 @@ name: build
 
 on:
   push:
-    branches: [master]
-  pull_request
-  tags
+    #- branches: [master]
+    #- tags:
+  pull_request:
 
 jobs:
   jvm:
