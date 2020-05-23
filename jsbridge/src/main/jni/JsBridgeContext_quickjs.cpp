@@ -264,7 +264,6 @@ JValue JsBridgeContext::callJsLambda(const std::string &strFunctionName,
 }
 
 void JsBridgeContext::assignJsValue(const std::string &strGlobalName, const JStringLocalRef &strCode) {
-
   JSValue v = JS_Eval(m_ctx, strCode.toUtf8Chars(), strCode.utf8Length(), strGlobalName.c_str(), 0);
   strCode.releaseChars();  // release chars now as we don't need them anymore
 
@@ -275,6 +274,21 @@ void JsBridgeContext::assignJsValue(const std::string &strGlobalName, const JStr
   JSValue globalObj = JS_GetGlobalObject(m_ctx);
   JS_SetPropertyStr(m_ctx, globalObj, strGlobalName.c_str(), v);
   // No JS_FreeValue(m_ctx, v) after JS_SetPropertyStr()
+  JS_FreeValue(m_ctx, globalObj);
+}
+
+void JsBridgeContext::deleteJsValue(const std::string &strGlobalName) {
+  JSValue globalObj = JS_GetGlobalObject(m_ctx);
+  JSAtom atom = JS_NewAtom(m_ctx, strGlobalName.c_str());
+  JS_DeleteProperty(m_ctx, globalObj, atom, 0);
+  JS_FreeAtom(m_ctx, atom);
+  JS_FreeValue(m_ctx, globalObj);
+}
+
+void JsBridgeContext::copyJsValue(const std::string &strGlobalNameTo, const std::string &strGlobalNameFrom) {
+  JSValue globalObj = JS_GetGlobalObject(m_ctx);
+  JSValue valueFrom = JS_GetPropertyStr(m_ctx, globalObj, strGlobalNameFrom.c_str());
+  JS_SetPropertyStr(m_ctx, globalObj, strGlobalNameTo.c_str(), valueFrom);
   JS_FreeValue(m_ctx, globalObj);
 }
 

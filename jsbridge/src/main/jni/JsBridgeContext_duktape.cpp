@@ -349,6 +349,23 @@ void JsBridgeContext::assignJsValue(const std::string &strGlobalName, const JStr
   duk_put_global_string(m_ctx, strGlobalName.c_str());
 }
 
+void JsBridgeContext::deleteJsValue(const std::string &strGlobalName) {
+  CHECK_STACK(m_ctx);
+
+  duk_push_global_object(m_ctx);
+  duk_del_prop_string(m_ctx, -1, strGlobalName.c_str());
+  duk_pop(m_ctx);
+}
+
+void JsBridgeContext::copyJsValue(const std::string &strGlobalNameTo, const std::string &strGlobalNameFrom) {
+  CHECK_STACK(m_ctx);
+
+  duk_push_global_object(m_ctx);
+  duk_get_prop_string(m_ctx, -1, strGlobalNameFrom.c_str());
+  duk_put_prop_string(m_ctx, -2, strGlobalNameTo.c_str());
+  duk_pop(m_ctx);
+}
+
 void JsBridgeContext::newJsFunction(const std::string &strGlobalName, const JObjectArrayLocalRef &args, const JStringLocalRef &strCode) {
   CHECK_STACK(m_ctx);
 

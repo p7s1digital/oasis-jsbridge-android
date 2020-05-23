@@ -211,7 +211,7 @@ internal constructor(
         }
 
         //Timber.v("Deleting JsValue $associatedJsName")
-        jsBridge.evaluateNoRetVal("delete $this;")  // TODO: jniDeleteJsValue
+        jsBridge.deleteJsValue(this)
     }
 
     // Return the associated JS name. Please be aware that the variable is only valid as long as
@@ -228,18 +228,11 @@ internal constructor(
     override fun hashCode(): Int = associatedJsName.hashCode()
 
     fun copyTo(other: JsValue) {
-        other.codeEvaluationDeferred = jsBridge?.async {
-            jsBridge?.evaluate<Unit>("$other = $associatedJsName;")  // TODO: via jniCopyJsValue
-            this@JsValue.hold()
-        }
+        jsBridge?.copyJsValue(other.associatedJsName, this@JsValue)
     }
 
     fun assignToGlobal(globalName: String) {
-        jsBridge?.launch {
-            codeEvaluationDeferred?.await()
-            jsBridge?.evaluate<Unit>("""global["$globalName"] = $associatedJsName;""")  // TODO: via jniCopyJsValue
-            this@JsValue.hold()
-        }
+        jsBridge?.copyJsValue(globalName, this@JsValue)
     }
 
     @UseExperimental(ExperimentalStdlibApi::class)
