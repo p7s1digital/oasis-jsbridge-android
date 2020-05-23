@@ -71,6 +71,8 @@ public:
                               bool awaitJsPromise);
 
   void assignJsValue(const std::string &strGlobalName, const JStringLocalRef &strCode);
+  void deleteJsValue(const std::string &strGlobalName);
+  void copyJsValue(const std::string &strGlobalNameTo, const std::string &strGlobalNameFrom);
   void newJsFunction(const std::string &strGlobalName, const JObjectArrayLocalRef &args, const JStringLocalRef &strCode);
 
   void convertJavaValueToJs(const std::string &strGlobalName, const JniLocalRef<jobject> &javaValue, const JniLocalRef<jsBridgeParameter> &parameter);

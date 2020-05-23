@@ -18445,8 +18445,7 @@ JSValue JS_CallConstructor(JSContext *ctx, JSValueConst func_obj,
                                       JS_CALL_FLAG_COPY_ARGV);
 }
 
-JSValue JS_Invoke(JSContext *ctx, JSValueConst this_val, JSAtom atom,
-                  int argc, JSValueConst *argv)
+JSValue JS_Invoke(JSContext *ctx, JSValueConst this_val, JSAtom atom, int argc, JSValueConst *argv)
 {
     JSValue func_obj;
     func_obj = JS_GetProperty(ctx, this_val, atom);

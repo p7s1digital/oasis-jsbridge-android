@@ -507,7 +507,7 @@ class JsBridge(context: Context): CoroutineScope {
             val jniJsContext = jniJsContextOrThrow()
 
             jsValue.codeEvaluationDeferred?.await()
-            jniEvaluateString(jniJsContext, "$lambdaJsValue = $jsValue", null, false)  // TODO: jniCopyJsValue
+            jniCopyJsValue(jniJsContext, lambdaJsValue.associatedJsName, jsValue.associatedJsName)
             jniRegisterJsLambda(jniJsContext, lambdaJsValue.associatedJsName, method)
             Timber.v("Registered JS lambda ${lambdaJsValue.associatedJsName}")
             lambdaJsValue.hold()
@@ -600,19 +600,6 @@ class JsBridge(context: Context): CoroutineScope {
             val jniJsContext = jniJsContextOrThrow()
             jniAssignJsValue(jniJsContext, jsValue.associatedJsName, jsCode)
         }
-    }
-
-    @PublishedApi
-    internal fun convertJavaValueToJs(value: Any?, parameter: Parameter): JsValue {
-        val suffix = internalCounter.incrementAndGet()
-        val jsValue = JsValue(this)
-
-        jsValue.codeEvaluationDeferred = async {
-            val jniJsContext = jniJsContextOrThrow()
-            jniConvertJavaValueToJs(jniJsContext, jsValue.associatedJsName, value, parameter)
-        }
-
-        return jsValue
     }
 
     internal fun deleteJsValue(jsValue: JsValue) {
@@ -861,22 +848,6 @@ class JsBridge(context: Context): CoroutineScope {
     }
 
     @Suppress("UNUSED")  // Called from JNI
-    // TODO: put console-related code into a separate extension
-    private fun consoleLogHelper(logType: String, str: String) {
-        checkJsThread()
-
-        val tree = Timber.tag(CONSOLE_TAG)
-
-        when (logType) {
-            "d" -> tree.d(str)
-            "i" -> tree.i(str)
-            "w" -> tree.w(str)
-            "e" -> tree.e(str)
-            else -> Timber.w("Unsupported console log type ($logType) for message: $str")
-        }
-    }
-
-    @Suppress("UNUSED")  // Called from JNI
     private fun onDebuggerPending() {
         checkJsThread()
 
@@ -1016,6 +987,8 @@ class JsBridge(context: Context): CoroutineScope {
     private external fun jniCallJsMethod(context: Long, objectName: String, javaMethod: JavaMethod, args: Array<Any?>, awaitJsPromise: Boolean): Any?
     private external fun jniCallJsLambda(context: Long, objectName: String, args: Array<Any?>, awaitJsPromise: Boolean): Any?
     private external fun jniAssignJsValue(context: Long, globalName: String, jsCode: String)
+    private external fun jniDeleteJsValue(context: Long, globalName: String)
+    private external fun jniCopyJsValue(context: Long, globalNameTo: String, globalNameFrom: String)
     private external fun jniNewJsFunction(context: Long, globalName: String, functionArgs: Array<String>, jsCode: String)
     private external fun jniConvertJavaValueToJs(context: Long, globalName: String, value: Any?, parameter: Parameter)
     private external fun jniCompleteJsPromise(context: Long, id: String, isFulfilled: Boolean, value: Any)
