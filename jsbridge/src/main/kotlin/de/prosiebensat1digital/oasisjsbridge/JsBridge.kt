@@ -92,10 +92,10 @@ constructor(config: JsBridgeConfig): CoroutineScope {
 
     // Extensions
     private var jsDebuggerExtension: JsDebuggerExtension? = null
-    private var promisePolyfillExtension: PromisePolyfillExtension? = null
+    private var promiseExtension: PromiseExtension? = null
     private var setTimeoutExtension: SetTimeoutExtension? = null
     private var consoleExtension: ConsoleExtension? = null
-    private var xmlHttpRequestExtension: XMLHttpRequestExtension? = null
+    private var xhrExtension: XMLHttpRequestExtension? = null
 
     private var internalCounter = AtomicInteger(0)
 
@@ -156,6 +156,10 @@ constructor(config: JsBridgeConfig): CoroutineScope {
         }
     }
 
+    protected fun finalize() {
+        release()
+    }
+
 
     // Public methods
     // ---
@@ -202,14 +206,14 @@ constructor(config: JsBridgeConfig): CoroutineScope {
             jsDebuggerExtension?.release()
             jsDebuggerExtension = null
 
-            promisePolyfillExtension?.release()
-            promisePolyfillExtension = null
+            promiseExtension?.release()
+            promiseExtension = null
 
             setTimeoutExtension?.release()
             setTimeoutExtension = null
 
-            xmlHttpRequestExtension?.release()
-            xmlHttpRequestExtension = null
+            xhrExtension?.release()
+            xhrExtension = null
 
             errorListeners.clear()
             jsDispatcher.close()
@@ -624,24 +628,12 @@ constructor(config: JsBridgeConfig): CoroutineScope {
 
         checkJsThread()
 
-<<<<<<< HEAD
-        val jniJsContext = jniJsContext ?: return
-
-        promisePolyfillExtension?.let { promisePolyfillExtension ->
-            promisePolyfillExtension.processQueue()
-            return
-        }
-
-        if (BuildConfig.HAS_BUILTIN_PROMISE) {
-            jniProcessPromiseQueue(jniJsContext)
-=======
         if (promiseExtension.config.needsPolyfill) {
             // Manually process promise queue of the polyfill
             promiseExtension.processPolyfillQueue()
         } else {
             // Run pending jobs of the JS engine with built-in promise support
             jniJsContext?.let { jniProcessPromiseQueue(it) }
->>>>>>> 2a0c2f6... Refactored JsBridgeConfig and more API simplifications
         }
     }
 

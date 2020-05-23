@@ -30,6 +30,12 @@ internal class PromiseExtension(
     private var onUnhandledPromiseRejectedJsValue: JsValue? = null
 
     init {
+        if (config.needsPolyfill) {
+            setUpPolyfill()
+        }
+    }
+
+    private fun setUpPolyfill() {
         onUnhandledPromiseRejectedJsValue = JsValue.fromNativeFunction3(jsBridge) { json: JsonObjectWrapper, message: String, stacktrace: String ->
             val e = JsBridgeError.UnhandledJsPromiseError(JsException(json.jsonString, message, stacktrace, null))
             jsBridge.notifyErrorListeners(e)

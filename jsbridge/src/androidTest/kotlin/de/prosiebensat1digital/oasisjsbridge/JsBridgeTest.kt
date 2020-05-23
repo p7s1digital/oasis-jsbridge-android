@@ -1232,9 +1232,10 @@ class JsBridgeTest {
             }
         }
 
-        val subject = JsBridge(InstrumentationRegistry.getInstrumentation().context)
-        val config = JsBridgeConfig(xmlHttpRequestConfig = JsBridgeConfig.XMLHttpRequestConfig(true, okHttpClient))
-        subject.start(config)
+        val config = JsBridgeConfig.standardConfig().apply {
+            xhrConfig.okHttpClient = okHttpClient
+        }
+        val subject = JsBridge(config)
 
         val jsExpectations = JsExpectations()
         val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
