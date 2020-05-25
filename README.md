@@ -338,7 +338,7 @@ val sum = jsApi.calcSum(3, 2)  // (suspending) 5
 ## License
 
 ```
-Copyright (C) 2018-2019 ProSiebenSat1.Digital GmbH
+Copyright (C) 2018-2020 ProSiebenSat1.Digital GmbH
 🏝 Oasis Player team
 
 Licensed under the Apache License, Version 2.0 (the "License");
