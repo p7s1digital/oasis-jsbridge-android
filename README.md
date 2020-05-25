@@ -157,17 +157,17 @@ interface JsApi : NativeToJsInterface {
     suspend fun method2(c: Double): String
 }
 
-val jsObject = JsValue(bridge, """({
+val jsObject = JsValue(jsBridge, """({
   method1: function(a, b) { /*...*/ },
   method2: function(c) { return "Value: " + c; }
 })""")
 
-val jsApi = jsObject.mapToNativeObject()  // no check
-val jsApi = jsObject.mapToNativeObject(check = true)  // suspending, optionally check that all methods are defined in the JS object
-val jsApi = jsObject.mapToNativeObjectBlocking(check = true)  // blocking (with optional check)
+val jsApi: JsApi = jsObject.mapToNativeObject()  // no check
+val jsApi: JsApi = jsObject.mapToNativeObject(check = true)  // suspending, optionally check that all methods are defined in the JS object
+val jsApi: JsApi = jsObject.mapToNativeObjectBlocking(check = true)  // blocking (with optional check)
 
 jsApi.method1(1, "two")
-val s = jsApi.method2(3.456)  // blocking
+val s = jsApi.method2(3.456)  // suspending
 ```
 
 See [Example](#example-consuming-a-js-api-from-kotlin).

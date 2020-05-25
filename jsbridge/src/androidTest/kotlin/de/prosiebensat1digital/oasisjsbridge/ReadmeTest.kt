@@ -51,11 +51,121 @@ class ReadmeTest {
     }
 
     @Test
-    fun testUsageMinimal() {
+    fun testHelloWorld() {
         runBlocking {
             val msg: String = jsBridge.evaluate("'Hello world!'.toUpperCase()")
-            assertEquals(msg, "HELLO WORLD!")
+            println(msg)  // HELLO WORLD!
         }
+    }
+
+    @Test
+    fun testEvaluation() {
+        // Without return value:
+        jsBridge.evaluateNoRetVal("console.log('hello');")
+        jsBridge.evaluateLocalFile(InstrumentationRegistry.getInstrumentation().context, "js/file.js")  // Android asset
+
+        runBlocking {
+            // With return value:
+            val sum1: Int = jsBridge.evaluate("1+2")  // suspending call
+            val sum2: Int = jsBridge.evaluate("new Promise(function(resolve) { resolve(1+2); })")  // suspending call (JS promise)
+            val msg: String = jsBridge.evaluate("'message'.toUpperCase()")  // suspending call
+            val obj: JsonObjectWrapper =
+                jsBridge.evaluate("({one: 1, two: 'two'})")  // suspending call (wrapped JS object via JSON)
+
+            // Blocking evaluation:
+            val result1: Int = jsBridge.evaluateBlocking("1+2")  // generic type inferred
+            val result2 = jsBridge.evaluateBlocking<Int>("1+2")  // with explicit generic type
+
+            // Exception handling:
+            try {
+                jsBridge.evaluate<Unit>("""
+                  |function buggy() { throw new Error('wrong') }
+                  |buggy();
+                """.trimMargin())
+            } catch (jse: JsException) {
+                // jse.message = "wrong"
+                // jse.stackTrace = [JavaScript.buggy(eval:1), JavaScript.<eval>(eval:2), ....JsBridge.jniEvaluateString(Native Method), ...]
+            }
+        }
+    }
+
+    @Test
+    fun testJsValue() {
+        runBlocking {
+            val jsInt1 = JsValue(jsBridge, "123")
+            val jsInt2 = JsValue.fromNativeValue(jsBridge, 123)
+            val jsString1 = JsValue(jsBridge, "'hello'.toUpperCase()")
+            val jsString2 = JsValue.fromNativeValue(jsBridge, "HELLO")
+            val jsObject1 = JsValue(jsBridge, "({one: 1, two: 'two'})")
+            val jsObject2 = JsValue.fromNativeValue(jsBridge, JsonObjectWrapper("one" to 1, "two" to "two"))
+            val calcSumJs1 = JsValue(jsBridge, "(function(a, b) { return a + b; })")
+            val calcSumJs2 = JsValue.newFunction(jsBridge, "a", "b", "return a + b;")
+            val calcSumJs3 = JsValue.fromNativeFunction2(jsBridge) { a: Int, b: Int -> a + b }
+
+            val sum: Int = jsBridge.evaluate("$calcSumJs1(2, 3)")
+
+            val s1 = jsString1.evaluate<String>()  // suspending function + explicit generic parameter
+            val s2: String = jsString1.evaluate()  // suspending function + inferred generic parameter
+            val s3: String = jsString1.evaluateBlocking()  // blocking
+        }
+    }
+
+    interface JsApi1 : NativeToJsInterface {
+        fun method1(a: Int, b: String)
+        suspend fun method2(c: Double): String
+    }
+
+    @Test
+    fun testJsObjectsFromKotlin() {
+        val jsObject = JsValue(jsBridge, """({
+          method1: function(a, b) { /*...*/ },
+          method2: function(c) { return "Value: " + c; }
+        })""")
+
+        val jsApi1: JsApi1 = jsObject.mapToNativeObject()  // no check
+        runBlocking {
+            val jsApi2: JsApi1 = jsObject.mapToNativeObject(check = true)  // suspending, optionally check that all methods are defined in the JS object
+        }
+        val jsApi3: JsApi1 = jsObject.mapToNativeObjectBlocking(check = true)  // blocking (with optional check)
+
+        jsApi1.method1(1, "two")
+        runBlocking {
+            val s = jsApi1.method2(3.456)  // suspending
+        }
+    }
+
+    interface NativeApi1 : JsToNativeInterface {
+        fun method(a: Int, b: String): Double
+    }
+
+    @Test
+    fun testKotlinObjectsFromJs() {
+        val obj = object : NativeApi1 {
+            override fun method(a: Int, b: String): Double { return 123.456 }
+        }
+
+        val nativeApi: JsValue = JsValue.fromNativeObject(jsBridge, obj)
+
+        jsBridge.evaluateNoRetVal("globalThis.x = $nativeApi.method(1, 'two');")
+    }
+
+    @Test
+    fun testJsFunctionFromKotlin() {
+        val calcSumJs: suspend (Int, Int) -> Int = JsValue.newFunction(jsBridge, "a", "b", """
+          return a + b;
+          """.trimIndent()
+        ).mapToNativeFunction2()
+
+        println("Sum is $calcSumJs(1, 2)")
+    }
+
+    @Test
+    fun testKotlinFunctionFromJs() {
+        val calcSumNative = JsValue.fromNativeFunction2(jsBridge) { a: Int, b: Int -> a + b }
+
+        jsBridge.evaluateNoRetVal("""
+          console.log("Sum is", $calcSumNative(1, 2));
+          """.trimIndent())
     }
 
     interface JsApi : NativeToJsInterface {
@@ -89,7 +199,7 @@ class ReadmeTest {
                     = JsValue(jsBridge, "createApi").mapToNativeFunction2()  // JS: global.createApi(nativeApi, config)
             val jsApi: JsApi = createJsApi(nativeApiJsValue, config).mapToNativeObject()
 
-// Call JS API methods
+            // Call JS API methods
             val msg = jsApi.createMessage()  // (suspending) "Hello Android, the temperature is 37.2 degrees C."
             val sum = jsApi.calcSum(3, 2)  // (suspending) 5
 
@@ -98,88 +208,11 @@ class ReadmeTest {
         }
     }
 
-    @Test
-    fun testEvaluation() {
-        // Without return value:
-        jsBridge.evaluateNoRetVal("console.log('hello');")
-
-        // Blocking evaluation
-        val result1: Int = jsBridge.evaluateBlocking("1+2")  // generic type inferred
-        println("result1 = $result1")
-        val result2 = jsBridge.evaluateBlocking<Int>("1+2")  // with explicit generic type
-        println("result2 = $result2")
-
-        // Via coroutines:
-        GlobalScope.launch {
-            val result3: Int = jsBridge.evaluate("1+2")  // suspending call
-            println("result3 = $result3")
-        }
-
-        // Exception handling
-        GlobalScope.launch {
-            try {
-                jsBridge.evaluate<Unit>("""
-                    |function buggy() {
-                    |  throw new Error('wrong')
-                    |}
-                    |buggy();
-                """.trimMargin())
-            } catch (jse: JsException) {
-                println("Exception: $jse")
-                println("Stacktrace: ${jse.stackTrace.asList()}")
-                // detailedMessage = wrong
-                // jsStackTrace = at buggy (eval:2)
-                //                at <eval> (eval:4)
-            }
-        }
-    }
-
-    interface JsToNativeApi: JsToNativeInterface
-
-    @Test
-    fun testJsValue() {
-        val jsValue1 = JsValue(jsBridge)
-        val jsValue2 = JsValue(jsBridge, "'hello'.toUpperCase()")
-        val calcSumJs = JsValue.newFunction(jsBridge, "a", "b", "return a + b;")
-        val nativeFunctionJs = JsValue.fromNativeFunction2(jsBridge) { a: Int, b: Int -> a + b }
-        val nativeObjectJs = JsValue.fromNativeObject(jsBridge, object: JsToNativeApi {})
-
-        runBlocking {
-            val sum: Int = jsBridge.evaluate("$calcSumJs(2, 3)")
-            println("Sum is $sum")
-
-            jsBridge.evaluate<Unit>("globalThis['nativeApi'] = $nativeObjectJs")
-        }
-
-        nativeObjectJs.assignToGlobal("nativeApi")
-    }
-
-    @Test
-    fun testKotlinToJsFunction() {
-        val calcSumJs: suspend (Int, Int) -> Int = JsValue.newFunction(jsBridge, "a", "b", """
-          return a + b;
-          """.trimIndent()
-        ).mapToNativeFunction2()
-
-        println("Sum is $calcSumJs(1, 2)")
-    }
-
-    @Test
-    fun testJsToKotlinFunction() {
-        val calcSumNative = JsValue.fromNativeFunction2(jsBridge) { a: Int, b: Int -> a + b }
-
-        jsBridge.evaluateNoRetVal("""
-          console.log("Sum is", $calcSumNative(1, 2));
-          """.trimIndent())
-    }
-
     // Wait until the JS queue is empty
     private suspend fun waitForDone(jsBridge: JsBridge) {
         try {
             withContext(jsBridge.coroutineContext) {
                 // ensure that triggered coroutines are processed
-                yield()
-                yield()
                 yield()
             }
         } catch (e: CancellationException) {
