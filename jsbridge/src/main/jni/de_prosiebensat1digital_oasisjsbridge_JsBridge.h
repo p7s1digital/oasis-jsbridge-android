@@ -67,6 +67,9 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCa
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniNewJsFunction
 (JNIEnv *, jobject, jlong, jstring, jobjectArray, jstring);
 
+JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniConvertJavaValueToJs
+    (JNIEnv *, jobject, jlong, jstring, jobject, jobject);
+
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCompleteJsPromise
     (JNIEnv *, jobject, jlong, jstring, jboolean, jobject);
 

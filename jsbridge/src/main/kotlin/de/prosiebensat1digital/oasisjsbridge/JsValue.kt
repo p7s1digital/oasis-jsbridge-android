@@ -55,7 +55,6 @@ internal constructor(
     val jsBridge: JsBridge? get() = jsBridgeRef.get()
 
     internal var codeEvaluationDeferred: Deferred<Unit>?
-        private set
 
     init {
         codeEvaluationDeferred = jsCode?.let {
@@ -158,6 +157,20 @@ internal constructor(
         @UseExperimental(ExperimentalStdlibApi::class)
         inline fun <reified P1, reified P2, reified P3, reified P4, reified P5, reified P6, reified P7, reified P8, reified P9, reified R> fromNativeFunction9(jsBridge: JsBridge, noinline func: (p1: P1, p2: P2, p3: P3, p4: P4, p5: P5, p6: P6, p7: P7, p8: P8, p9: P9) -> R): JsValue {
             return jsBridge.registerJsToNativeFunction(func, listOf(typeOf<P1>(), typeOf<P2>(), typeOf<P3>(), typeOf<P4>(), typeOf<P5>(), typeOf<P6>(), typeOf<P7>(), typeOf<P8>(), typeOf<P9>(), typeOf<R>()))
+        }
+
+
+        // Convert native value to JSValue
+        // ---
+
+        @UseExperimental(ExperimentalStdlibApi::class)
+        inline fun <reified T> fromNativeValue(jsBridge: JsBridge, nativeValue: T): JsValue {
+            return jsBridge.convertJavaValueToJs(nativeValue, Parameter(typeOf<T>()))
+        }
+
+        @JvmStatic
+        fun fromNativeValue(jsBridge: JsBridge, nativeValue: Any, javaClass: Class<*>): JsValue {
+            return jsBridge.convertJavaValueToJs(nativeValue, Parameter(javaClass))
         }
 
 

@@ -293,6 +293,25 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniNe
   }
 }
 
+JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniConvertJavaValueToJs
+    (JNIEnv *env, jobject, jlong lctx, jstring globalName, jobject javaValue, jobject parameter) {
+
+  //alog("jniConvertJavaValueToJs()");
+
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
+  auto jniContext = jsBridgeContext->getJniContext();
+
+  std::string strGlobalName = JStringLocalRef(jniContext, globalName, JniLocalRefMode::Borrowed).toUtf8Chars();
+  JniLocalRef<jobject> javaValueRef(jniContext, javaValue, JniLocalRefMode::Borrowed);
+  JniLocalRef<jsBridgeParameter> parameterRef(jniContext, parameter, JniLocalRefMode::Borrowed);
+
+  try {
+    jsBridgeContext->convertJavaValueToJs(strGlobalName, javaValueRef, parameterRef);
+  } catch (const std::exception &e) {
+    jsBridgeContext->getExceptionHandler()->jniThrow(e);
+  }
+}
+
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCompleteJsPromise
     (JNIEnv *env, jobject, jlong lctx, jstring id, jboolean isFulfilled, jobject value) {
 

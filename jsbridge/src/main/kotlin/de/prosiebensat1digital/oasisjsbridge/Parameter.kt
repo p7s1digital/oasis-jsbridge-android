@@ -21,6 +21,7 @@ import kotlin.reflect.full.memberFunctions
 // Represents a (reflected) function parameter (or return value) with its (optional) name based on:
 // - (ideally) Kotlin KParameter or KType which has the (full) reflection info
 // - Java Class which has the reflection info without generic type info
+@PublishedApi
 internal open class Parameter private constructor(
     internal val kotlinType: KType?,
     private val javaClass: Class<*>?,

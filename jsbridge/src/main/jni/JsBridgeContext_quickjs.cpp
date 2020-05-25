@@ -311,6 +311,21 @@ void JsBridgeContext::newJsFunction(const std::string &strGlobalName, const JObj
   JS_FreeValue(m_ctx, globalObj);
 }
 
+void JsBridgeContext::convertJavaValueToJs(const std::string &strGlobalName, const JniLocalRef<jobject> &javaValue, const JniLocalRef<jsBridgeParameter> &parameter) {
+
+  auto type = m_javaTypeProvider.makeUniqueType(parameter, true /*boxed*/);
+
+  JSValue value = type->fromJava(JValue(javaValue));
+  if (JS_IsException(value)) {
+    throw m_exceptionHandler->getCurrentJsException();
+  }
+
+  JSValue globalObj = JS_GetGlobalObject(m_ctx);
+  JS_SetPropertyStr(m_ctx, globalObj, strGlobalName.c_str(), value);
+  // No JS_FreeValue(m_ctx, value) after JS_SetPropertyStr
+  JS_FreeValue(m_ctx, globalObj);
+}
+
 void JsBridgeContext::processPromiseQueue() {
   JSContext *ctx1;
   int err;
