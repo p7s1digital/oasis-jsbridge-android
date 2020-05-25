@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 
 // Support for setTimeout() and setInterval()
-class SetTimeoutExtension(private val jsBridge: JsBridge) {
+internal class SetTimeoutExtension(private val jsBridge: JsBridge) {
     private val setTimeoutHelperJs: JsValue
     private val activeTimers = mutableSetOf<String>()
     private var timerCounter = 0

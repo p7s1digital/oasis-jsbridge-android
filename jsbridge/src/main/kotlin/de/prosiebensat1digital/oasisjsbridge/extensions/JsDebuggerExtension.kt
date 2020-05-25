@@ -29,7 +29,7 @@ import java.math.BigInteger
 import java.net.InetAddress
 import java.nio.ByteOrder
 
-class JsDebuggerExtension(
+internal class JsDebuggerExtension(
     private val jsBridge: JsBridge,
     val config: JsBridgeConfig.JsDebuggerConfig
 ) {

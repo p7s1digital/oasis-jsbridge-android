@@ -20,7 +20,7 @@ import de.prosiebensat1digital.oasisjsbridge.*
 
 // Still missing: trace functionality (currently: alias to debug)
 
-interface StringConsole : JsToNativeInterface {
+internal interface StringConsole : JsToNativeInterface {
     fun log(vararg args: DebugString)
     fun debug(vararg args: DebugString)
     fun assert(assertion: Boolean, vararg args: DebugString)
@@ -31,7 +31,7 @@ interface StringConsole : JsToNativeInterface {
     fun exception(vararg args: DebugString)
 }
 
-interface JsonConsole : JsToNativeInterface {
+internal interface JsonConsole : JsToNativeInterface {
     fun log(vararg args: JsonObjectWrapper)
     fun debug(vararg args: JsonObjectWrapper)
     fun assert(assertion: Boolean, vararg args: JsonObjectWrapper)
@@ -42,7 +42,7 @@ interface JsonConsole : JsToNativeInterface {
     fun exception(vararg args: JsonObjectWrapper)
 }
 
-interface EmptyConsole : JsToNativeInterface {
+internal interface EmptyConsole : JsToNativeInterface {
     fun log(vararg args: Unit)
     fun debug(vararg args: Unit)
     fun assert(assertion: Boolean, vararg args: Unit)
@@ -53,7 +53,7 @@ interface EmptyConsole : JsToNativeInterface {
     fun exception(vararg args: Unit)
 }
 
-class ConsoleExtension(
+internal class ConsoleExtension(
     private val jsBridge: JsBridge,
     val config: JsBridgeConfig.ConsoleConfig
 ) {

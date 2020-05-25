@@ -1,3 +1,3 @@
 package de.prosiebensat1digital.oasisjsbridge
 
-class DebugString(val string: String)
+internal class DebugString(val string: String)

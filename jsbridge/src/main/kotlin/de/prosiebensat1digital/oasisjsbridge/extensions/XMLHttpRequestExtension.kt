@@ -24,7 +24,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.*
 import timber.log.Timber
 
-class XMLHttpRequestExtension(
+internal class XMLHttpRequestExtension(
     private val jsBridge: JsBridge,
     val config: JsBridgeConfig.XMLHttpRequestConfig
 ) {
