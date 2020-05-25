@@ -1,7 +1,4 @@
 Features:
-- test exceptions:
-  * array too large (how?)
-- JsValue.fromNativeValue<T: Any?>(v: T)
 - Support for @Serializable objects
 - Small app for performance tests
 

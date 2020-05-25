@@ -107,10 +107,15 @@ Note: the JS code is evaluated in a dedicated "JS" thread.
 A JsValue is a reference to any JS value.
 
 ```kotlin
+val jsInt = JsValue(jsBridge, "123")
+val jsInt = JsValue.fromNativeValue(jsBridge, 123)
 val jsString = JsValue(jsBridge, "'hello'.toUpperCase()")
+val jsString = JsValue.fromNativeValue(jsBridge, "HELLO")
 val jsObject = JsValue(jsBridge, "({one: 1, two: 'two'})")
+val jsObject = JsValue.fromNativeValue(jsBridge, JsonObjectWrapper("one" to 1, "two" to "two"))
 val calcSumJs = JsValue(jsBridge, "(function(a, b) { return a + b; })")
 val calcSumJs = JsValue.newFunction(jsBridge, "a", "b", "return a + b;")
+val calcSumJs = JsValue.fromNativeFunction2(jsBridge) { a: Int, b: Int -> a + b }
 ```
 
 It has an associated (global) JS variable whose name can be accessed via `toString()` which makes it easy to re-use it from JS code.<br/>

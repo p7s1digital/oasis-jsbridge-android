@@ -73,6 +73,8 @@ public:
   void assignJsValue(const std::string &strGlobalName, const JStringLocalRef &strCode);
   void newJsFunction(const std::string &strGlobalName, const JObjectArrayLocalRef &args, const JStringLocalRef &strCode);
 
+  void convertJavaValueToJs(const std::string &strGlobalName, const JniLocalRef<jobject> &javaValue, const JniLocalRef<jsBridgeParameter> &parameter);
+
   void processPromiseQueue();
 
   JniContext *getJniContext() { return m_jniContext; }

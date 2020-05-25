@@ -377,6 +377,14 @@ void JsBridgeContext::newJsFunction(const std::string &strGlobalName, const JObj
   duk_put_global_string(m_ctx, strGlobalName.c_str());
 }
 
+void JsBridgeContext::convertJavaValueToJs(const std::string &strGlobalName, const JniLocalRef<jobject> &javaValue, const JniLocalRef<jsBridgeParameter> &parameter) {
+
+  auto type = m_javaTypeProvider.makeUniqueType(parameter, true /*boxed*/);
+
+  type->push(JValue(javaValue));
+  duk_put_global_string(m_ctx, strGlobalName.c_str());
+}
+
 void JsBridgeContext::processPromiseQueue() {
   // No built-in promise
 }

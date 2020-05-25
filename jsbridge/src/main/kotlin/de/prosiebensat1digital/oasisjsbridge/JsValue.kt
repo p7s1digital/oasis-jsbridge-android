@@ -55,7 +55,6 @@ internal constructor(
     val jsBridge: JsBridge? get() = jsBridgeRef.get()
 
     internal var codeEvaluationDeferred: Deferred<Unit>?
-        private set
 
     init {
         codeEvaluationDeferred = jsCode?.let {

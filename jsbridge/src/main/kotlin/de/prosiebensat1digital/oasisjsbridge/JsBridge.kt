@@ -534,7 +534,6 @@ class JsBridge(context: Context): CoroutineScope {
     }
 
     // Call a JS lambda registered via registerJsLambda()
-    // TODO: optimize and avoid context switch when it can directly run (when already in JS thread...)
     @PublishedApi
     internal suspend fun callJsLambda(lambdaJsValue: JsValue, args: Array<Any?>, awaitJsPromise: Boolean): Any? {
         return withContext(coroutineContext) {
@@ -600,6 +599,34 @@ class JsBridge(context: Context): CoroutineScope {
         return async {
             val jniJsContext = jniJsContextOrThrow()
             jniAssignJsValue(jniJsContext, jsValue.associatedJsName, jsCode)
+        }
+    }
+
+    @PublishedApi
+    internal fun convertJavaValueToJs(value: Any?, parameter: Parameter): JsValue {
+        val suffix = internalCounter.incrementAndGet()
+        val jsValue = JsValue(this)
+
+        jsValue.codeEvaluationDeferred = async {
+            val jniJsContext = jniJsContextOrThrow()
+            jniConvertJavaValueToJs(jniJsContext, jsValue.associatedJsName, value, parameter)
+        }
+
+        return jsValue
+    }
+
+    internal fun deleteJsValue(jsValue: JsValue) {
+        val globalName = jsValue.associatedJsName
+
+        launch {
+            jniJsContext?.let { jniDeleteJsValue(it, globalName) }
+        }
+    }
+
+    internal fun copyJsValue(globalNameTo: String, jsValueFrom: JsValue) {
+        launch {
+            jsValueFrom.codeEvaluationDeferred?.await()
+            jniJsContext?.let { jniCopyJsValue(it, globalNameTo, jsValueFrom.associatedJsName) }
         }
     }
 
@@ -990,6 +1017,7 @@ class JsBridge(context: Context): CoroutineScope {
     private external fun jniCallJsLambda(context: Long, objectName: String, args: Array<Any?>, awaitJsPromise: Boolean): Any?
     private external fun jniAssignJsValue(context: Long, globalName: String, jsCode: String)
     private external fun jniNewJsFunction(context: Long, globalName: String, functionArgs: Array<String>, jsCode: String)
+    private external fun jniConvertJavaValueToJs(context: Long, globalName: String, value: Any?, parameter: Parameter)
     private external fun jniCompleteJsPromise(context: Long, id: String, isFulfilled: Boolean, value: Any)
     private external fun jniProcessPromiseQueue(context: Long)
 
