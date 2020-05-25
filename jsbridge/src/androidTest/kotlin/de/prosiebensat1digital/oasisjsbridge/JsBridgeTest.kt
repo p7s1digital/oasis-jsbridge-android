@@ -1304,7 +1304,7 @@ class JsBridgeTest {
 
 
         // WHEN
-        val jsApi: TestJsApiInterfaceWithSuspend = testJsApi.mapToNativeObjectBlocking()
+        val jsApi: TestJsApiInterfaceWithSuspend = testJsApi.mapToNativeObject()
         runBlocking {
             jsApi.jsMethodWithString("Hello JS!")
 
@@ -1405,7 +1405,7 @@ class JsBridgeTest {
         assertNotNull(arr)
 
         // WHEN
-        val jsApi: TestJsApiInterface = testJsApi.mapToNativeObjectBlocking()
+        val jsApi: TestJsApiInterface = testJsApi.mapToNativeObject()
         jsApi.jsMethodWithString("Hello JS!")
         jsApi.jsMethodWithJsonObjects(obj, arr)
         val jsValueParam = JsValue(subject, "\"This is a JS value\"")
