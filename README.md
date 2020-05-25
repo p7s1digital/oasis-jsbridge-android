@@ -1,5 +1,8 @@
 🏝 Oasis JsBridge
-===============
+=================
+
+![jitpack](https://jitpack.io/v/p7s1digital/oasis-jsbridge-android.svg)
+![build](https://github.com/p7s1digital/oasis-jsbridge-android/workflows/build/badge.svg)
 
 Evaluate JavaScript code and map values, objects and functions between Kotlin/Java and JavaScript on Android.
 
