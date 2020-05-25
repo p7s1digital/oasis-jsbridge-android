@@ -144,7 +144,7 @@ class JsBridgeTest {
         // THEN
         val stringEvaluationError = errors.singleOrNull() as? JsStringEvaluationError
         assertNotNull(stringEvaluationError)
-        assertEquals(stringEvaluationError.js, js)
+        assertEquals(js, stringEvaluationError.js)
     }
 
     @Test
@@ -178,8 +178,8 @@ class JsBridgeTest {
         }
 
         // THEN
-        assertEquals(jsException1.message?.contains("invalid"), true)
-        assertEquals(jsException1.message, jsException2.message)
+        assertEquals(true, jsException1.message?.contains("invalid"))
+        assertEquals(jsException2.message, jsException1.message)
         assertTrue(errors.isEmpty())
     }
 
@@ -193,25 +193,35 @@ class JsBridgeTest {
             assertNull(subject.evaluate("null"))
             assertNull(subject.evaluate("undefined"))
 
-            assertEquals(subject.evaluate("\"1.5+1\""), "1.5+1")  // String
-            assertEquals(subject.evaluate("1.5+1"), 2)  // Int
-            assertEquals(subject.evaluate("1.5+1"), 2L)  // Long
-            assertEquals(subject.evaluate("1.5+1"), 2.5)  // Double
-            assertEquals(subject.evaluate("1.5+1"), 2.5f)  // Float
+            assertEquals("1.5+1", subject.evaluate("\"1.5+1\""))  // String
+            assertEquals(2, subject.evaluate("1.5+1"))  // Int
+            assertEquals(2L, subject.evaluate("1.5+1"))  // Long
+            assertEquals(2.5, subject.evaluate("1.5+1"))  // Double
+            assertEquals(2.5f, subject.evaluate("1.5+1"))  // Float
+
+            // Throwing undefined from JS
+            val exceptionFromUndefined: JsException = assertFailsWith { subject.evaluate("throw undefined;") }
+            assertEquals("undefined", exceptionFromUndefined.message)
+            assertEquals("", exceptionFromUndefined.jsonValue)
+
+            // Throwing null from JS
+            val exceptionFromNull: JsException = assertFailsWith { subject.evaluate("throw null;") }
+            assertEquals("null", exceptionFromNull.message)
+            assertEquals("null", exceptionFromNull.jsonValue)
 
             // Throwing string from JS
             val exceptionFromString: JsException = assertFailsWith { subject.evaluate("""throw "Error string";""") }
-            assertEquals(exceptionFromString.message, "Error string")
-            assertEquals(exceptionFromString.jsonValue, "\"Error string\"")
+            assertEquals("Error string", exceptionFromString.message)
+            assertEquals("\"Error string\"", exceptionFromString.jsonValue)
 
             // Throwing Error from JS
             val exceptionFromError: JsException = assertFailsWith { subject.evaluate("""throw new Error("Error message");""") }
-            assertEquals(exceptionFromError.message?.contains("Error message"), true)
-            assertEquals(exceptionFromError.jsonValue?.toPayload(), """{message: "Error message"}""".toPayload())
+            assertEquals(true, exceptionFromError.message?.contains("Error message"))
+            assertEquals("""{message: "Error message"}""".toPayload(), exceptionFromError.jsonValue?.toPayload())
 
             // Throwing Object from JS
             val exceptionFromObject: JsException = assertFailsWith { subject.evaluate("""throw {message: "Error object", hint: "Just a test"};""") }
-            assertEquals(exceptionFromObject.jsonValue?.toPayload(), """{message: "Error object", hint: "Just a test"}""".toPayload())
+            assertEquals("""{message: "Error object", hint: "Just a test"}""".toPayload(), exceptionFromObject.jsonValue?.toPayload())
 
             // Pending promise
             val resolveFuncJsValue = JsValue(subject)
@@ -220,51 +230,51 @@ class JsBridgeTest {
 
             // Resolve pending promise
             subject.evaluateNoRetVal("$resolveFuncJsValue(69);")
-            assertEquals(jsPromise.await(), 69)
+            assertEquals(69, jsPromise.await())
 
             // Resolved promise
-            assertEquals(subject.evaluate("new Promise(function(resolve) { resolve(123); });"), 123)
-            assertEquals(subject.evaluate<Deferred<Int>>("new Promise(function(resolve) { resolve(123); });").await(), 123)
+            assertEquals(123, subject.evaluate("new Promise(function(resolve) { resolve(123); });"))
+            assertEquals(123, subject.evaluate<Deferred<Int>>("new Promise(function(resolve) { resolve(123); });").await())
 
             // Rejected promise
             val jsPromiseException: JsException = assertFailsWith {
                 subject.evaluate<Int>("new Promise(function(resolve, reject) { reject(new Error('JS test error')); });")
             }
             val jsPromiseErrorPayload = jsPromiseException.jsonValue?.toPayloadObject()
-            assertEquals(jsPromiseErrorPayload?.getString("message"), "JS test error")
+            assertEquals("JS test error", jsPromiseErrorPayload?.getString("message"))
 
             // Array
-            assertArrayEquals(subject.evaluate<Array<String>>("""["a", "b", "c"]"""), arrayOf("a", "b", "c"))  // Array<String>
-            assertArrayEquals(subject.evaluate("""[true, false, true]"""), booleanArrayOf(true, false, true))  // BooleanArray
+            assertArrayEquals(arrayOf("a", "b", "c"), subject.evaluate<Array<String>>("""["a", "b", "c"]"""))  // Array<String>
+            assertArrayEquals(booleanArrayOf(true, false, true), subject.evaluate("""[true, false, true]"""))  // BooleanArray
             assertArrayEquals(subject.evaluate<Array<Boolean>>("""[true, false, true]"""), arrayOf(true, false, true))  // Array<Boolean>
-            assertArrayEquals(subject.evaluate("""[1.0, 2.2, 3.8]"""), intArrayOf(1, 2, 3))  // IntArray
-            assertArrayEquals(subject.evaluate<Array<Int>>("""[1.0, 2.2, 3.8]"""), arrayOf(1, 2, 3))  // Array<Int>
-            assertArrayEquals(subject.evaluate("""[1.0, 2.2, 3.8]"""), longArrayOf(1L, 2L, 3L))  // LongArray
-            assertArrayEquals(subject.evaluate<Array<Long>>("""[1.0, 2.2, 3.8]"""), arrayOf(1L, 2L, 3L))  // Array<Long>
+            assertArrayEquals(intArrayOf(1, 2, 3), subject.evaluate("""[1.0, 2.2, 3.8]"""))  // IntArray
+            assertArrayEquals(arrayOf(1, 2, 3), subject.evaluate<Array<Int>>("""[1.0, 2.2, 3.8]"""))  // Array<Int>
+            assertArrayEquals(longArrayOf(1L, 2L, 3L), subject.evaluate("""[1.0, 2.2, 3.8]"""))  // LongArray
+            assertArrayEquals(arrayOf(1L, 2L, 3L), subject.evaluate<Array<Long>>("""[1.0, 2.2, 3.8]"""))  // Array<Long>
             assertTrue(subject.evaluate<DoubleArray>("""[1.0, 2.2, 3.8]""").contentEquals(doubleArrayOf(1.0, 2.2, 3.8)))  // DoubleArray
-            assertArrayEquals(subject.evaluate<Array<Double>>("""[1.0, 2.2, 3.8]"""), arrayOf(1.0, 2.2, 3.8))  // Array<Double>
+            assertArrayEquals(arrayOf(1.0, 2.2, 3.8), subject.evaluate<Array<Double>>("""[1.0, 2.2, 3.8]"""))  // Array<Double>
             assertTrue(subject.evaluate<FloatArray>("""[1.0, 2.2, 3.8]""").contentEquals(floatArrayOf(1.0f, 2.2f, 3.8f)))  // FloatArray
-            assertArrayEquals(subject.evaluate<Array<Float>>("""[1.0, 2.2, 3.8]"""), arrayOf(1.0f, 2.2f, 3.8f))  // Array<Float>
+            assertArrayEquals(arrayOf(1.0f, 2.2f, 3.8f), subject.evaluate<Array<Float>>("""[1.0, 2.2, 3.8]"""))  // Array<Float>
 
             // 2D-Arrays
-            assertArrayEquals(subject.evaluate<Array<Array<Int>>>("""[[1, 2], [3, 4]]"""), arrayOf(arrayOf(1, 2), arrayOf(3, 4)))  // Array<Array<Int>>
-            assertArrayEquals(subject.evaluate<Array<Array<Int?>>>("""[[1, 2], [null, 4]]"""), arrayOf(arrayOf(1, 2), arrayOf(null, 4)))  // Array<Array<Int?>>
-            assertArrayEquals(subject.evaluate<Array<IntArray>>("""[[1, 2], [3, 4]]"""), arrayOf(intArrayOf(1, 2), intArrayOf(3, 4)))  // Array<IntArray>>
+            assertArrayEquals(arrayOf(arrayOf(1, 2), arrayOf(3, 4)), subject.evaluate<Array<Array<Int>>>("""[[1, 2], [3, 4]]"""))  // Array<Array<Int>>
+            assertArrayEquals(arrayOf(arrayOf(1, 2), arrayOf(null, 4)), subject.evaluate<Array<Array<Int?>>>("""[[1, 2], [null, 4]]"""))  // Array<Array<Int?>>
+            assertArrayEquals(arrayOf(intArrayOf(1, 2), intArrayOf(3, 4)), subject.evaluate<Array<IntArray>>("""[[1, 2], [3, 4]]"""))  // Array<IntArray>>
 
             // Array with optionals
-            assertArrayEquals(subject.evaluate<Array<String?>>("""["a", null, "c"]"""), arrayOf("a", null, "c"))  // Array<String?>
-            assertArrayEquals(subject.evaluate<Array<Boolean?>>("""[false, null, true]"""), arrayOf(false, null, true))  // Array<Boolean?>
-            assertArrayEquals(subject.evaluate<Array<Int?>>("""[1.0, null, 3.8]"""), arrayOf(1, null, 3))  // Array<Int?>
-            assertArrayEquals(subject.evaluate<Array<Double?>>("""[1.0, null, 3.8]"""), arrayOf(1.0, null, 3.8))  // Array<Double?>
-            assertArrayEquals(subject.evaluate<Array<Float?>>("""[1.0, null, 3.8]"""), arrayOf(1.0f, null, 3.8f))  // Array<Float?>
+            assertArrayEquals(arrayOf("a", null, "c"), subject.evaluate<Array<String?>>("""["a", null, "c"]"""))  // Array<String?>
+            assertArrayEquals(arrayOf(false, null, true), subject.evaluate<Array<Boolean?>>("""[false, null, true]"""))  // Array<Boolean?>
+            assertArrayEquals(arrayOf(1, null, 3), subject.evaluate<Array<Int?>>("""[1.0, null, 3.8]"""))  // Array<Int?>
+            assertArrayEquals(arrayOf(1.0, null, 3.8), subject.evaluate<Array<Double?>>("""[1.0, null, 3.8]"""))  // Array<Double?>
+            assertArrayEquals(arrayOf(1.0f, null, 3.8f), subject.evaluate<Array<Float?>>("""[1.0, null, 3.8]"""))  // Array<Float?>
 
             // Array of (any) objects
-            assertArrayEquals(subject.evaluate<Array<Any>>("""[1.0, "hello", null]"""), arrayOf(1.0, "hello", null))  // Array<Any?>
+            assertArrayEquals(arrayOf(1.0, "hello", null), subject.evaluate<Array<Any>>("""[1.0, "hello", null]"""))  // Array<Any?>
 
             // JSON
             assertEquals(
-                subject.evaluate<JsonObjectWrapper>("({key1: 1, key2: \"value2\"})").toPayload(),
-                JsonObjectWrapper("key1" to 1, "key2" to "value2").toPayload()
+                JsonObjectWrapper("key1" to 1, "key2" to "value2").toPayload(),
+                subject.evaluate<JsonObjectWrapper>("({key1: 1, key2: \"value2\"})").toPayload()
             )
         }
     }
@@ -300,7 +310,7 @@ class JsBridgeTest {
         // THEN
         val fileEvaluationError = errors.firstOrNull() as? JsFileEvaluationError
         assertNotNull(fileEvaluationError)
-        assertEquals(fileEvaluationError.fileName, "non-existing/file.js")
+        assertEquals("non-existing/file.js", fileEvaluationError.fileName)
     }
 
     @Test
@@ -318,8 +328,8 @@ class JsBridgeTest {
         assertNotNull(jsException)
         assertTrue(jsException.stackTrace.isNotEmpty())
         jsException.stackTrace[0].let { e ->
-            assertEquals(e.fileName, "test_with_error.js")
-            assertEquals(e.lineNumber, 1)
+            assertEquals("test_with_error.js", e.fileName)
+            assertEquals(1, e.lineNumber)
         }
     }
 
@@ -354,8 +364,8 @@ class JsBridgeTest {
         assertNotNull(jsException)
         assertTrue(jsException.stackTrace.isNotEmpty())
         jsException.stackTrace[0].let { e ->
-            assertEquals(e.fileName, "file.js")
-            assertEquals(e.lineNumber, 1)
+            assertEquals("file.js", e.fileName)
+            assertEquals(1, e.lineNumber)
         }
     }
 
@@ -380,11 +390,11 @@ class JsBridgeTest {
             val evaluatedStrValue: String = subject.evaluateBlocking("$strValue")
             val evaluatedIntValue = subject.evaluateBlocking<Int>("$intValue")
 
-            assertEquals(strValue.evaluateBlocking(), evaluatedStrValue)
-            assertEquals(intValue.evaluateBlocking(), evaluatedIntValue)
+            assertEquals(evaluatedStrValue, strValue.evaluateBlocking())
+            assertEquals(evaluatedIntValue, intValue.evaluateBlocking())
 
-            assertEquals(strValue.evaluateBlocking(), "123")
-            assertEquals(intValue.evaluateBlocking(), 123)
+            assertEquals("123", strValue.evaluateBlocking())
+            assertEquals(123, intValue.evaluateBlocking())
 
             assertFailsWith<JsException> {
                 errorValue.evaluateBlocking<Unit>()
@@ -396,11 +406,11 @@ class JsBridgeTest {
             val evaluatedStrValue: String = subject.evaluate("$strValue")
             val evaluatedIntValue = subject.evaluate<Int>("$intValue")
 
-            assertEquals(strValue.evaluate(), evaluatedStrValue)
-            assertEquals(intValue.evaluate(), evaluatedIntValue)
+            assertEquals(evaluatedStrValue, strValue.evaluate())
+            assertEquals(evaluatedIntValue, intValue.evaluate())
 
-            assertEquals(strValue.evaluate(), "123")
-            assertEquals(intValue.evaluate(), 123)
+            assertEquals("123", strValue.evaluate())
+            assertEquals(123, intValue.evaluate())
         }
 
         // THEN (with async methods)
@@ -408,24 +418,24 @@ class JsBridgeTest {
         val evaluatedIntValueAsync = subject.evaluateAsync<Int>("$intValue")
 
         runBlocking {
-            assertEquals(strValue.evaluateAsync<String>().await(), evaluatedStrValueAsync.await())
-            assertEquals(intValue.evaluateAsync<Int>().await(), evaluatedIntValueAsync.await())
+            assertEquals(evaluatedStrValueAsync.await(), strValue.evaluateAsync<String>().await())
+            assertEquals(evaluatedIntValueAsync.await(), intValue.evaluateAsync<Int>().await())
 
-            assertEquals(strValue.evaluateAsync<String>().await(), "123")
-            assertEquals(intValue.evaluateAsync<Int>().await(), 123)
+            assertEquals("123", strValue.evaluateAsync<String>().await())
+            assertEquals(123, intValue.evaluateAsync<Int>().await())
         }
 
         // THEN (evaluate promise)
         runBlocking {
             val promiseValue: Int = resolvedPromiseValue.evaluate()
-            assertEquals(promiseValue, 123)
+            assertEquals(123, promiseValue)
 
-            assertEquals(resolvedPromiseAwaitValue.await().evaluate(), 123)
+            assertEquals(123, resolvedPromiseAwaitValue.await().evaluate())
 
             val awaitError = assertFailsWith<JsException> {
                 rejectedPromiseAwaitValue.await().evaluate()
             }
-            assertEquals(awaitError.jsonValue?.toPayload()?.stringValue(), "wrong")
+            assertEquals("wrong", awaitError.jsonValue?.toPayload()?.stringValue())
         }
 
         // THEN (promise await)
@@ -436,8 +446,8 @@ class JsBridgeTest {
             val awaitError = assertFailsWith<JsException> {
                 rejectedPromiseValue.await()
             }
-            assertEquals(error.jsonValue?.toPayload()?.stringValue(), "wrong")
-            assertEquals(awaitError.jsonValue?.toPayload()?.stringValue(), "wrong")
+            assertEquals("wrong", error.jsonValue?.toPayload()?.stringValue())
+            assertEquals("wrong", awaitError.jsonValue?.toPayload()?.stringValue())
         }
 
         // THEN (null JsValue)
@@ -460,8 +470,8 @@ class JsBridgeTest {
             // Non-nullable JsonObjectWrapper with JS var = "null" or "undefined"
             val nonNullableJsonObjectWrapperNull: JsonObjectWrapper = subject.evaluate("null")
             val nonNullableJsonObjectWrapperUndefined: JsonObjectWrapper = subject.evaluate("undefined")
-            assertEquals(nonNullableJsonObjectWrapperNull.jsonString, "null")
-            assertEquals(nonNullableJsonObjectWrapperUndefined, JsonObjectWrapper.Undefined)
+            assertEquals("null", nonNullableJsonObjectWrapperNull.jsonString)
+            assertEquals(JsonObjectWrapper.Undefined, nonNullableJsonObjectWrapperUndefined)
 
             // Nullable JsonObjectWrapper with JS var = "null" or "undefined"
             val nullableJsonObjectWrapperNull: JsonObjectWrapper? = subject.evaluate("null")
@@ -495,8 +505,8 @@ class JsBridgeTest {
         // THEN
         val unhandledJsPromiseError = unhandledPromiseErrors.firstOrNull()
         assertNotNull(unhandledJsPromiseError?.jsException)
-        assertEquals(unhandledJsPromiseError?.jsException?.message, "Test unhandled promise rejection")
-        assertEquals(unhandledJsPromiseError?.jsException?.jsonValue?.toPayloadObject()?.getString("message"), "Test unhandled promise rejection")
+        assertEquals("Test unhandled promise rejection", unhandledJsPromiseError?.jsException?.message)
+        assertEquals("Test unhandled promise rejection", unhandledJsPromiseError?.jsException?.jsonValue?.toPayloadObject()?.getString("message"))
     }
 
     @Test
@@ -536,33 +546,33 @@ class JsBridgeTest {
         // - ...
         assertTrue(jsException.stackTrace.size >= 4)
         jsException.stackTrace[0].let { e ->
-            assertEquals(e.className, "JavaScript")
-            assertEquals(e.methodName, "testFunction1")
-            assertEquals(e.fileName, "eval")
-            assertEquals(e.lineNumber, 2)
+            assertEquals("JavaScript", e.className)
+            assertEquals("testFunction1", e.methodName)
+            assertEquals("eval", e.fileName)
+            assertEquals(2, e.lineNumber)
         }
         jsException.stackTrace[1].let { e ->
-            assertEquals(e.className, "JavaScript")
-            assertEquals(e.methodName, "testFunction2")
-            assertEquals(e.fileName, "eval")
-            assertEquals(e.lineNumber, 6)
+            assertEquals("JavaScript", e.className)
+            assertEquals("testFunction2", e.methodName)
+            assertEquals("eval", e.fileName)
+            assertEquals(6, e.lineNumber)
         }
         jsException.stackTrace[2].let { e ->
-            assertEquals(e?.className, "JavaScript")
-            assertEquals(e?.methodName, "testFunction3")
-            assertEquals(e?.fileName, "eval")
-            assertEquals(e?.lineNumber, 10)
+            assertEquals("JavaScript", e?.className)
+            assertEquals("testFunction3", e?.methodName)
+            assertEquals("eval", e?.fileName)
+            assertEquals(10, e?.lineNumber)
         }
         jsException.stackTrace[3].let { e ->
-            assertEquals(e.className, "JavaScript")
+            assertEquals("JavaScript", e.className)
             assertEquals(true, """^<?eval>?$""".toRegex().matches(e.methodName))
-            assertEquals(e?.fileName, "eval")
-            assertEquals(e?.lineNumber, 13)
+            assertEquals("eval", e?.fileName)
+            assertEquals(13, e?.lineNumber)
         }
         jsException.stackTrace[4].let { e ->
             assert(e.className.endsWith(".JsBridge"))
-            assertEquals(e.methodName, "jniEvaluateString")
-            assertEquals(e.fileName, "JsBridge.kt")
+            assertEquals("jniEvaluateString", e.methodName)
+            assertEquals("JsBridge.kt", e.fileName)
         }
     }
 
@@ -598,24 +608,24 @@ class JsBridgeTest {
         // - ...
         assertTrue(jsException.stackTrace.size >= 2)
         jsException.stackTrace[0].let { e ->
-            assertEquals(e.className, "JavaScript")
-            assertEquals(e.methodName, "testFunction")
-            assertEquals(e.fileName, "eval")
-            assertEquals(e.lineNumber, 2)
+            assertEquals("JavaScript", e.className)
+            assertEquals("testFunction", e.methodName)
+            assertEquals("eval", e.fileName)
+            assertEquals(2, e.lineNumber)
         }
         jsException.stackTrace[1].let { e ->
-            assertEquals(e.className, "JavaScript")
+            assertEquals("JavaScript", e.className)
             assertEquals(true, """^<?eval>?$""".toRegex().matches(e.methodName))
-            assertEquals(e?.fileName, "eval")
-            assertEquals(e?.lineNumber, 5)
+            assertEquals("eval", e?.fileName)
+            assertEquals(5, e?.lineNumber)
         }
         jsException.stackTrace[2].let { e ->
             assert(e.className.endsWith(".JsBridge"))
-            assertEquals(e.methodName, "jniEvaluateString")
-            assertEquals(e.fileName, "JsBridge.kt")
+            assertEquals("jniEvaluateString", e.methodName)
+            assertEquals("JsBridge.kt", e.fileName)
         }
         assert(jsException.cause is java.lang.Exception)
-        assertEquals(jsException.cause?.message, "Kotlin exception")
+        assertEquals("Kotlin exception", jsException.cause?.message)
     }
 
     @Test
@@ -670,62 +680,62 @@ class JsBridgeTest {
         runBlocking {
             val jsTrue = JsValue.fromNativeValue(subject, true)
             val jsFalse = JsValue.fromNativeValue(subject, false)
-            assertEquals(jsTrue.evaluate(), true)
-            assertEquals(jsFalse.evaluate(), false)
+            assertEquals(true, jsTrue.evaluate())
+            assertEquals(false, jsFalse.evaluate())
 
             val jsString = JsValue.fromNativeValue(subject, "nativeString")
-            assertEquals(jsString.evaluate(), "nativeString")
+            assertEquals("nativeString", jsString.evaluate())
 
             val jsInt = JsValue.fromNativeValue(subject, 123)
             val jsNullableInt = JsValue.fromNativeValue<Int?>(subject, 123)
             val jsNullInt = JsValue.fromNativeValue<Int?>(subject, null)
-            assertEquals(jsInt.evaluate(), 123)
-            assertEquals(jsNullableInt.evaluate(), 123)
-            assertEquals(jsNullInt.evaluate<Int?>(), null)
+            assertEquals(123, jsInt.evaluate())
+            assertEquals(123, jsNullableInt.evaluate())
+            assertEquals(null, jsNullInt.evaluate<Int?>())
 
             val jsFloat = JsValue.fromNativeValue(subject, 123.456f)
             val jsNullableFloat = JsValue.fromNativeValue<Float?>(subject, 123.456f)
             val jsNullFloat = JsValue.fromNativeValue<Float?>(subject, null)
-            assertEquals(jsFloat.evaluate(), 123.456f)
-            assertEquals(jsNullableFloat.evaluate(), 123.456f)
-            assertEquals(jsNullFloat.evaluate<Float?>(), null)
+            assertEquals(123.456f, jsFloat.evaluate())
+            assertEquals(123.456f, jsNullableFloat.evaluate())
+            assertEquals(null, jsNullFloat.evaluate<Float?>())
 
             val jsDouble = JsValue.fromNativeValue(subject, 123.456)
             val jsNullableDouble = JsValue.fromNativeValue<Double?>(subject, 123.456)
             val jsNullDouble = JsValue.fromNativeValue<Double?>(subject, null)
-            assertEquals(jsDouble.evaluate(), 123.456)
-            assertEquals(jsNullableDouble.evaluate(), 123.456)
-            assertEquals(jsNullDouble.evaluate<Double?>(), null)
+            assertEquals(123.456, jsDouble.evaluate())
+            assertEquals(123.456, jsNullableDouble.evaluate())
+            assertEquals(null, jsNullDouble.evaluate<Double?>())
 
             val jsArrayBoolean = JsValue.fromNativeValue(subject, booleanArrayOf(true, true, false))
             val jsArrayNullableBoolean = JsValue.fromNativeValue(subject, arrayOf(true, null, false))
-            assertArrayEquals(jsArrayBoolean.evaluate(), booleanArrayOf(true, true, false))
-            assertArrayEquals(jsArrayNullableBoolean.evaluate(), arrayOf(true, null, false))
+            assertArrayEquals(booleanArrayOf(true, true, false), jsArrayBoolean.evaluate())
+            assertArrayEquals(arrayOf(true, null, false), jsArrayNullableBoolean.evaluate())
 
             val jsArrayInt = JsValue.fromNativeValue(subject, intArrayOf(1, 2, 3))
             val jsArrayNullableInt = JsValue.fromNativeValue(subject, arrayOf(1, null, 3))
-            assertArrayEquals(jsArrayInt.evaluate(), intArrayOf(1, 2, 3))
-            assertArrayEquals(jsArrayNullableInt.evaluate<Array<Int?>>(), arrayOf(1, null, 3))
+            assertArrayEquals(intArrayOf(1, 2, 3), jsArrayInt.evaluate())
+            assertArrayEquals(arrayOf(1, null, 3), jsArrayNullableInt.evaluate<Array<Int?>>())
 
             val jsArrayLong = JsValue.fromNativeValue(subject, longArrayOf(1L, 2L, 3L))
             val jsArrayNullableLong = JsValue.fromNativeValue(subject, arrayOf(1L, null, 3L))
-            assertArrayEquals(jsArrayLong.evaluate(), longArrayOf(1L, 2L, 3L))
-            assertArrayEquals(jsArrayNullableLong.evaluate<Array<Long?>>(), arrayOf(1L, null, 3L))
+            assertArrayEquals(longArrayOf(1L, 2L, 3L), jsArrayLong.evaluate())
+            assertArrayEquals(arrayOf(1L, null, 3L), jsArrayNullableLong.evaluate<Array<Long?>>())
 
             val jsArrayFloat = JsValue.fromNativeValue(subject, floatArrayOf(1f, 2f, 3f))
             val jsArrayNullableFloat = JsValue.fromNativeValue(subject, arrayOf(1f, null, 3f))
             assertTrue(jsArrayFloat.evaluate<FloatArray>().contentEquals(floatArrayOf(1f, 2f, 3f)))
-            assertArrayEquals(jsArrayNullableFloat.evaluate<Array<Float?>>(), arrayOf(1f, null, 3f))
+            assertArrayEquals(arrayOf(1f, null, 3f), jsArrayNullableFloat.evaluate<Array<Float?>>())
 
             val jsArrayDouble = JsValue.fromNativeValue(subject, doubleArrayOf(1.0, 2.0, 3.0))
             val jsArrayNullableDouble = JsValue.fromNativeValue(subject, arrayOf(1.0, null, 3.0))
             assertTrue(jsArrayDouble.evaluate<DoubleArray>().contentEquals(doubleArrayOf(1.0, 2.0, 3.0)))
-            assertArrayEquals(jsArrayNullableDouble.evaluate<Array<Double?>>(), arrayOf(1.0, null, 3.0))
+            assertArrayEquals(arrayOf(1.0, null, 3.0), jsArrayNullableDouble.evaluate<Array<Double?>>())
 
             val jsArrayString = JsValue.fromNativeValue(subject, arrayOf("a", "b", "c"))
             val jsArrayNullableString = JsValue.fromNativeValue(subject, arrayOf("a", null, "c"))
-            assertArrayEquals(jsArrayString.evaluate(), arrayOf("a", "b", "c"))
-            assertArrayEquals(jsArrayNullableString.evaluate(), arrayOf("a", null, "c"))
+            assertArrayEquals(arrayOf("a", "b", "c"), jsArrayString.evaluate())
+            assertArrayEquals(arrayOf("a", null, "c"), jsArrayNullableString.evaluate())
         }
     }
 
@@ -855,36 +865,36 @@ class JsBridgeTest {
             Timber.i("Executing calcMagicJsFunc()...")
             var result = calcMagicJsFunc()
             Timber.i("-> result is $result")
-            assertEquals(result, expectedResult)
+            assertEquals(expectedResult, result)
 
             Timber.i("Executing calcMagicCallJsFunctionInsideNativeLoop()...")
             result = calcMagicCallJsFunctionInsideNativeLoop()
             Timber.i("-> result is $result")
-            assertEquals(result, expectedResult)
+            assertEquals(expectedResult, result)
 
             Timber.i("Executing calcMagicCallJsFunctionInsideNativeLoop() in JS thread...")
             withContext(subject.coroutineContext) {
                 result = calcMagicCallJsFunctionInsideNativeLoop()
                 Timber.i("-> result is $result")
-                assertEquals(result, expectedResult)
+                assertEquals(expectedResult, result)
             }
 
             Timber.i("Executing calcMagicEvaluateJsInsideNativeLoop()...")
             result = calcMagicEvaluateJsInsideNativeLoop()
             Timber.i("-> result is $result")
-            assertEquals(result, expectedResult)
+            assertEquals(expectedResult, result)
 
             Timber.i("Executing calcMagicEvaluateJsInsideNativeLoop() in JS thread...")
             withContext(subject.coroutineContext) {
                 result = calcMagicEvaluateJsInsideNativeLoop()
                 Timber.i("-> result is $result")
-                assertEquals(result, expectedResult)
+                assertEquals(expectedResult, result)
             }
 
             Timber.i("Executing calcMagicCallNativeFunctionInsideJsLoop()...")
             result = calcMagicCallNativeFunctionInsideJsLoop()
             Timber.i("-> result is $result")
-            assertEquals(result, expectedResult)
+            assertEquals(expectedResult, result)
 
             // Make sure that the JS value does not create garbage-collected as calcMagicMixed3Func()
             // access the value by its name!
@@ -951,7 +961,7 @@ class JsBridgeTest {
         jsApi.start()
 
         runBlocking {
-            assertEquals(jsApi.helloAsync().await(), "ok")
+            assertEquals("ok", jsApi.helloAsync().await())
         }
 
         runBlocking {
@@ -991,10 +1001,7 @@ class JsBridgeTest {
             |$nativeApiJsValue.registerCallback(jsCb);
             |$nativeApiJsValue.start();""".trimMargin())
 
-        assertEquals(
-            subject.evaluateBlocking("$nativeApiJsValue.helloAsync()"),
-            "ok"
-        )
+        assertEquals("ok", subject.evaluateBlocking("$nativeApiJsValue.helloAsync()"))
 
         for (i in 0 until 100) {
             jsExpectations.checkEquals("ex$i", i)
@@ -1055,7 +1062,7 @@ class JsBridgeTest {
         ).mapToNativeFunction1()
 
         // THEN
-        assertEquals(calcSumBlocking(3, 7), 10)
+        assertEquals(10, calcSumBlocking(3, 7))
 
         runBlocking {
             // Missing JS function (the evalution of the JS code should throw)
@@ -1070,11 +1077,11 @@ class JsBridgeTest {
 
             // Call JS function calcSum(3, 4)
             val sum = calcSum(3, 4)
-            assertEquals(sum, 7)
+            assertEquals(7, sum)
 
             // Call JS function calcSumFromAnonymousFunction(3, 4)
             val sumFromAnonymousFunction = calcSumFromAnonymousFunction(3, 4)
-            assertEquals(sumFromAnonymousFunction, 7)
+            assertEquals(7, sumFromAnonymousFunction)
 
             // Call JS function calcSumWrongSignature(3, "four")
             assertFailsWith<IllegalArgumentException> {
@@ -1085,37 +1092,37 @@ class JsBridgeTest {
             val invalidFunctionException: JsException = assertFailsWith {
                 invalidFunction()
             }
-            assertEquals(invalidFunctionException.message?.contains("invalid"), true)
+            assertEquals(true, invalidFunctionException.message?.contains("invalid"))
 
             // Call JS function createJsObject(69, "sixty-nine")
             val jsObject = createJsObject(69, "sixty-nine")
-            assertEquals(jsObject.toPayload(), PayloadObject.fromValues("key1" to 69, "key2" to "sixty-nine"))
+            assertEquals(PayloadObject.fromValues("key1" to 69, "key2" to "sixty-nine"), jsObject.toPayload())
 
             // Call JS function createCalcSumFunc()(2, 2)
             val calcSum2: suspend (Int, Int) -> Int = createCalcSumFunc().mapToNativeFunction2()
             val sum2 = calcSum2(2, 2)
-            assertEquals(sum2, 4)
+            assertEquals(4, sum2)
 
             // Call JS function throwException()
             val jsException: JsException = assertFailsWith {
                 throwException()
             }
-            assertEquals(jsException.message, "JS exception from function")
+            assertEquals("JS exception from function", jsException.message)
 
             // Call JS function getPromise("testPromise")
             val promiseResult = getPromise("testPromise")
-            assertEquals(promiseResult, "Hello testPromise!")
+            assertEquals("Hello testPromise!", promiseResult)
 
             // Call JS function getPromiseAsync("testPromise")
             val promiseResultDeferred = getPromiseAsync("testPromise")
-            assertEquals(promiseResultDeferred.await(), "Hello testPromise!")
+            assertEquals("Hello testPromise!", promiseResultDeferred.await())
 
             // Call JS function getFailedPromise("testPromise")
             val promiseException: JsException = assertFailsWith {
                 getFailedPromise("testPromise")
             }
             val promiseErrorPayload = promiseException.jsonValue?.toPayload()
-            assertEquals(promiseErrorPayload?.stringValue(), "Oh no!")
+            assertEquals("Oh no!", promiseErrorPayload?.stringValue())
         }
 
         assertTrue(errors.isEmpty())
@@ -1142,8 +1149,8 @@ class JsBridgeTest {
         subject.evaluateBlocking<Unit>("$setFlag()")
         assertTrue(flag)
 
-        assertEquals(subject.evaluateBlocking("""$toUpperCaseNative("test string")"""), "TEST STRING")
-        assertEquals(subject.evaluateBlocking("$calcSumNative(7, 8)"), 15)
+        assertEquals("TEST STRING", subject.evaluateBlocking("""$toUpperCaseNative("test string")"""))
+        assertEquals(15, subject.evaluateBlocking("$calcSumNative(7, 8)"))
 
         subject.evaluateNoRetVal("""
             |setCustomTimeout(function() {
@@ -1331,13 +1338,13 @@ class JsBridgeTest {
         runBlocking { waitForDone(subject) }
 
         // THEN
-        assertEquals(receivedBool1, true)
-        assertEquals(receivedBool2, false)
-        assertEquals(receivedString, "Hello JsBridgeTest!")
-        assertEquals(receivedJsonObject1?.jsonString, """{"returnKey1":1,"returnKey2":"returnValue2"}""")
-        assertEquals(receivedJsonObject2?.jsonString, """[1,"two",3]""")
-        assertArrayEquals(receivedIntVarArg, intArrayOf(1, 2, 3, 4, 5))
-        assertArrayEquals(receivedStringVarArg, arrayOf("vararg1", "vararg2", "vararg3"))
+        assertEquals(true, receivedBool1)
+        assertEquals(false, receivedBool2)
+        assertEquals("Hello JsBridgeTest!", receivedString)
+        assertEquals("""{"returnKey1":1,"returnKey2":"returnValue2"}""", receivedJsonObject1?.jsonString)
+        assertEquals("""[1,"two",3]""", receivedJsonObject2?.jsonString)
+        assertArrayEquals(intArrayOf(1, 2, 3, 4, 5), receivedIntVarArg)
+        assertArrayEquals(arrayOf("vararg1", "vararg2", "vararg3"), receivedStringVarArg)
 
         runBlocking { waitForDone(subject) }
 
@@ -1348,7 +1355,7 @@ class JsBridgeTest {
         jsExpectations.checkEquals("rejectedDeferredStringError", "returned deferred string error")
         jsExpectations.checkEquals("cbString", "cbString")
         jsExpectations.checkBlock("cbObj") { value: JsonObjectWrapper? ->
-            assertEquals(value?.toPayload(), """{"cbKey1": 1, "cbKey2": "cbValue2"}""".toPayload())
+            assertEquals("""{"cbKey1": 1, "cbKey2": "cbValue2"}""".toPayload(), value?.toPayload())
         }
         jsExpectations.checkEquals("cbBool1", true)
         jsExpectations.checkEquals("cbBool2", false)
@@ -1401,15 +1408,15 @@ class JsBridgeTest {
             val exception = assertFailsWith<JsException> {
                 jsApi.jsMethodThrowingException()
             }
-            assertEquals(exception.message?.contains("js exception"), true)
+            assertEquals(true, exception.message?.contains("js exception"))
 
             val promiseResult = jsApi.jsMethodReturningFulfilledPromise()
-            assertEquals(promiseResult, "fulfilled promise")
+            assertEquals("fulfilled promise", promiseResult)
 
             val promiseException = assertFailsWith<JsException> {
                 jsApi.jsMethodReturningRejectedPromise()
             }
-            assertEquals(promiseException.message?.contains("rejected promise"), true)
+            assertEquals(true, promiseException.message?.contains("rejected promise"))
 
             waitForDone(subject)
         }
@@ -1514,19 +1521,19 @@ class JsBridgeTest {
 
         // THEN
         assertNotNull(callbackValues)
-        assertEquals(callbackValues!!.jsonObject1?.jsonString, """{"test1":"value1","test2":2}""")
-        assertEquals(callbackValues!!.jsonObject2?.jsonString, "[1,2,3]")
-        assertEquals(callbackValues!!.bool1, true)
-        assertEquals(callbackValues!!.bool2, false)
-        assertEquals(callbackValues!!.int, 69)
-        assertEquals(callbackValues!!.double, 123.456)
-        assertEquals(callbackValues!!.optionalInt1, 123)
-        assertEquals(callbackValues!!.optionalInt2, null)
+        assertEquals("""{"test1":"value1","test2":2}""", callbackValues!!.jsonObject1?.jsonString)
+        assertEquals("[1,2,3]", callbackValues!!.jsonObject2?.jsonString)
+        assertEquals(true, callbackValues!!.bool1)
+        assertEquals(false, callbackValues!!.bool2)
+        assertEquals(69, callbackValues!!.int)
+        assertEquals(123.456, callbackValues!!.double)
+        assertEquals(123, callbackValues!!.optionalInt1)
+        assertEquals(null, callbackValues!!.optionalInt2)
         assertTrue(unitCallbackCalled)
         assert(fulfilledPromise.isCompleted)
         runBlocking {
             assert(fulfilledPromise.isCompleted)
-            assertEquals(fulfilledPromise.await(), "Promise value")
+            assertEquals("Promise value", fulfilledPromise.await())
         }
         assert(rejectedPromise.isCancelled)
         runBlocking {
@@ -1534,19 +1541,19 @@ class JsBridgeTest {
                 rejectedPromise.await()
             }
             val promiseErrorPayload = promiseException.jsonValue?.toPayload()
-            assertEquals(promiseErrorPayload?.doubleValue(), 987.0)
+            assertEquals(987.0, promiseErrorPayload?.doubleValue())
         }
         runBlocking {
             val jsValueString = jsValueAsync.await().evaluate<String>()
-            assertEquals(jsValueString, "JsValue value")
+            assertEquals("JsValue value", jsValueString)
         }
 
         jsExpectations.checkEquals("stringArg", "Hello JS!")
         jsExpectations.checkBlock("jsonObjectArg") { value: JsonObjectWrapper? ->
-            assertEquals(value?.toPayload(), objectJson.toPayload())
+            assertEquals(objectJson.toPayload(), value?.toPayload())
         }
         jsExpectations.checkBlock("jsonArrayArg") { value: JsonObjectWrapper? ->
-            assertEquals(value?.toPayload(), arrayJson.toPayload())
+            assertEquals(arrayJson.toPayload(), value?.toPayload())
         }
         runBlocking {
             val jsValueArg = jsExpectations.takeExpectation<JsValue>("jsValueArg")
@@ -1602,7 +1609,7 @@ class JsBridgeTest {
 
         // THEN
         runBlocking {
-            assertEquals(jsApi.jsMethodReturningFulfilledPromise("test string").await(), "test string")
+            assertEquals("test string", jsApi.jsMethodReturningFulfilledPromise("test string").await())
             assertFailsWith<IllegalArgumentException> {
                 jsApiNoObject.jsMethodReturningFulfilledPromise("test string").await()
             }
@@ -1771,9 +1778,9 @@ class JsBridgeTest {
         verify(exactly = 2) { jsToNativeFunctionMock(neq("timeout2")) }
 
         // timeout1 should be skipped!
-        assertEquals(events.size, 2)
-        assertEquals(events[0], "timeout1")
-        assertEquals(events[1], "timeout3")
+        assertEquals(2, events.size)
+        assertEquals("timeout1", events[0])
+        assertEquals("timeout3", events[1])
         assertTrue(errors.isEmpty())
     }
 
@@ -1858,23 +1865,23 @@ class JsBridgeTest {
                     assertNotNull(responseJson)
                     val responseObject = PayloadObject.fromJsonString(responseJson as String)
                     assertNotNull(responseObject)
-                    assertEquals(responseObject.keyCount, 2)
-                    assertEquals(responseObject.getString("testKey1"), "testValue1")
-                    assertEquals(responseObject.getString("testKey2"), "testValue2")
+                    assertEquals(2, responseObject.keyCount)
+                    assertEquals("testValue1", responseObject.getString("testKey1"))
+                    assertEquals("testValue2", responseObject.getString("testKey2"))
                     true
                 })
 
                 jsToNativeFunctionMock(match { headersJson ->
                     val responseHeadersObject = PayloadObject.fromJsonString(headersJson as String)
                     assertNotNull(responseHeadersObject)
-                    assertEquals(responseHeadersObject.keyCount, 2)
+                    assertEquals(2, responseHeadersObject.keyCount)
                     assertEquals(
-                        responseHeadersObject.getString("testresponseheaderkey1"),
-                        "testResponseHeaderValue1"
+                        "testResponseHeaderValue1",
+                        responseHeadersObject.getString("testresponseheaderkey1")
                     )
                     assertEquals(
-                        responseHeadersObject.getString("testresponseheaderkey2"),
-                        "testResponseHeaderValue2"
+                        "testResponseHeaderValue2",
+                        responseHeadersObject.getString("testresponseheaderkey2")
                     )
                     true
                 })
@@ -1972,13 +1979,13 @@ class JsBridgeTest {
         runBlocking { waitForDone(subject) }
 
         // THEN
-        assertEquals(messages, listOf(
+        assertEquals(listOf(
             Log.DEBUG to "This is a log with undefined and null: undefined - null",
             Log.INFO to "This is an info with 2 integers: 1664 and 69",
             Log.WARN to """This is a warning with an object: [object Object]""",
             Log.ERROR to """This is an error: Error: completely wrong""",
             Log.ASSERT to """Assertion failed: should be displayed"""
-        ))
+        ), messages)
         assertTrue(errors.isEmpty())
     }
 
@@ -2010,13 +2017,13 @@ class JsBridgeTest {
         runBlocking { waitForDone(subject) }
 
         // THEN
-        assertEquals(messages, listOf(
+        assertEquals(listOf(
             Log.DEBUG to "This is a log with undefined and null: undefined - null",
             Log.INFO to "This is an info with 2 integers: 1664 and 69",
             Log.WARN to """This is a warning with an object: {"one":1,"two":"two"}""",
             Log.ERROR to """This is an error: {"message":"completely wrong"}""",
             Log.ASSERT to """Assertion failed: should be displayed"""
-        ))
+        ), messages)
         assertTrue(errors.isEmpty())
     }
 
@@ -2048,7 +2055,7 @@ class JsBridgeTest {
         runBlocking { waitForDone(subject) }
 
         // THEN
-        assertEquals(hasMessage, false)
+        assertFalse(hasMessage)
         assertTrue(errors.isEmpty())
     }
 
@@ -2074,9 +2081,9 @@ class JsBridgeTest {
 
         inline fun <reified T: Any> checkEquals(name: String, value: T?) {
             when (value) {
-                is IntArray -> assertArrayEquals(takeExpectation(name), value)
-                is Array<*> -> assertArrayEquals(takeExpectation(name), value)
-                else -> assertEquals(takeExpectation(name), value)
+                is IntArray -> assertArrayEquals(value, takeExpectation(name))
+                is Array<*> -> assertArrayEquals(value, takeExpectation(name))
+                else -> assertEquals(value, takeExpectation(name))
             }
         }
 
