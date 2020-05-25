@@ -157,6 +157,10 @@ constructor(config: JsBridgeConfig): CoroutineScope {
     }
 
     protected fun finalize() {
+        if (state.get() == State.Releasing.intValue || state.get() == State.Released.intValue) {
+            return
+        }
+
         release()
     }
 
