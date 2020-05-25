@@ -70,8 +70,15 @@ JValue Double::popArray(uint32_t count, bool expanded) const {
     if (!expanded) {
       duk_get_prop_index(m_ctx, -1, static_cast<duk_uarridx_t>(i));
     }
-    JValue value = pop();
-    elements[i] = value.getDouble();
+    try {
+      JValue value = pop();
+      elements[i] = value.getDouble();
+    } catch (const std::exception &e) {
+      if (!expanded) {
+        duk_pop(m_ctx);  // pop the array
+      }
+      throw;
+    }
   }
 
   if (!expanded) {
@@ -124,14 +131,13 @@ namespace {
       return static_cast<jdouble>(JS_VALUE_GET_FLOAT64(v));
     }
 
-    alog_warn("Cannot get double from JS: returning 0");  // TODO: proper exception handling
-    return jdouble();
+    throw std::invalid_argument("Cannot convert JS value to Java double");
   }
 }
 
 JValue Double::toJava(JSValueConst v) const {
   if (!JS_IsNumber(v)) {
-    throw std::invalid_argument("Cannot convert return value to double");
+    throw std::invalid_argument("Cannot convert JS value to double");
   }
 
   if (JS_IsNull(v) || JS_IsUndefined(v)) {

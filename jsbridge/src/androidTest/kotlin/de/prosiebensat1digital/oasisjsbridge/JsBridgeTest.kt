@@ -662,69 +662,34 @@ class JsBridgeTest {
     }
 
     @Test
-    fun testFromNativeValueAndBack() {
+    fun testConversionErrors() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
 
+        // THEN
         runBlocking {
-            val jsTrue = JsValue.fromNativeValue(subject, true)
-            val jsFalse = JsValue.fromNativeValue(subject, false)
-            assertEquals(jsTrue.evaluate(), true)
-            assertEquals(jsFalse.evaluate(), false)
+            assertFailsWith<IllegalArgumentException> { subject.evaluate<BooleanArray>("1") }
+            assertFailsWith<IllegalArgumentException> { subject.evaluate<IntArray>("1") }
+            assertFailsWith<IllegalArgumentException> { subject.evaluate<LongArray>("1") }
+            assertFailsWith<IllegalArgumentException> { subject.evaluate<FloatArray>("1") }
+            assertFailsWith<IllegalArgumentException> { subject.evaluate<DoubleArray>("1") }
+            assertFailsWith<IllegalArgumentException> { subject.evaluate<Array<Any>>("1") }
 
-            val jsString = JsValue.fromNativeValue(subject, "nativeString")
-            assertEquals(jsString.evaluate(), "nativeString")
-
-            val jsInt = JsValue.fromNativeValue(subject, 123)
-            val jsNullableInt = JsValue.fromNativeValue<Int?>(subject, 123)
-            val jsNullInt = JsValue.fromNativeValue<Int?>(subject, null)
-            assertEquals(jsInt.evaluate(), 123)
-            assertEquals(jsNullableInt.evaluate(), 123)
-            assertEquals(jsNullInt.evaluate<Int?>(), null)
-
-            val jsFloat = JsValue.fromNativeValue(subject, 123.456f)
-            val jsNullableFloat = JsValue.fromNativeValue<Float?>(subject, 123.456f)
-            val jsNullFloat = JsValue.fromNativeValue<Float?>(subject, null)
-            assertEquals(jsFloat.evaluate(), 123.456f)
-            assertEquals(jsNullableFloat.evaluate(), 123.456f)
-            assertEquals(jsNullFloat.evaluate<Float?>(), null)
-
-            val jsDouble = JsValue.fromNativeValue(subject, 123.456)
-            val jsNullableDouble = JsValue.fromNativeValue<Double?>(subject, 123.456)
-            val jsNullDouble = JsValue.fromNativeValue<Double?>(subject, null)
-            assertEquals(jsDouble.evaluate(), 123.456)
-            assertEquals(jsNullableDouble.evaluate(), 123.456)
-            assertEquals(jsNullDouble.evaluate<Double?>(), null)
-
-            val jsArrayBoolean = JsValue.fromNativeValue(subject, booleanArrayOf(true, true, false))
-            val jsArrayNullableBoolean = JsValue.fromNativeValue(subject, arrayOf(true, null, false))
-            assertArrayEquals(jsArrayBoolean.evaluate(), booleanArrayOf(true, true, false))
-            assertArrayEquals(jsArrayNullableBoolean.evaluate(), arrayOf(true, null, false))
-
-            val jsArrayInt = JsValue.fromNativeValue(subject, intArrayOf(1, 2, 3))
-            val jsArrayNullableInt = JsValue.fromNativeValue(subject, arrayOf(1, null, 3))
-            assertArrayEquals(jsArrayInt.evaluate(), intArrayOf(1, 2, 3))
-            assertArrayEquals(jsArrayNullableInt.evaluate<Array<Int?>>(), arrayOf(1, null, 3))
-
-            val jsArrayLong = JsValue.fromNativeValue(subject, longArrayOf(1L, 2L, 3L))
-            val jsArrayNullableLong = JsValue.fromNativeValue(subject, arrayOf(1L, null, 3L))
-            assertArrayEquals(jsArrayLong.evaluate(), longArrayOf(1L, 2L, 3L))
-            assertArrayEquals(jsArrayNullableLong.evaluate<Array<Long?>>(), arrayOf(1L, null, 3L))
-
-            val jsArrayFloat = JsValue.fromNativeValue(subject, floatArrayOf(1f, 2f, 3f))
-            val jsArrayNullableFloat = JsValue.fromNativeValue(subject, arrayOf(1f, null, 3f))
-            assertTrue(jsArrayFloat.evaluate<FloatArray>().contentEquals(floatArrayOf(1f, 2f, 3f)))
-            assertArrayEquals(jsArrayNullableFloat.evaluate<Array<Float?>>(), arrayOf(1f, null, 3f))
-
-            val jsArrayDouble = JsValue.fromNativeValue(subject, doubleArrayOf(1.0, 2.0, 3.0))
-            val jsArrayNullableDouble = JsValue.fromNativeValue(subject, arrayOf(1.0, null, 3.0))
-            assertTrue(jsArrayDouble.evaluate<DoubleArray>().contentEquals(doubleArrayOf(1.0, 2.0, 3.0)))
-            assertArrayEquals(jsArrayNullableDouble.evaluate<Array<Double?>>(), arrayOf(1.0, null, 3.0))
-
-            val jsArrayString = JsValue.fromNativeValue(subject, arrayOf("a", "b", "c"))
-            val jsArrayNullableString = JsValue.fromNativeValue(subject, arrayOf("a", null, "c"))
-            assertArrayEquals(jsArrayString.evaluate(), arrayOf("a", "b", "c"))
-            assertArrayEquals(jsArrayNullableString.evaluate(), arrayOf("a", null, "c"))
+            assertFailsWith<IllegalArgumentException> {
+                subject.evaluate<BooleanArray>("[true, false, 'patate']")
+            }
+            assertFailsWith<IllegalArgumentException> {
+                subject.evaluate<IntArray>("[1, 2, 'patate']")
+            }
+            assertFailsWith<IllegalArgumentException> {
+                subject.evaluate<LongArray>("[1, 2, 'patate']")
+            }
+            assertFailsWith<IllegalArgumentException> {
+                subject.evaluate<FloatArray>("[1.0, 2.0, 'patate']")
+            }
+            assertFailsWith<IllegalArgumentException> {
+                subject.evaluate<DoubleArray>("[1.0, 2.0, 'patate']")
+            }
         }
     }
 
