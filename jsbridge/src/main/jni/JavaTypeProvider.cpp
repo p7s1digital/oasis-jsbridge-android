@@ -79,7 +79,7 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
       return createPrimitive<Double>(m_jsBridgeContext, boxed);
 
     case JavaTypeId::BoxedVoid:
-      return new Void(m_jsBridgeContext, id, false /*boxed*/);  // TODO: check it
+      return new Void(m_jsBridgeContext, id, false /*boxed*/);  // Java "Void" object behaves like the unboxed version
     case JavaTypeId::BoxedBoolean:
       return createPrimitive<Boolean>(m_jsBridgeContext, true);
     case JavaTypeId::BoxedInt:
