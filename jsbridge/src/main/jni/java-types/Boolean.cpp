@@ -71,8 +71,15 @@ JValue Boolean::popArray(uint32_t count, bool expanded) const {
     if (!expanded) {
       duk_get_prop_index(m_ctx, -1, static_cast<duk_uarridx_t>(i));
     }
-    JValue value = pop();
-    elements[i] = value.getBool();
+    try {
+      JValue value = pop();
+      elements[i] = value.getBool();
+    } catch (const std::exception &e) {
+      if (!expanded) {
+        duk_pop(m_ctx);  // pop the array
+      }
+      throw;
+    }
   }
 
   if (!expanded) {
@@ -116,7 +123,7 @@ duk_ret_t Boolean::pushArray(const JniLocalRef<jarray>& values, bool expand) con
 
 JValue Boolean::toJava(JSValueConst v) const {
   if (!JS_IsBool(v)) {
-    throw std::invalid_argument("Cannot convert return value to boolean");
+    throw std::invalid_argument("Cannot convert JS value to Java boolean");
   }
 
   return JValue(static_cast<jboolean>(JS_VALUE_GET_BOOL(v)));
@@ -149,7 +156,7 @@ JValue Boolean::toJavaArray(JSValueConst v) const {
   for (uint32_t i = 0; i < count; ++i) {
     JSValue ev = JS_GetPropertyUint32(m_ctx, v, i);
     if (!JS_IsBool(ev)) {
-      alog_warn("Cannot get int from JS: returning 0");  // TODO: proper exception handling
+      throw std::invalid_argument("Cannot convert array element to Java bool");
     }
 
     elements[i] = static_cast<jboolean>(JS_VALUE_GET_BOOL(ev));

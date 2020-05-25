@@ -71,8 +71,15 @@ JValue Float::popArray(uint32_t count, bool expanded) const {
     if (!expanded) {
       duk_get_prop_index(m_ctx, -1, static_cast<duk_uarridx_t>(i));
     }
-    JValue value = pop();
-    elements[i] = value.getFloat();
+    try {
+      JValue value = pop();
+      elements[i] = value.getFloat();
+    } catch (const std::exception &e) {
+      if (!expanded) {
+        duk_pop(m_ctx);  // pop the array
+      }
+      throw;
+    }
   }
 
   if (!expanded) {
@@ -125,16 +132,11 @@ namespace {
       return static_cast<jfloat>(JS_VALUE_GET_FLOAT64(v));
     }
 
-    alog_warn("Cannot get float from JS: returning 0");  // TODO: proper exception handling
-    return jfloat();
+    throw std::invalid_argument("Cannot convert JS value to Java float");
   }
 }
 
 JValue Float::toJava(JSValueConst v) const {
-  if (!JS_IsNumber(v)) {
-    throw std::invalid_argument("Cannot convert return value to float");
-  }
-
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
     return JValue();
   }

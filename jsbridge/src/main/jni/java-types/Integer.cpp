@@ -74,8 +74,15 @@ JValue Integer::popArray(uint32_t count, bool expanded) const {
     if (!expanded) {
       duk_get_prop_index(m_ctx, -1, static_cast<duk_uarridx_t>(i));
     }
-    JValue value = pop();
-    elements[i] = value.getInt();
+    try {
+      JValue value = pop();
+      elements[i] = value.getInt();
+    } catch (const std::exception &e) {
+      if (!expanded) {
+        duk_pop(m_ctx);  // pop the array
+      }
+      throw;
+    }
   }
 
   if (!expanded) {
@@ -128,16 +135,11 @@ namespace {
       return jint(JS_VALUE_GET_FLOAT64(v));
     }
 
-    alog_warn("Cannot get int from JS: returning 0");  // TODO: proper exception handling
-    return jint();
+    throw std::invalid_argument("Cannot convert JS value to Java int");
   }
 }
 
 JValue Integer::toJava(JSValueConst v) const {
-  if (!JS_IsNumber(v)) {
-    throw std::invalid_argument("Cannot convert return value to int");
-  }
-
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
     return JValue();
   }

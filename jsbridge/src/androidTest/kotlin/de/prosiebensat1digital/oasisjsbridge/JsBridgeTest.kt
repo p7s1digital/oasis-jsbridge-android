@@ -666,6 +666,7 @@ class JsBridgeTest {
         // GIVEN
         val subject = createAndSetUpJsBridge()
 
+        // THEN
         runBlocking {
             val jsTrue = JsValue.fromNativeValue(subject, true)
             val jsFalse = JsValue.fromNativeValue(subject, false)
@@ -725,6 +726,38 @@ class JsBridgeTest {
             val jsArrayNullableString = JsValue.fromNativeValue(subject, arrayOf("a", null, "c"))
             assertArrayEquals(jsArrayString.evaluate(), arrayOf("a", "b", "c"))
             assertArrayEquals(jsArrayNullableString.evaluate(), arrayOf("a", null, "c"))
+        }
+    }
+
+    @Test
+    fun testConversionErrors() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // THEN
+        runBlocking {
+            assertFailsWith<IllegalArgumentException> { subject.evaluate<BooleanArray>("1") }
+            assertFailsWith<IllegalArgumentException> { subject.evaluate<IntArray>("1") }
+            assertFailsWith<IllegalArgumentException> { subject.evaluate<LongArray>("1") }
+            assertFailsWith<IllegalArgumentException> { subject.evaluate<FloatArray>("1") }
+            assertFailsWith<IllegalArgumentException> { subject.evaluate<DoubleArray>("1") }
+            assertFailsWith<IllegalArgumentException> { subject.evaluate<Array<Any>>("1") }
+
+            assertFailsWith<IllegalArgumentException> {
+                subject.evaluate<BooleanArray>("[true, false, 'patate']")
+            }
+            assertFailsWith<IllegalArgumentException> {
+                subject.evaluate<IntArray>("[1, 2, 'patate']")
+            }
+            assertFailsWith<IllegalArgumentException> {
+                subject.evaluate<LongArray>("[1, 2, 'patate']")
+            }
+            assertFailsWith<IllegalArgumentException> {
+                subject.evaluate<FloatArray>("[1.0, 2.0, 'patate']")
+            }
+            assertFailsWith<IllegalArgumentException> {
+                subject.evaluate<DoubleArray>("[1.0, 2.0, 'patate']")
+            }
         }
     }
 
@@ -1994,7 +2027,7 @@ class JsBridgeTest {
         val config = JsBridgeConfig.bareConfig().apply {
             consoleConfig.enabled = true
             consoleConfig.mode = JsBridgeConfig.ConsoleConfig.Mode.Empty
-            consoleConfig.appendMessage = { priority, message ->
+            consoleConfig.appendMessage = { _, _ ->
                 hasMessage = true
             }
         }
@@ -2094,7 +2127,7 @@ class JsBridgeTest {
 
     @Suppress("UNUSED")  // Only for debugging
     private fun printErrors() {
-        if (!errors.isEmpty()) {
+        if (errors.isNotEmpty()) {
             Timber.e("JsBridge errors:")
             errors.forEachIndexed { index, error ->
                 Timber.e("Error ${index + 1}/${errors.count()}:\n")
@@ -2102,7 +2135,7 @@ class JsBridgeTest {
             }
         }
 
-        if (!unhandledPromiseErrors.isEmpty()) {
+        if (unhandledPromiseErrors.isNotEmpty()) {
             Timber.w("JsBridge unhandled Promise errors:")
             unhandledPromiseErrors.forEachIndexed { index, error ->
                 Timber.w("Unhandled Promise error ${index + 1}/${unhandledPromiseErrors.count()}:\n")
