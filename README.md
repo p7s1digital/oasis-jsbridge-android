@@ -10,15 +10,15 @@ println(msg)  // HELLO WORLD!
 ```
 
 Powered by:
-- [Duktape][duktape] (E5 + partial ES2015) or
+- [Duktape][duktape] (E5 + partially ES2015) or
 - [QuickJS][quickjs] (ES2020)
 
 
 ## Features
 
- * evaluate JavaScript code from Java/Kotlin
- * map values, objects and functions between Java/Kotlin and JavaScript
- * propagate exceptions between JavaScript and Java/Kotlin (including stack trace)
+ * evaluate JavaScript code from Kotlin/Java
+ * map values, objects and functions between Kotlin/Java and JavaScript
+ * propagate exceptions between JavaScript and Kotlin/Java (including stack trace)
  * non-blocking API (via coroutines)
  * support for suspending functions and JavaScript promises
  * extensions (optional): console, setTimeout/setInterval, XmlHttpRequest, Promise, JS debugger
@@ -40,8 +40,8 @@ allprojects {
 
 Add jsbridge dependency (module gradle):
 ```
-implementation "com.github.p7s1digital.oasis-jsbridge-android:oasis-jsbridge-duktape:1.0.0"  // Duktape flavor
-// OR: implementation "com.github.p7s1digital.oasis-jsbridge-android:oasis-duktape-quickjs:1.0.0"  // QuickJS flavor
+implementation "com.github.p7s1digital.oasis-jsbridge-android:oasis-jsbridge-duktape:<version>"  // Duktape flavor
+// OR: implementation "com.github.p7s1digital.oasis-jsbridge-android:oasis-duktape-quickjs:<version>"  // QuickJS flavor
 ```
 
 
@@ -49,8 +49,8 @@ implementation "com.github.p7s1digital.oasis-jsbridge-android:oasis-jsbridge-duk
 
 1. [Evaluate JS code](#evaluating-js-code)
 1. [Reference any JS value](#jsvalue)
-1. [Map JS objects to Java/Kotlin](#using-js-objects-from-javakotlin)
-1. [Map Kotlin/Java objects to JS](#using-javakotlin-objects-from-js)
+1. [Map JS objects to Kotlin/Java](#using-js-objects-from-kotlinjava)
+1. [Map Kotlin/Java objects to JS](#using-kotlinjava-objects-from-js)
 1. [Map JS functions to Kotlin](#calling-js-functions-from-kotlin)
 1. [Map Kotlin functions to JS](#calling-kotlin-functions-from-js)
 1. [Extensions](#extensions)
@@ -113,8 +113,9 @@ val calcSumJs = JsValue.newFunction(jsBridge, "a", "b", "return a + b;")
 It has an associated (global) JS variable whose name can be accessed via `toString()` which makes it easy to re-use it from JS code.<br/>
 e.g.: `val sum: Int = jsBridge.evaluate("$calcSumJs(2, 3)")`
 
-The scope of a JsValue is the one defined by the JVM. In other words, the associated global
-variable will be deleted when JsValue is garbage-collected.
+The scope of a JsValue is defined by JVM. In other words, the associated global
+variable in JavaScript will be avalaible as long as the JsValue instance is not  
+garbage-collected.
 
 Evaluating a JsValue:
 ```kotlin
@@ -129,15 +130,15 @@ String s = (String) jsString.evaluateBlocking(String.class);
 ```
 
 Additionally, a JS (proxy) value can be created from:
-- [a Java/Kotlin object](#using-javakotlin-objects-from-js) via `JsValue.fromNativeObject()`.
+- [a Kotlin/Java object](#using-kotlinjava-objects-from-js) via `JsValue.fromNativeObject()`.
 - [a Kotlin function](#calling-kotlin-functions-from-js) via `JsValue.fromNativeFunction()`.
 
 A JS value can be mapped to:
-- [a Java/Kotlin proxy object](#using-js-objects-from-javakotlin) via `JsValue.mapToNativeObject()`.
+- [a Kotlin/Java proxy object](#using-js-objects-from-kotlinjava) via `JsValue.mapToNativeObject()`.
 - [a Kotlin proxy function](#calling-js-functions-from-kotlin) via `JsValue.mapToNativeFunction()`.
 
 
-### Using JS objects from Java/Kotlin
+### Using JS objects from Kotlin/Java
 
 An interface extending `NativeToJsInterface` must be defined with the methods implemented by the
 JS object and mapped to a native object:
@@ -166,7 +167,7 @@ See [Example](#example-consuming-a-js-api-from-kotlin).
 Note: when calling a non-suspending method with return value, the caller thread will be blocked until the result has been returned.
 
 
-### Using Java/Kotlin objects from JS
+### Using Kotlin/Java objects from JS
 
 An interface extending `JsToNativeInterface` must be defined, implemented by the
 native object and mapped to a new JsValue via `JsValue.fromNativeObject()`.
@@ -235,15 +236,20 @@ conversion or via JSON serialization. JSON serialization provides much more deta
 (including objects and Error instances) but is slower than the string variant (which displays
 objects as "[object Object]").
 
-- **XMLHtmlRequest:**<br/>
-Support for network requests using okhttp client internally.
+- **XMLHtmlRequest (XHR):**<br/>
+Support for XmlHttpRequest network requests using `okhttp` client internally. The `okhttp` instance
+can be injected in the `JsBridgeConfig` object.
+_Note: not all HTTP methods are currently implemented, check the source code for details._
+Other network clients are not tested but should work as well (polyfill for
+[fetch](https://www.npmjs.com/package/whatwg-fetch),
+[axios](https://github.com/axios/axios#features) uses XHR in browser mode)
 
 - **Promise:**<br/>
 Support for ES6 promises (Duktape: via polyfill, QuickJS: built-in). Pending jobs are triggered
 after each evaluation.
 
 - **JS Debugger:**<br/>
-JS debugger support (Duktape-only)
+JS debugger support (Duktape only via Visual Studio Code plugin)
 
 
 ## Supported types
