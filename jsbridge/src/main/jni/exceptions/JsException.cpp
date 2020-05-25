@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <log.h>
 #include "JsException.h"
 #include "JsBridgeContext.h"
 
@@ -35,13 +36,17 @@ namespace {
   }
 #elif defined(QUICKJS)
   std::string createMessage(const JsBridgeContext *jsBridgeContext, JSValueConst exceptionValue) {
+    alog("BW - JsException::createMessage() - P0");
+
     JSContext *ctx = jsBridgeContext->getQuickJsContext();
     const QuickJsUtils *utils = jsBridgeContext->getUtils();
 
     if (JS_IsError(ctx, exceptionValue)) {
+      alog("BW - JsException::createMessage() - P1");
       return utils->toString(JS_GetPropertyStr(ctx, exceptionValue, "message"));
     }
 
+    alog("BW - JsException::createMessage() - P2");
     return utils->toString(exceptionValue);
   }
 #endif
@@ -99,6 +104,7 @@ JsException::JsException(const JsBridgeContext *jsBridgeContext, JSValue excepti
  : m_jsBridgeContext(jsBridgeContext)
  , m_value(exceptionValue)
  , m_what(createMessage(jsBridgeContext, exceptionValue)) {
+  alog("BW - JsException::JsException()");
 }
 
 JsException::~JsException() {
