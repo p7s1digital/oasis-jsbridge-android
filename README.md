@@ -118,8 +118,10 @@ val calcSumJs = JsValue.newFunction(jsBridge, "a", "b", "return a + b;")
 val calcSumJs = JsValue.fromNativeFunction2(jsBridge) { a: Int, b: Int -> a + b }
 ```
 
-It has an associated (global) JS variable whose name can be accessed via `toString()` which makes it easy to re-use it from JS code.<br/>
-e.g.: `val sum: Int = jsBridge.evaluate("$calcSumJs(2, 3)")`
+It has an associated (global) JS variable whose name can be accessed via `toString()` which makes it easy to re-use it from JS code:<br/>
+```kotlin
+val sum: Int = jsBridge.evaluate("$calcSumJs(2, 3)")
+```
 
 The scope of a JsValue is defined by JVM. In other words, the associated global
 variable in JavaScript will be avalaible as long as the JsValue instance is not  
@@ -127,9 +129,11 @@ garbage-collected.
 
 Evaluating a JsValue:
 ```kotlin
-val s = jsString.evaluate<String>()  // suspending function + explicit generic parameter
-val s: String = jsString.evaluate()  // suspending function + inferred generic parameter
-val s: String = jsString.evaluateBlocking()  // blocking
+val i = jsInt.evaluate<Int>()  // suspending function + explicit generic parameter
+val i: Int = jsInt.evaluate()  // suspending function + inferred generic parameter
+val i: Int = jsString.evaluateBlocking()  // blocking
+val s: String = jsString.evaluate()
+val o: JsonObjectWrapper = jsObject.evaluate()
 ```
 
 From Java (blocking):
@@ -148,8 +152,8 @@ A JS value can be mapped to:
 
 ### Using JS objects from Kotlin/Java
 
-An interface extending `NativeToJsInterface` must be defined with the methods implemented by the
-JS object and mapped to a native object:
+An interface extending `NativeToJsInterface` must be defined with the methods of the
+JS object:
 
 ```kotlin
 interface JsApi : NativeToJsInterface {
@@ -162,10 +166,12 @@ val jsObject = JsValue(jsBridge, """({
   method2: function(c) { return "Value: " + c; }
 })""")
 
+// Create a native proxy to the JS object
 val jsApi: JsApi = jsObject.mapToNativeObject()  // no check
 val jsApi: JsApi = jsObject.mapToNativeObject(check = true)  // suspending, optionally check that all methods are defined in the JS object
 val jsApi: JsApi = jsObject.mapToNativeObjectBlocking(check = true)  // blocking (with optional check)
 
+// Call JS methods from native
 jsApi.method1(1, "two")
 val s = jsApi.method2(3.456)  // suspending
 ```
@@ -177,8 +183,8 @@ Note: when calling a non-suspending method with return value, the caller thread 
 
 ### Using Kotlin/Java objects from JS
 
-An interface extending `JsToNativeInterface` must be defined, implemented by the
-native object and mapped to a new JsValue via `JsValue.fromNativeObject()`.
+An interface extending `JsToNativeInterface` must be defined with the methods of the
+native object:
 
 ```kotlin
 interface NativeApi : JsToNativeInterface {
@@ -189,8 +195,10 @@ val obj = object : NativeApi {
     override fun method(a: Int, b: String): Double { ... }
 }
 
+// Create a JS proxy to the native object
 val nativeApi: JsValue = JsValue.fromNativeObject(jsBridge, obj)
 
+// Call native method from JS
 jsBridge.evaluateNoRetVal("globalThis.x = $nativeApi.method(1, 'two');")
 ```
 
@@ -205,9 +213,8 @@ is possible to return a Deferred.
 ### Calling JS functions from Kotlin
 
 ```kotlin
-val calcSumJs: suspend (Int, Int) -> Int = JsValue.newFunction(jsBridge, "a", "b", """
-  return a + b;
-""".trimIndent())
+val calcSumJs: suspend (Int, Int) -> Int = JsValue
+    .newFunction(jsBridge, "a", "b", "return a + b;")
     .mapToNativeFunction2()
 
 println("Sum is $calcSumJs(1, 2)")
@@ -223,9 +230,7 @@ Available methods:
 ```kotlin
 val calcSumNative = JsValue.fromNativeFunction2(jsBridge) { a: Int, b: Int -> a + b }
 
-jsBridge.evaluateNoRetVal("""
-  console.log("Sum is", $calcSumNative(1, 2));
-""".trimIndent())
+jsBridge.evaluateNoRetVal("console.log('Sum is', $calcSumNative(1, 2))");
 ```
 
 Note: the native function is triggered from the "JS" thread
@@ -299,7 +304,7 @@ JavaScript (js/api.js):
 ```js
 globalThis.createApi = function(nativeApi, config) {
   return {
-    createMessage: function(name) {
+    createMessage: function() {
       const platformName = nativeApi.getPlatformName();
       return nativeApi.getTemperatureCelcius().then(function(celcius) {
         const value = config.useFahrenheit ? celcius * x + c : celcius;
@@ -329,7 +334,7 @@ val nativeApi = object: NativeApi {
 }
 val nativeApiJsValue = JsValue.fromNativeObject(jsBridge, nativeApi)
 
-// Create JS API
+// Create native "proxy" to JS API
 val config = JsonObjectWrapper("debug" to true, "useFahrenheit" to false)  // {debug: true, useFahrenheit: false}
 val createJsApi: suspend (JsValue, JsonObjectWrapper) -> JsValue
     = JsValue(jsBridge, "createApi").mapToNativeFunction2()  // JS: globalThis.createApi(nativeApi, config)
@@ -364,11 +369,11 @@ Originally based on [Duktape Android][duktape-android] (Apache license, version 
 `Copyright (C) 2015 Square, Inc.`
 
 Includes C code from [Duktape][duktape] (MIT license)<br/>
-`Copyright (c) 2013-2019 by Duktape authors`
+`Copyright (c) 2013-2020 by Duktape authors`
 
 Includes C code from [QuickJS][quickjs] (MIT license)<br/>
-`Copyright (c) 2017-2019 Fabrice Bellard`<br/>
-`Copyright (c) 2017-2019 Charlie Gordon`
+`Copyright (c) 2017-2020 Fabrice Bellard`<br/>
+`Copyright (c) 2017-2010 Charlie Gordon`
 
 
  [duktape-android]: https://github.com/square/duktape-android/
