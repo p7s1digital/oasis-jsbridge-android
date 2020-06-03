@@ -13,7 +13,7 @@ println(msg)  // HELLO WORLD!
 ```
 
 Powered by:
-- [Duktape][duktape] (E5 + partially ES2015) or
+- [Duktape][duktape] (ES5 + partially ES6) or
 - [QuickJS][quickjs] (ES2020)
 
 
@@ -287,7 +287,7 @@ JS debugger support (Duktape only via Visual Studio Code plugin)
 
 ## Example: consuming a JS API from Kotlin
 
-JS <=> Kotlin API:
+ JavaScript <=> Kotlin API:
 ```kotlin
 interface JsApi : NativeToJsInterface {
     suspend fun createMessage(): String
@@ -300,7 +300,10 @@ interface NativeApi : JsToNativeInterface {
 }
 ```
 
-JavaScript (js/api.js):
+JavaScript API (js/api.js):
+<details>
+    <summary>ES5</summary>
+
 ```js
 globalThis.createApi = function(nativeApi, config) {
   return {
@@ -316,15 +319,28 @@ globalThis.createApi = function(nativeApi, config) {
       return new Promise(function(resolve) { resolve(a + b); });
     }
   };
-}
+};
 ```
+</details>
+<details>
+    <summary>ES6</summary>
 
-Kotlin:
+```js
+globalThis.createApi = (nativeApi, config) => {(
+  createMessage: async () => {
+    const platformName = nativeApi.getPlatformName();
+    const celcius = await nativeApi.getTemperatureCelcius();
+    const value = config.useFahrenheit ? celcius * x + c : celcius;
+    const unit = config.useFahrenheit ? "degrees F" : "degrees C";
+    return `Hello ${platformName}! The temperature is ${value} ${unit}.`;
+  },
+  calcSum: async (a, b) => a + b
+});
+```
+</details>
+
+Kotlin API:
 ```kotlin
-val jsBridge = JsBridge()
-jsBridge.evaluateLocalFile(context, "js/api.js")
-
-// Implement native API
 val nativeApi = object: NativeApi {
     override fun getPlatformName() = "Android"
     override fun getTemperatureCelcius() = async {
@@ -332,15 +348,27 @@ val nativeApi = object: NativeApi {
         37.2f
     }
 }
+```
+
+Bridging JavaScript and Kotlin:
+```kotlin
+val jsBridge = JsBridge()
+jsBridge.evaluateLocalFile(context, "js/api.js")
+
+// JS "proxy" to native API
 val nativeApiJsValue = JsValue.fromNativeObject(jsBridge, nativeApi)
 
-// Create native "proxy" to JS API
+// JS function createApi(nativeApi, config)
 val config = JsonObjectWrapper("debug" to true, "useFahrenheit" to false)  // {debug: true, useFahrenheit: false}
 val createJsApi: suspend (JsValue, JsonObjectWrapper) -> JsValue
-    = JsValue(jsBridge, "createApi").mapToNativeFunction2()  // JS: globalThis.createApi(nativeApi, config)
+    = JsValue(jsBridge, "createApi").mapToNativeFunction2()
+    
+// Create native "proxy" to JS API
 val jsApi: JsApi = createJsApi(nativeApiJsValue, config).mapToNativeObject()
+```
 
-// Call JS API methods
+Consume API:
+```kotlin
 val msg = jsApi.createMessage()  // (suspending) "Hello Android, the temperature is 37.2 degrees C."
 val sum = jsApi.calcSum(3, 2)  // (suspending) 5
 ```
