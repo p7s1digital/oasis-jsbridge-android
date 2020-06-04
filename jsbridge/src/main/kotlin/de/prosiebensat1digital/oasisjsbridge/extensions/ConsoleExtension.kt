@@ -27,7 +27,7 @@ internal interface StringConsole : JsToNativeInterface {
     fun trace(vararg args: DebugString)
     fun info(vararg args: DebugString)
     fun warn(vararg args: DebugString)
-    fun err(vararg args: DebugString)
+    fun error(vararg args: DebugString)
     fun exception(vararg args: DebugString)
 }
 
@@ -38,7 +38,7 @@ internal interface JsonConsole : JsToNativeInterface {
     fun trace(vararg args: JsonObjectWrapper)
     fun info(vararg args: JsonObjectWrapper)
     fun warn(vararg args: JsonObjectWrapper)
-    fun err(vararg args: JsonObjectWrapper)
+    fun error(vararg args: JsonObjectWrapper)
     fun exception(vararg args: JsonObjectWrapper)
 }
 
@@ -49,7 +49,7 @@ internal interface EmptyConsole : JsToNativeInterface {
     fun trace(vararg args: Unit)
     fun info(vararg args: Unit)
     fun warn(vararg args: Unit)
-    fun err(vararg args: Unit)
+    fun error(vararg args: Unit)
     fun exception(vararg args: Unit)
 }
 
@@ -76,7 +76,7 @@ internal class ConsoleExtension(
             override fun trace(vararg args: DebugString) = message(Log.DEBUG, ds2s(args))
             override fun info(vararg args: DebugString) = message(Log.INFO, ds2s(args))
             override fun warn(vararg args: DebugString) = message(Log.WARN, ds2s(args))
-            override fun err(vararg args: DebugString) = message(Log.ERROR, ds2s(args))
+            override fun error(vararg args: DebugString) = message(Log.ERROR, ds2s(args))
             override fun exception(vararg args: DebugString) = message(Log.ERROR, ds2s(args))
 
             override fun assert(assertion: Boolean, vararg args: DebugString) {
@@ -96,7 +96,7 @@ internal class ConsoleExtension(
             override fun trace(vararg args: JsonObjectWrapper) = message(Log.DEBUG, j2s(args))
             override fun info(vararg args: JsonObjectWrapper) = message(Log.INFO, j2s(args))
             override fun warn(vararg args: JsonObjectWrapper) = message(Log.WARN, j2s(args))
-            override fun err(vararg args: JsonObjectWrapper) = message(Log.ERROR, j2s(args))
+            override fun error(vararg args: JsonObjectWrapper) = message(Log.ERROR, j2s(args))
             override fun exception(vararg args: JsonObjectWrapper) = message(Log.ERROR, j2s(args))
 
             override fun assert(assertion: Boolean, vararg args: JsonObjectWrapper) {
@@ -116,7 +116,7 @@ internal class ConsoleExtension(
             override fun trace(vararg args: Unit) = Unit
             override fun info(vararg args: Unit) = Unit
             override fun warn(vararg args: Unit) = Unit
-            override fun err(vararg args: Unit) = Unit
+            override fun error(vararg args: Unit) = Unit
             override fun exception(vararg args: Unit) = Unit
             override fun assert(assertion: Boolean, vararg args: Unit) = Unit
         }
