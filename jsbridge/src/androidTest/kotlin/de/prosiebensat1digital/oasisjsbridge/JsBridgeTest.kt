@@ -1161,6 +1161,21 @@ class JsBridgeTest {
         if (android.os.Build.VERSION.SDK_INT >= 24) {
             verify(timeout = 3000L) { jsToNativeFunctionMock(eq(true)) }
         }
+
+        // AND WHEN
+        runBlocking {
+            // Missing parameter (replaced with null)
+            val missingParameterException = assertFailsWith<JsException> {
+                subject.evaluate<Unit>("$calcSumNative(2)")
+            }
+            assertTrue(missingParameterException.cause is NullPointerException)
+
+            // Too many parameters
+            val tooManyParametersException = assertFailsWith<JsException> {
+                subject.evaluate<Unit>("$calcSumNative(2, 3, 4)")
+            }
+        }
+        calcSumNative.hold()
     }
 
     // Port of similar test in Duktape Android
@@ -1970,7 +1985,7 @@ class JsBridgeTest {
             console.log("This is a log with undefined and null:", undefined, "-", null);
             console.info("This is an info with 2 integers:", 1664, "and", 69);
             console.warn("This is a warning with an object:", { one: 1, two: "two" });
-            console.err("This is an error:", new Error("completely wrong"));
+            console.error("This is an error:", new Error("completely wrong"));
             console.assert(1 == 1, "should not be displayed");
             console.assert(1 == 2, "should be displayed");
             """
@@ -2008,7 +2023,7 @@ class JsBridgeTest {
             console.log("This is a log with undefined and null:", undefined, "-", null);
             console.info("This is an info with 2 integers:", 1664, "and", 69);
             console.warn("This is a warning with an object:", { one: 1, two: "two" });
-            console.err("This is an error:", new Error("completely wrong"));
+            console.error("This is an error:", new Error("completely wrong"));
             console.assert(1 == 1, "should not be displayed");
             console.assert(1 == 2, "should be displayed");
             """
@@ -2046,7 +2061,7 @@ class JsBridgeTest {
             console.log("This is a log with undefined and null:", undefined, "-", null);
             console.info("This is an info with 2 integers:", 1664, "and", 69);
             console.warn("This is a warning with an object:", { one: 1, two: "two" });
-            console.err("This is an error:", new Error("completely wrong"));
+            console.error("This is an error:", new Error("completely wrong"));
             console.assert(1 == 1, "should not be displayed");
             console.assert(1 == 2, "should be displayed");
             """

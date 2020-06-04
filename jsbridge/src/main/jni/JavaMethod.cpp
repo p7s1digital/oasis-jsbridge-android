@@ -24,6 +24,7 @@
 #include "JniTypes.h"
 #include "JsBridgeContext.h"
 #include "exceptions/JniException.h"
+#include "log.h"
 #include "jni-helpers/JniLocalRef.h"
 #include "jni-helpers/JniLocalFrame.h"
 #include "jni-helpers/JniContext.h"
@@ -107,8 +108,14 @@ duk_ret_t JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRe
       ? m_argumentTypes.size() - 1
       : m_argumentTypes.size();
 
-  if (argCount < minArgs || (!m_isVarArgs && argCount > minArgs)) {
-    throw std::invalid_argument(std::string() + "wrong number of arguments when calling Java method " + m_methodName + " (expected: " + std::to_string(minArgs) + ", received: " + std::to_string(argCount) + ")");
+  if (argCount < minArgs) {
+    // Not enough args
+    alog_warn("Not enough parameters when calling Java method %s (expected: %d, received: %d). Missing parameters will be set to null.", m_methodName.c_str(), minArgs, argCount);
+  }
+
+  if (!m_isVarArgs && argCount > minArgs) {
+    // Too many args
+    throw std::invalid_argument(std::string() + "Too many parameters when calling Java method " + m_methodName + " (expected: " + std::to_string(minArgs) + ", received: " + std::to_string(argCount) + ")");
   }
 
   std::vector<JValue> args(m_argumentTypes.size());
@@ -121,7 +128,13 @@ duk_ret_t JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRe
   }
   for (ssize_t i = minArgs - 1; i >= 0; --i) {
     const auto &argumentType = m_argumentTypes[i];
-    JValue value = argumentType->pop();
+    JValue value;
+    if (i >= argCount) {
+      // Parameter not given by JS: set it to null
+      // Note: we do not explicitly check if the parameter is nullable so the execution might throw!
+    } else {
+      value = argumentType->pop();
+    }
     args[i] = std::move(value);
   }
 
@@ -140,15 +153,13 @@ JSValue JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRef<
       : m_argumentTypes.size();
 
   if (argc < minArgs) {
-    // Not enough arguments
-    JS_ThrowRangeError(ctx, "Not enough parameters when calling Java method %s (got %d, expected %d)", m_methodName.c_str(), argc, minArgs);
-    return JS_UNDEFINED;
+    // Not enough args
+    alog_warn("Not enough parameters when calling Java method %s (expected: %d, received: %d). Missing parameters will be set to null.", m_methodName.c_str(), minArgs, argc);
   }
 
   if (!m_isVarArgs && argc > minArgs) {
-    // Too many arguments
-    JS_ThrowRangeError(ctx, "Too many parameters when calling Java method %s (got %d, expected %d)", m_methodName.c_str(), argc, minArgs);
-    return JS_UNDEFINED;
+    // Too many args
+    throw std::invalid_argument(std::string() + "Too many parameters when calling Java method " + m_methodName + " (expected: " + std::to_string(minArgs) + ", received: " + std::to_string(argc) + ")");
   }
 
   std::vector<JValue> args(m_argumentTypes.size());
@@ -156,7 +167,13 @@ JSValue JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRef<
   // Load arguments and convert to Java types
   for (int i = 0; i < minArgs; ++i) {
     const auto &argumentType = m_argumentTypes[i];
-    JValue value = argumentType->toJava(argv[i]);
+    JValue value;
+    if (i >= argc) {
+      // Parameter not given by JS: set it to null
+      // Note: we do not explicitly check if the parameter is nullable so the execution might throw!
+    } else {
+      value = argumentType->toJava(argv[i]);
+    }
     args[i] = std::move(value);
   }
 
