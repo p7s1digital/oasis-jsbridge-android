@@ -110,7 +110,11 @@ class JsBridge(context: Context): CoroutineScope {
             return
         }
 
-        release()
+        try {
+            release()
+        } catch (t: Throwable) {
+            Timber.e(t)
+        }
     }
 
 
