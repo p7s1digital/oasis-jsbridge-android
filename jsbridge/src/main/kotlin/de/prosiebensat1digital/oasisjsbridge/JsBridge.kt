@@ -105,6 +105,14 @@ class JsBridge(context: Context): CoroutineScope {
         }
     }
 
+    protected fun finalize() {
+        if (state.get() == State.Releasing.intValue || state.get() == State.Released.intValue) {
+            return
+        }
+
+        release()
+    }
+
 
     // Public methods
     // ---
