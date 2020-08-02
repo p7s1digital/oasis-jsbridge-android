@@ -21,26 +21,24 @@ package de.prosiebensat1digital.oasisjsbridge
 import android.app.Activity
 import android.content.Context
 import android.os.Looper
-import android.support.annotation.VisibleForTesting
+import androidx.annotation.VisibleForTesting
 import de.prosiebensat1digital.oasisjsbridge.JsBridgeError.*
-import de.prosiebensat1digital.oasisjsbridge.extensions.JsDebuggerExtension
-import de.prosiebensat1digital.oasisjsbridge.extensions.PromisePolyfillExtension
-import de.prosiebensat1digital.oasisjsbridge.extensions.SetTimeoutExtension
-import de.prosiebensat1digital.oasisjsbridge.extensions.XMLHttpRequestExtension
-import kotlinx.coroutines.*
-import okhttp3.OkHttpClient
-import timber.log.Timber
+import de.prosiebensat1digital.oasisjsbridge.extensions.*
 import java.io.FileNotFoundException
 import java.io.InputStream
+import java.lang.reflect.Method as JavaMethod
 import java.lang.reflect.Proxy
 import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 import kotlin.coroutines.*
 import kotlin.reflect.*
 import kotlin.reflect.full.createType
 import kotlin.reflect.full.declaredMemberFunctions
-import java.lang.reflect.Method as JavaMethod
+import kotlinx.coroutines.*
+import timber.log.Timber
 
 
 // Execute JS code via Duktape or QuickJS and handle the bi-directional communication between native
@@ -57,7 +55,9 @@ import java.lang.reflect.Method as JavaMethod
 // Note: all the public methods are asynchronous and will not block the caller threads. They
 // can be safely called in a "synchronous" way. though, because their executions are guaranteed
 // to be performed sequentially (via an internal queue).
-class JsBridge(context: Context): CoroutineScope {
+class JsBridge
+@JvmOverloads
+constructor(config: JsBridgeConfig): CoroutineScope {
 
     companion object {
         private const val CONSOLE_TAG = "JsBridgeConsole"
@@ -68,13 +68,12 @@ class JsBridge(context: Context): CoroutineScope {
         abstract fun onError(error: JsBridgeError)
     }
 
-    internal val context = context.applicationContext
-
     // State
     private enum class State(val intValue: Int) {
-        Pending(0), Starting1(1), Starting2(2), Started(3),
+        Pending(0), AboutToStart(1), Starting(2), Started(3),
         Releasing(4), Released(5);
     }
+    private val startReleaseLock = ReentrantLock()
     private var state = AtomicInteger(State.Pending.intValue)
     private val currentState get() = State.values().firstOrNull { it.intValue == state.get() }
 
@@ -93,81 +92,96 @@ class JsBridge(context: Context): CoroutineScope {
 
     // Extensions
     private var jsDebuggerExtension: JsDebuggerExtension? = null
-    private var promisePolyfillExtension: PromisePolyfillExtension? = null
+    private var promiseExtension: PromiseExtension? = null
     private var setTimeoutExtension: SetTimeoutExtension? = null
-    private var xmlHttpRequestExtension: XMLHttpRequestExtension? = null
+    private var consoleExtension: ConsoleExtension? = null
+    private var xhrExtension: XMLHttpRequestExtension? = null
 
     private var internalCounter = AtomicInteger(0)
 
-    val isJsDebuggerActive: Boolean get() = jsDebuggerExtension?.isActive == true
-
-
+    // Initialize the JS interpreter
+    // - create the JS context via JNI
+    // - set up the interpreter with polyfills and helpers (e.g. support for setTimeout)
     init {
         launch {
             jsThreadId = Thread.currentThread().id
         }
+
+        startReleaseLock.withLock {
+            Timber.d("Starting JsBridge")
+
+            // Pending -> AboutToStart
+            if (!state.compareAndSet(State.Pending.intValue, State.AboutToStart.intValue)) {
+                throw StartError(
+                    null,
+                    "Cannot start the JsBridge because its current state is $currentState"
+                )
+                    .also(::notifyErrorListeners)
+            }
+
+            launch {
+                // AboutToStart -> Starting
+                // From now on, a release() call is allowed to interrupt the start
+                if (!state.compareAndSet(State.AboutToStart.intValue, State.Starting.intValue)) {
+                    return@launch  // Start interrupted by a Destroy
+                }
+
+                try {
+                    val jniJsContext = createJniJsContext()
+
+                    if (this@JsBridge.jniJsContext != null) {
+                        throw InternalError("Cannot create a second JNI context!")
+                    }
+                    this@JsBridge.jniJsContext = jniJsContext
+                } catch (t: Throwable) {
+                    throw StartError(t)
+                }
+
+                if (state.compareAndSet(State.Starting.intValue, State.Started.intValue)) {
+                    Timber.d("JsBridge successfully started!")
+                }
+            }
+
+            // Extensions
+            if (config.jsDebuggerConfig.enabled)
+                jsDebuggerExtension = JsDebuggerExtension(this, config.jsDebuggerConfig)
+            if (config.promiseConfig.enabled)
+                promiseExtension = PromiseExtension(this@JsBridge, config.promiseConfig)
+            if (config.setTimeoutConfig.enabled)
+                setTimeoutExtension = SetTimeoutExtension(this@JsBridge)
+            if (config.consoleConfig.enabled)
+                consoleExtension = ConsoleExtension(this@JsBridge, config.consoleConfig)
+            if (config.xhrConfig.enabled)
+                xhrExtension = XMLHttpRequestExtension(this@JsBridge, config.xhrConfig)
+        }
+    }
+
+    protected fun finalize() {
+        if (state.get() == State.Releasing.intValue || state.get() == State.Released.intValue) {
+            return
+        }
+
+        release()
     }
 
 
     // Public methods
     // ---
 
-    // Start and initialize the JS interpreter
-    //
-    // - create the Duktape context via JNI
-    // - set up the interpreter with polyfills and helpers (e.g. support for setTimeout)
-    @JvmOverloads
-    fun start(okHttpClient: OkHttpClient? = null) {
-        Timber.d("Starting JsBridge")
-
-        // Pending -> Starting1
-        if (!state.compareAndSet(State.Pending.intValue, State.Starting1.intValue)) {
-            throw StartError(null, "Cannot start the JsBridge because its current state is $currentState")
-                .also(::notifyErrorListeners)
-        }
-
-        launch {
-            // Starting1 -> Starting2
-            // From now on, a release() call is allowed to interrupt the start
-            if (!state.compareAndSet(State.Starting1.intValue, State.Starting2.intValue)) {
-                return@launch  // Start interrupted by a Destroy
-            }
-
-            try {
-                val jniJsContext = createJniJsContext()
-
-                assert(this@JsBridge.jniJsContext == null)
-                this@JsBridge.jniJsContext = jniJsContext
-            } catch (t: Throwable) {
-                throw StartError(t)
-            }
-
-            if (state.compareAndSet(State.Starting2.intValue, State.Started.intValue)) {
-                Timber.d("JsBridge successfully started!")
-            }
-        }
-
-        // Extensions (TODO: use a Configuration data class)
-        jsDebuggerExtension = JsDebuggerExtension(this)
-        if (!BuildConfig.HAS_BUILTIN_PROMISE) promisePolyfillExtension = PromisePolyfillExtension(this@JsBridge)
-        setTimeoutExtension = SetTimeoutExtension(this@JsBridge)
-        xmlHttpRequestExtension = XMLHttpRequestExtension(this@JsBridge, okHttpClient)
-    }
-
     // Destroy the JsBridge
     //
     // - Cancel (and join) all the active jobs
     // - Destroy the JS context via JNI
     // - Clean up resources
-    fun release() {
+    fun release(): Unit = startReleaseLock.withLock {
         if (state.get() == State.Releasing.intValue || state.get() == State.Released.intValue) {
             Timber.w("JsBridge is already in state $currentState and does not need to be released again!")
             return
         }
 
-        // Started or Starting2 -> Releasing
-        if (!state.compareAndSet(State.Started.intValue, State.Releasing.intValue) &&
-            !state.compareAndSet(State.Starting2.intValue, State.Releasing.intValue)) {
+        if (!state.compareAndSet(State.AboutToStart.intValue, State.Releasing.intValue) &&
+            !state.compareAndSet(State.Starting.intValue, State.Releasing.intValue) &&
+            !state.compareAndSet(State.Started.intValue, State.Releasing.intValue)) {
             throw DestroyError(null, "Cannot destroy the JsBridge because its current state is $currentState}")
                 .also(::notifyErrorListeners)
         }
@@ -177,9 +191,14 @@ class JsBridge(context: Context): CoroutineScope {
                 .also(::notifyErrorListeners)
         }
 
+        rootJob.cancel()
+
         // As we are at the end of the lifecycle, we use here the GlobalScope
         GlobalScope.launch(jsDispatcher + coroutineExceptionHandler) {
-            rootJob.cancelAndJoin()
+            try {
+                rootJob.join()
+            } catch (c: CancellationException) {
+            }
 
             try {
                 jniJsContext?.let { jniDeleteContext(it) }
@@ -191,14 +210,14 @@ class JsBridge(context: Context): CoroutineScope {
             jsDebuggerExtension?.release()
             jsDebuggerExtension = null
 
-            promisePolyfillExtension?.release()
-            promisePolyfillExtension = null
+            promiseExtension?.release()
+            promiseExtension = null
 
             setTimeoutExtension?.release()
             setTimeoutExtension = null
 
-            xmlHttpRequestExtension?.release()
-            xmlHttpRequestExtension = null
+            xhrExtension?.release()
+            xhrExtension = null
 
             errorListeners.clear()
             jsDispatcher.close()
@@ -220,14 +239,14 @@ class JsBridge(context: Context): CoroutineScope {
 
     fun startDebugger(activity: Activity? = null) {
         val jsDebuggerExtension = jsDebuggerExtension ?: run {
-            Timber.w("Cannot start debugger: JS debugger extension has not been created!")
+            Timber.w("Cannot start JS debugger: Please enable it in JsBridgeConfig.jsDebuggerConfig.")
             return
         }
 
         jsDebuggerExtension.activity = activity
 
         launch {
-            jniStartDebugger(jniJsContextOrThrow())
+            jniStartDebugger(jniJsContextOrThrow(), jsDebuggerExtension.config.port)
         }
     }
 
@@ -235,15 +254,32 @@ class JsBridge(context: Context): CoroutineScope {
     //
     // If the given file has a corresponding .max file, this one will be used in debug mode.
     // e.g.: "myfile.js" / "myfile.max.js"
-    fun evaluateLocalFile(filename: String, useMaxJs: Boolean = false) {
+    fun evaluateLocalFile(context: Context, filename: String, useMaxJs: Boolean = false) {
         launch {
             val jniJsContext = jniJsContextOrThrow()
 
             try {
-                val (inputStream, jsFileName) = getInputStream(filename, useMaxJs)
+                val (inputStream, jsFileName) = getInputStream(context, filename, useMaxJs)
                 val jsString = inputStream.bufferedReader().use { it.readText() }
                 jniEvaluateFileContent(jniJsContext, jsString, jsFileName)
-                Timber.d("-> $filename has been successfully evaluated!")
+                Timber.d("-> $filename ($jsFileName) has been successfully evaluated!")
+            } catch (t: Throwable) {
+                throw JsFileEvaluationError(filename, t)
+                    .also(::notifyErrorListeners)
+            }
+
+            processPromiseQueue()
+        }
+    }
+
+    // Evaluate the content of a JavaScript file (e.g. fetched from the network).
+    fun evaluateFileContent(content: String, filename: String) {
+        launch {
+            val jniJsContext = jniJsContextOrThrow()
+
+            try {
+                jniEvaluateFileContent(jniJsContext, content, filename)
+                Timber.d("-> file content ($filename) has been successfully evaluated!")
             } catch (t: Throwable) {
                 throw JsFileEvaluationError(filename, t)
                     .also(::notifyErrorListeners)
@@ -380,7 +416,15 @@ class JsBridge(context: Context): CoroutineScope {
     // - if the JS value is a promise, you need to resolve it first with jsValue.await() or jsValue.awaitAsync()
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
     suspend fun <T : NativeToJsInterface> registerNativeToJsInterface(jsValue: JsValue, type: KClass<T>, check: Boolean): T {
-        return registerNativeToJsInterfaceHelper(jsValue, type, check, false)
+        return registerNativeToJsInterfaceHelper(jsValue, type, check, true)
+    }
+
+    // Register a "JS" interface called by native (unchecked)
+    @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
+    fun <T : NativeToJsInterface> registerNativeToJsInterfaceUnchecked(jsValue: JsValue, type: KClass<T>, check: Boolean): T {
+        return runBlocking(Dispatchers.Unconfined) {
+            registerNativeToJsInterfaceHelper(jsValue, type, false, false)
+        }
     }
 
     // Register a "JS" interface called by native (blocking)
@@ -389,11 +433,11 @@ class JsBridge(context: Context): CoroutineScope {
     // When check = true, the method will block the current thread until the registration has been
     // done and then return the proxy object
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
-    fun <T : NativeToJsInterface> registerNativeToJsInterfaceBlocking(jsValue: JsValue, type: KClass<T>, check: Boolean): T {
-        val async = !check
+    fun <T : NativeToJsInterface> registerNativeToJsInterfaceBlocking(jsValue: JsValue, type: KClass<T>, check: Boolean, context: CoroutineContext?): T {
+        val waitForRegistration = check
 
-        return runBlocking(Dispatchers.Unconfined) {
-            registerNativeToJsInterfaceHelper(jsValue, type, check, async)
+        return runBlocking(context ?: Dispatchers.Unconfined) {
+            registerNativeToJsInterfaceHelper(jsValue, type, check, waitForRegistration)
         }
     }
 
@@ -423,31 +467,75 @@ class JsBridge(context: Context): CoroutineScope {
         return jsValue
     }
 
-    // Register a JS lambda from a JsValue and return a new JsValue which can be used for calling
-    // the lambda via callJsLambda()
+    // Register a JS lambda from a JsValue.
+    //
+    // Return a new JsValue which can be used for calling the lambda via callJsLambda()
     @PublishedApi
-    internal fun registerJsLambda(jsValue: JsValue, types: List<KType>, isVarArgs: Boolean): JsValue {
+    internal suspend fun registerJsLambda(jsValue: JsValue, types: List<KType>, waitForRegistration: Boolean): JsValue {
+        return registerJsLambdaHelper(jsValue, types, waitForRegistration)
+    }
+
+    // Register a JS lambda from a JsValue (unchecked).
+    //
+    // Return a new JsValue which can be used for calling the lambda via callJsLambda()
+    // Register a "JS" interface called by native (blocking)
+    @PublishedApi
+    internal fun registerJsLambdaAsync(jsValue: JsValue, types: List<KType>): JsValue {
+        return runBlocking(Dispatchers.Unconfined) {
+            registerJsLambdaHelper(jsValue, types, false)
+        }
+    }
+
+    // Register a JS lambda from a JsValue (blocking).
+    //
+    // Return a new JsValue which can be used for calling the lambda via callJsLambda()
+    // Register a "JS" interface called by native (blocking)
+    //
+    // When check = false, the proxy function will be directly returned
+    // When check = true, the method will block the current thread until the registration has been
+    // done and then return the proxy function
+    @PublishedApi
+    internal fun registerJsLambdaBlocking(jsValue: JsValue, types: List<KType>, context: CoroutineContext?): JsValue {
+        return runBlocking(context ?: Dispatchers.Unconfined) {
+            registerJsLambdaHelper(jsValue, types, false)
+        }
+    }
+
+    @PublishedApi
+    internal suspend fun registerJsLambdaHelper(jsValue: JsValue, types: List<KType>, waitForRegistration: Boolean): JsValue {
         val parameters = types.map { Parameter(it) }
         val inputParameters = parameters.take(types.count() - 1)
         val outputParameter = parameters.last()
-        val method = Method(inputParameters.toTypedArray(), outputParameter, isVarArgs)
+        val method = Method(inputParameters.toTypedArray(), outputParameter, false)
 
         // Create a separate JS value just for the call
         val suffix = internalCounter.incrementAndGet()
         val lambdaJsValue = JsValue(this, null, associatedJsName =  "__jsBridge_jsLambda$suffix")
 
-        launch {
+        val registerBlock = suspend {
             val jniJsContext = jniJsContextOrThrow()
 
-            try {
-                jsValue.codeEvaluationDeferred?.await()
-                jniEvaluateString(jniJsContext, "$lambdaJsValue = $jsValue", null, false)  // TODO: jniCopyJsValue
-                jniRegisterJsLambda(jniJsContext, lambdaJsValue.associatedJsName, method)
-                Timber.v("Registered JS lambda ${lambdaJsValue.associatedJsName}")
-                lambdaJsValue.hold()
-            } catch (t: Throwable) {
-                throw t as? JsException
-                        ?: NativeToJsFunctionRegistrationError(jsValue.associatedJsName, t)
+            jsValue.codeEvaluationDeferred?.await()
+            jniCopyJsValue(jniJsContext, lambdaJsValue.associatedJsName, jsValue.associatedJsName)
+            jniRegisterJsLambda(jniJsContext, lambdaJsValue.associatedJsName, method)
+            Timber.v("Registered JS lambda ${lambdaJsValue.associatedJsName}")
+            lambdaJsValue.hold()
+        }
+
+        if (waitForRegistration) {
+            // Synchronous registration
+            withContext(coroutineContext) {
+                registerBlock()
+            }
+        } else {
+            // Asynchronous registration
+            launch {
+                try {
+                    registerBlock()
+                } catch (t: Throwable) {
+                    throw t as? JsException
+                            ?: NativeToJsFunctionRegistrationError(jsValue.associatedJsName, t)
+                }
             }
         }
 
@@ -455,7 +543,6 @@ class JsBridge(context: Context): CoroutineScope {
     }
 
     // Call a JS lambda registered via registerJsLambda()
-    // TODO: optimize and avoid context switch when it can directly run (when already in JS thread...)
     @PublishedApi
     internal suspend fun callJsLambda(lambdaJsValue: JsValue, args: Array<Any?>, awaitJsPromise: Boolean): Any? {
         return withContext(coroutineContext) {
@@ -524,19 +611,46 @@ class JsBridge(context: Context): CoroutineScope {
         }
     }
 
-    // Simulate a "Promise" tick. Needs to be manually triggered as we don't use an event loop.
-    internal fun processPromiseQueue() {
-        checkJsThread()
+    internal fun deleteJsValue(jsValue: JsValue) {
+        val globalName = jsValue.associatedJsName
 
-        val jniJsContext = jniJsContext ?: return
+        launch {
+            jniJsContext?.let { jniDeleteJsValue(it, globalName) }
+        }
+    }
 
-        promisePolyfillExtension?.let { promisePolyfillExtension ->
-            promisePolyfillExtension.processQueue()
-            return
+    internal fun copyJsValue(globalNameTo: String, jsValueFrom: JsValue) {
+        launch {
+            jsValueFrom.codeEvaluationDeferred?.await()
+            jniJsContext?.let { jniCopyJsValue(it, globalNameTo, jsValueFrom.associatedJsName) }
+        }
+    }
+
+    @PublishedApi
+    internal fun convertJavaValueToJs(value: Any?, parameter: Parameter): JsValue {
+        val suffix = internalCounter.incrementAndGet()
+        val jsValue = JsValue(this)
+
+        jsValue.codeEvaluationDeferred = async {
+            val jniJsContext = jniJsContextOrThrow()
+            jniConvertJavaValueToJs(jniJsContext, jsValue.associatedJsName, value, parameter)
         }
 
-        if (BuildConfig.HAS_BUILTIN_PROMISE) {
-            jniProcessPromiseQueue(jniJsContext)
+        return jsValue
+    }
+
+    // Simulate a "Promise" tick. Needs to be manually triggered as we don't use an event loop.
+    internal fun processPromiseQueue() {
+        val promiseExtension = promiseExtension ?: return
+
+        checkJsThread()
+
+        if (promiseExtension.config.needsPolyfill) {
+            // Manually process promise queue of the polyfill
+            promiseExtension.processPolyfillQueue()
+        } else {
+            // Run pending jobs of the JS engine with built-in promise support
+            jniJsContext?.let { jniProcessPromiseQueue(it) }
         }
     }
 
@@ -587,7 +701,7 @@ class JsBridge(context: Context): CoroutineScope {
     }
 
     @Throws
-    private fun getInputStream(filename: String, useMaxJs: Boolean): Pair<InputStream, String> {
+    private fun getInputStream(context: Context, filename: String, useMaxJs: Boolean): Pair<InputStream, String> {
         if (filename.contains("""\.max\.js$""".toRegex())) {
             throw Throwable(".max.js file should not be directly set, use .js and set useMaxJs parameter to true instead!")
         }
@@ -664,7 +778,7 @@ class JsBridge(context: Context): CoroutineScope {
     // launched asynchronously a
     // - If async = false, the proxy object is only returned after a successful registration
     @Throws
-    private suspend fun <T: Any> registerNativeToJsInterfaceHelper(jsValue: JsValue, type: KClass<T>, check: Boolean, async: Boolean): T {
+    private suspend fun <T: Any> registerNativeToJsInterfaceHelper(jsValue: JsValue, type: KClass<T>, check: Boolean, waitForRegistration: Boolean): T {
         if (!type.java.isInterface) {
             throw NativeToJsRegistrationError(type, customMessage = "$type must be an interface")
         }
@@ -693,7 +807,7 @@ class JsBridge(context: Context): CoroutineScope {
                 }
 
                 // Continue until it is the NativeToJsInterface
-                .takeIf { it !=  NativeToJsInterface::class }
+                .takeIf { it != NativeToJsInterface::class }
         }
 
         val methods = interfaces
@@ -715,21 +829,21 @@ class JsBridge(context: Context): CoroutineScope {
             // => Sequence<Method>
             .values
 
-        if (async) {
-            launch(this@JsBridge.coroutineContext) {
-                val jniJsContext = jniJsContextOrThrow()
-
-                try {
-                    jsValue.codeEvaluationDeferred?.await()
-                    jniRegisterJsObject(jniJsContext, jsValue.associatedJsName, methods.toTypedArray(), check)
-                } catch (t: Throwable) {
-                    throw NativeToJsRegistrationError(type, cause = t)
-                }
-            }
-        } else {
+        if (waitForRegistration) {
+            // Synchronous registration
             withContext(coroutineContext) {
                 jsValue.codeEvaluationDeferred?.await()
                 jniRegisterJsObject(jniJsContextOrThrow(), jsValue.associatedJsName, methods.toTypedArray(), check)
+            }
+        } else {
+            // Asynchronous registration
+            launch(this@JsBridge.coroutineContext) {
+                try {
+                    jsValue.codeEvaluationDeferred?.await()
+                    jniRegisterJsObject(jniJsContextOrThrow(), jsValue.associatedJsName, methods.toTypedArray(), check)
+                } catch (t: Throwable) {
+                    throw NativeToJsRegistrationError(type, cause = t)
+                }
             }
         }
 
@@ -744,30 +858,14 @@ class JsBridge(context: Context): CoroutineScope {
 
     // Call a JS method registered via registerNativeToJsInterface()
     @Throws
-    private fun callJsMethod(name: String, method: JavaMethod, args: Array<Any?>): Any? {
+    private fun callJsMethod(name: String, method: JavaMethod, args: Array<Any?>, awaitJsPromise: Boolean): Any? {
         checkJsThread()
 
         val jniJsContext = jniJsContextOrThrow()
-        val retVal = jniCallJsMethod(jniJsContext, name, method, args)
+        val retVal = jniCallJsMethod(jniJsContext, name, method, args, awaitJsPromise)
 
         processPromiseQueue()
         return retVal
-    }
-
-    @Suppress("UNUSED")  // Called from JNI
-    // TODO: put console-related code into a separate extension
-    private fun consoleLogHelper(logType: String, str: String) {
-        checkJsThread()
-
-        val tree = Timber.tag(CONSOLE_TAG)
-
-        when (logType) {
-            "d" -> tree.d(str)
-            "i" -> tree.i(str)
-            "w" -> tree.w(str)
-            "e" -> tree.e(str)
-            else -> Timber.w("Unsupported console log type ($logType) for message: $str")
-        }
     }
 
     @Suppress("UNUSED")  // Called from JNI
@@ -796,7 +894,7 @@ class JsBridge(context: Context): CoroutineScope {
     // When JS code calls "myNativeMethod()", the cb parameter will be passed to the native after being
     // created via createJsLambdaProxy().
     //
-    // Note: as it triggers a JS function running in the Duktape thread, the lambda needs to be started
+    // Note: as it triggers a JS function running in the JS thread, the lambda needs to be started
     // asynchronously and shall not block the current thread. As a result, only JS lambdas without
     // return value are supported (which is usually fine for callbacks).
     @Suppress("UNUSED")  // Called from JNI
@@ -897,39 +995,23 @@ class JsBridge(context: Context): CoroutineScope {
 
     // JNI functions
     private external fun jniCreateContext(): Long
-    private external fun jniStartDebugger(context: Long)
+    private external fun jniStartDebugger(context: Long, port: Int)
     private external fun jniCancelDebug(context: Long)
-
     private external fun jniDeleteContext(context: Long)
     private external fun jniEvaluateString(context: Long, js: String, type: Parameter?, awaitJsPromise: Boolean): Any?
     private external fun jniEvaluateFileContent(context: Long, js: String, filename: String)
-    private external fun jniRegisterJavaLambda(
-        context: Long,
-        name: String,
-        obj: Any,
-        method: Any
-    )
-    private external fun jniRegisterJavaObject(
-        context: Long,
-        name: String,
-        obj: Any,
-        methods: Array<Any>
-    )
-    private external fun jniRegisterJsObject(
-        context: Long,
-        name: String,
-        methods: Array<Any>,
-        check: Boolean
-    )
-    private external fun jniRegisterJsLambda(
-        context: Long,
-        name: String,
-        method: Any
-    )
+    private external fun jniRegisterJavaLambda(context: Long, name: String, obj: Any, method: Any)
+    private external fun jniRegisterJavaObject(context: Long, name: String, obj: Any, methods: Array<Any>)
+    private external fun jniRegisterJsObject(context: Long, name: String, methods: Array<Any>, check: Boolean)
+    private external fun jniRegisterJsLambda(context: Long, name: String, method: Any)
     private external fun jniCallJsMethod(context: Long, objectName: String, javaMethod: JavaMethod, args: Array<Any?>): Any?
+    private external fun jniCallJsMethod(context: Long, objectName: String, javaMethod: JavaMethod, args: Array<Any?>, awaitJsPromise: Boolean): Any?
     private external fun jniCallJsLambda(context: Long, objectName: String, args: Array<Any?>, awaitJsPromise: Boolean): Any?
     private external fun jniAssignJsValue(context: Long, globalName: String, jsCode: String)
+    private external fun jniDeleteJsValue(context: Long, globalName: String)
+    private external fun jniCopyJsValue(context: Long, globalNameTo: String, globalNameFrom: String)
     private external fun jniNewJsFunction(context: Long, globalName: String, functionArgs: Array<String>, jsCode: String)
+    private external fun jniConvertJavaValueToJs(context: Long, globalName: String, value: Any?, parameter: Parameter)
     private external fun jniCompleteJsPromise(context: Long, id: String, isFulfilled: Boolean, value: Any)
     private external fun jniProcessPromiseQueue(context: Long)
 
@@ -977,7 +1059,7 @@ class JsBridge(context: Context): CoroutineScope {
             runInJsThread {
                 try {
                     Timber.v("Calling (void) JS method ${type.canonicalName}/$jsValue.${method.name}...")
-                    callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf())
+                    callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf(), false)
                 } catch (t: Throwable) {
                     throw NativeToJsCallError("${type.canonicalName}/$jsValue.${method.name}", t)
                         .also(::notifyErrorListeners)
@@ -987,11 +1069,25 @@ class JsBridge(context: Context): CoroutineScope {
 
         private fun callJsMethodSuspended(method: JavaMethod, args: Array<Any?>, continuation: Continuation<Any?>): Any {
             launch {
-                try {
-                    val result = callJsMethod(jsValue.associatedJsName, method, args)
-                    continuation.resume(result)
+                val retVal = try {
+                    Timber.v("Calling (suspend) JS method ${type.canonicalName}/$jsValue.${method.name}...")
+                    callJsMethod(jsValue.associatedJsName, method, args, true)
                 } catch (t: Throwable) {
+                    // Throw JS exception (which must be directly caught by the caller)
                     continuation.resumeWithException(t)
+                    return@launch
+                }
+
+                if (retVal is Deferred<*>) {
+                    try {
+                        continuation.resume(retVal.await())
+                    } catch (t: Throwable) {
+                        // For deferred, don't apply the generic JsBridge exception handling
+                        // but directly add the exception into the returned Deferred
+                        continuation.resumeWithException(t)
+                    }
+                } else {
+                    continuation.resume(retVal)
                 }
             }
 
@@ -1004,7 +1100,7 @@ class JsBridge(context: Context): CoroutineScope {
             launch {
                 val retVal = try {
                     Timber.v("Calling (deferred) JS method ${type.canonicalName}/$jsValue.${method.name}...")
-                    callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf())
+                    callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf(), false)
                 } catch (t: Throwable) {
                     // Reject the deferred with the JS exception (which must be directly caught by the caller)
                     deferred.completeExceptionally(t)
@@ -1035,7 +1131,7 @@ class JsBridge(context: Context): CoroutineScope {
 
             return runBlocking(coroutineContext) {
                 // Exceptions must be directly caught by the caller
-                callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf())
+                callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf(), false)
             }
         }
     }

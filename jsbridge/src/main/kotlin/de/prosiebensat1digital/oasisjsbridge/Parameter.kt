@@ -21,6 +21,7 @@ import kotlin.reflect.full.memberFunctions
 // Represents a (reflected) function parameter (or return value) with its (optional) name based on:
 // - (ideally) Kotlin KParameter or KType which has the (full) reflection info
 // - Java Class which has the reflection info without generic type info
+@PublishedApi
 internal open class Parameter private constructor(
     internal val kotlinType: KType?,
     private val javaClass: Class<*>?,
@@ -83,6 +84,30 @@ internal open class Parameter private constructor(
         Method(javaMethod, kotlinType.arguments, true)
     }
 
+    // Return the component type of an array (e.g. for varargs parameters)
+    //
+    // e.g.: if the parameter is vararg Int, return Int
+    @Suppress("UNUSED")  // Called from JNI
+    fun getComponentType(): Parameter? {
+        val javaComponentType = javaClass?.componentType
+        if (javaComponentType?.isPrimitive == true) {
+            return Parameter(javaComponentType)
+        }
+
+        return if (kotlinType == null) {
+            if (javaComponentType == null) {
+                // No type information => using generic Object type
+                Parameter(Any::class.java)
+            } else {
+                Parameter(javaComponentType)
+            }
+        } else {
+            // Use KType instance to create the (only) generic type
+            kotlinType.arguments.firstOrNull()?.type?.let { genericParameterType ->
+                Parameter(genericParameterType)
+            }
+        }
+    }
 
     // For Deferred
     // TODO: replace it into more "generic" method like "getGenericParameters()"

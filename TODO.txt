@@ -1,14 +1,5 @@
 Features:
-- JS Api with suspending functions
-- implement varargs for QuickJS
-- pure Kotlin version of console (.log, .warn, ...) with
-  * varargs JsonObjectWrapper (debug)
-  * varargs String (release)
-- test exceptions:
-  * array too large (how?)
-  * JS exception stack with line number (done)
-  * null pointer exceptions (done)
-- JsValue.fromNativeValue<T: Any?>(v: T)
+- Support for @Serializable objects
 - Small app for performance tests
 
 Performance:

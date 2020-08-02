@@ -1,80 +1,78 @@
 🏝 Oasis JsBridge
-===============
+=================
 
-Evaluate JavaScript code and map values, objects and functions between Kotlin/Java and JavaScript on Android.  
+![jitpack](https://jitpack.io/v/p7s1digital/oasis-jsbridge-android.svg)
+![build](https://github.com/p7s1digital/oasis-jsbridge-android/workflows/build/badge.svg)
+
+Evaluate JavaScript code and map values, objects and functions between Kotlin/Java and JavaScript on Android.
+
+```kotlin
+val jsBridge = JsBridge()
+val msg: String = jsBridge.evaluate("'Hello world!'.toUpperCase()")
+println(msg)  // HELLO WORLD!
+```
 
 Powered by:
-- [Duktape][duktape] or
-- [QuickJS][quickjs]
+- [Duktape][duktape] (ES5 + partially ES6) or
+- [QuickJS][quickjs] (ES2020)
 
 
 ## Features
 
-Based on [Duktape Android][duktape-android] we added:
- * advanced type inference (generics, reified type parameters)
- * support for non-blocking API, suspending functions (coroutines)
- * higher order functions (lambdas, callback functions)
- * two-way support for JS promises (mapped to Kotlin via Deferred or suspending functions)
- * JsValue class to reference JS objects from Kotlin/Java
- * JsonObjectWrapper for object serialization
- * polyfills for some JS runtime features (e.g. setTimeout, XmlHttpRequest, console)
+ * evaluate JavaScript code from Kotlin/Java
+ * map values, objects and functions between Kotlin/Java and JavaScript
+ * propagate exceptions between JavaScript and Kotlin/Java (including stack trace)
+ * non-blocking API (via coroutines)
+ * support for suspending functions and JavaScript promises
+ * extensions (optional): console, setTimeout/setInterval, XmlHttpRequest, Promise, JS debugger
+
+See [Example](#example-consuming-a-js-api-from-kotlin).
+
+
+## Installation
+
+Add jitpack repository (root gradle):
+```
+allprojects {
+    repositories {
+        ...
+        maven { url 'https://jitpack.io' }
+    }
+}
+```
+
+Add jsbridge dependency (module gradle):
+```
+implementation "com.github.p7s1digital.oasis-jsbridge-android:oasis-jsbridge-duktape:<version>"  // Duktape flavor
+// OR: implementation "com.github.p7s1digital.oasis-jsbridge-android:oasis-duktape-quickjs:<version>"  // QuickJS flavor
+```
 
 
 ## Usage
-  
-1. [Evaluate JS code](#1-evaluating-js-code)
-1. [Reference any JS value](#2-jsvalue)
-1. [Map JS functions to Kotlin](#3-calling-js-functions-from-kotlin)
-1. [Map Kotlin functions to JS](#4-calling-kotlin-functions-from-js)
-1. [Map JS objects to Java/Kotlin](#5-using-js-objects-from-javakotlin)
-1. [Map Kotlin/Java objects to JS](#6-using-javakotlin-objects-from-js)
+
+1. [Evaluate JS code](#evaluating-js-code)
+1. [Reference any JS value](#jsvalue)
+1. [Map JS objects to Kotlin/Java](#using-js-objects-from-kotlinjava)
+1. [Map Kotlin/Java objects to JS](#using-kotlinjava-objects-from-js)
+1. [Map JS functions to Kotlin](#calling-js-functions-from-kotlin)
+1. [Map Kotlin functions to JS](#calling-kotlin-functions-from-js)
+1. [Extensions](#extensions)
 
 
-Minimal hello world:
-```kotlin
-val jsBridge = JsBridge(application.context)
-jsBridge.start()
-jsBridge.evaluateNoRetVal("console.log('Hello world!');")
-jsBridge.release()
-```
-
-Hello world with JS <-> Kotlin function mapping and Promise:
-```kotlin
-val jsBridge = JsBridge(application.context)
-jsBridge.start()
-
-// Create a Kotlin proxy to a JS function
-val helloJs: suspend (String) -> Unit = JsValue.newFunction(jsBridge, "s",
-    "console.log('Hello ' + s + '!');"
-).mapToNativeFunction1()
-
-// Create a JS proxy to a Kotlin function
-val toUpperCaseNative = JsValue.fromNativeFunction1(jsBridge) { s: String -> s.toUpperCase() }
-
-runBlocking {
-    // Evaluate JS promise calling Kotlin function "toUpperCaseNative()"
-    // (suspend function call) -> returns "WORLD" after 1s timeout
-    val world: String = jsBridge.evaluate("""new Promise(function(resolve) {
-      setTimeout(function() {
-        resolve($toUpperCaseNative('world'));
-      }, 1000);
-    })""".trimIndent())
-    
-    // Manually release the JsValue after usage (otherwise handled by garbage collector)
-    toUpperCaseNative.release()
-    
-    // Call JS function "helloJs()" -> displays "Hello WORLD!"
-    helloJs(world)
-}
-
-jsBridge.release()
-``` 
-
-### 1. Evaluating JS code
+### Evaluating JS code
 
 Without return value:
 ```kotlin
 jsBridge.evaluateNoRetVal("console.log('hello');")
+jsBridge.evaluateLocalFile(context, "js/file.js")  // Android asset
+```
+
+With return value:
+```kotlin
+val sum: Int = jsBridge.evaluate("1+2")  // suspending call
+val sum: Int = jsBridge.evaluate("new Promise(function(resolve) { resolve(1+2); })")  // suspending call (JS promise)
+val msg: String = jsBridge.evaluate("'message'.toUpperCase()")  // suspending call
+val obj: JsonObjectWrapper = jsBridge.evaluate("({one: 1, two: 'two'})")  // suspending call (wrapped JS object via JSON)
 ```
 
 Blocking evaluation:
@@ -83,214 +81,302 @@ val result1: Int = jsBridge.evaluateBlocking("1+2")  // generic type inferred
 val result2 = jsBridge.evaluateBlocking<Int>("1+2")  // with explicit generic type
 ```
 
-Via coroutines:
-```kotlin
-CoroutineScope.launch {
-  val result: Int = jsBridge.evaluate("1+2")  // suspending call
-}
-```
-
 From Java (blocking):
 ```java
 Integer sum = (Integer) jsBridge.evaluateBlocking("1+2", Integer.class);
 ```
 
+Exception handling:
+```kotlin
+try {
+    jsBridge.evaluate<Unit>("""
+        |function buggy() { throw new Error('wrong') }
+        |buggy();
+    """.trimMargin())
+} catch (jse: JsException) {
+    // jse.message = "wrong"
+    // jse.stackTrace = [JavaScript.buggy(eval:1), JavaScript.<eval>(eval:2), ....JsBridge.jniEvaluateString(Native Method), ...]
+}
+```
 
-### 2. JsValue
+Note: the JS code is evaluated in a dedicated "JS" thread.
+
+
+### JsValue
 
 A JsValue is a reference to any JS value.
 
-#### 2.1 Creating a JsValue
-
-With initial value (JS code):<br/>
 ```kotlin
-val jsValue = JsValue(jsBridge, "'hello'.toUpperCase()")
-```
-
-As a new JS function:<br/>
-```kotlin
+val jsInt = JsValue(jsBridge, "123")
+val jsInt = JsValue.fromNativeValue(jsBridge, 123)
+val jsString = JsValue(jsBridge, "'hello'.toUpperCase()")
+val jsString = JsValue.fromNativeValue(jsBridge, "HELLO")
+val jsObject = JsValue(jsBridge, "({one: 1, two: 'two'})")
+val jsObject = JsValue.fromNativeValue(jsBridge, JsonObjectWrapper("one" to 1, "two" to "two"))
+val calcSumJs = JsValue(jsBridge, "(function(a, b) { return a + b; })")
 val calcSumJs = JsValue.newFunction(jsBridge, "a", "b", "return a + b;")
+val calcSumJs = JsValue.fromNativeFunction2(jsBridge) { a: Int, b: Int -> a + b }
 ```
 
-As [a proxy to a Kotlin lambda](#4-calling-kotlin-functions-from-js):<br/>
+It has an associated (global) JS variable whose name can be accessed via `toString()` which makes it easy to re-use it from JS code:<br/>
 ```kotlin
-val nativeFunctionJs = JsValue.fromNativeFunction2(jsBridge) { a: Int, b: Int -> a + b }
+val sum: Int = jsBridge.evaluate("$calcSumJs(2, 3)")
 ```
 
-As [a proxy to a Java/Kotlin object](#6-using-javakotlin-objects-from-js):<br/>
+The scope of a JsValue is defined by JVM. In other words, the associated global
+variable in JavaScript will be avalaible as long as the JsValue instance is not  
+garbage-collected.
+
+Evaluating a JsValue:
 ```kotlin
-val nativeObjectJs = JsValue.fromNativeObject(jsBridge, jsToNativeApi)
+val i = jsInt.evaluate<Int>()  // suspending function + explicit generic parameter
+val i: Int = jsInt.evaluate()  // suspending function + inferred generic parameter
+val i: Int = jsString.evaluateBlocking()  // blocking
+val s: String = jsString.evaluate()
+val o: JsonObjectWrapper = jsObject.evaluate()
 ```
 
-#### 2.2 Associated JS variable
+From Java (blocking):
+```java
+String s = (String) jsString.evaluateBlocking(String.class);
+```
 
-It has an associated (global) JS variable whose name can be accessed via `toString()` which makes it easy to re-use it from JS code.
-e.g.: `val sum: Int = jsBridge.evaluate("$calcSumJs(2, 3)")`
+Additionally, a JS (proxy) value can be created from:
+- [a Kotlin/Java object](#using-kotlinjava-objects-from-js) via `JsValue.fromNativeObject()`.
+- [a Kotlin function](#calling-kotlin-functions-from-js) via `JsValue.fromNativeFunction()`.
 
-
-#### 2.3 JsValue scope
-
-The scope a JsValue is the one defined by the JVM. In other words, the associated global
-variable will be deleted when JsValue is garbage-collected. To make it persisting in the
-JS world, you can either manually copy it via JS code or use JsValue.assignToGlobal(): 
-e.g.:
-- `jsBridge.evaluate<Unit>("global['nativeApi'] = $nativeObjectJs")`
-- `nativeObjectJs.assignToGlobal("nativeApi")`
-
-Note: this implies that any access to the associated global JS variable via `toString()` must not be done when
-there is no existing reference to the JsValue instance in the JVM!
+A JS value can be mapped to:
+- [a Kotlin/Java proxy object](#using-js-objects-from-kotlinjava) via `JsValue.mapToNativeObject()`.
+- [a Kotlin proxy function](#calling-js-functions-from-kotlin) via `JsValue.mapToNativeFunction()`.
 
 
-#### 2.4 JsValue evaluation and mapping to Kotlin/Java
+### Using JS objects from Kotlin/Java
 
-A JS value can be evaluated via:
-- `JsValue.evaluate<T>()`  // suspending function
-- `JsValue.evaluateAsync<T>()`
-- `JsValue.evaluateBlocking<T>()`  // blocking
-- `JsValue.evaluateBlocking(Class<*> javaClass)`  // from Java
-
-A JS function can be [mapped to a Kotlin proxy function](#using-js-functions-from-native) via `JsValue.mapToNativeObject()`.
-A JS object can be [mapped to a Java/Kotlin proxy object](#using-js-objects-from-native) via `JsValue.mapToNativeObject()`.
-
-
-### 3. Calling JS functions from Kotlin
+An interface extending `NativeToJsInterface` must be defined with the methods of the
+JS object:
 
 ```kotlin
-val calcSumJs: suspend (Int, Int) -> Int = JsValue.newFunction(jsBridge, "a", "b", """
-  return a + b;
-""".trimIndent())
+interface JsApi : NativeToJsInterface {
+    fun method1(a: Int, b: String)
+    suspend fun method2(c: Double): String
+}
+
+val jsObject = JsValue(jsBridge, """({
+  method1: function(a, b) { /*...*/ },
+  method2: function(c) { return "Value: " + c; }
+})""")
+
+// Create a native proxy to the JS object
+val jsApi: JsApi = jsObject.mapToNativeObject()  // no check
+val jsApi: JsApi = jsObject.mapToNativeObject(check = true)  // suspending, optionally check that all methods are defined in the JS object
+val jsApi: JsApi = jsObject.mapToNativeObjectBlocking(check = true)  // blocking (with optional check)
+
+// Call JS methods from native
+jsApi.method1(1, "two")
+val s = jsApi.method2(3.456)  // suspending
+```
+
+See [Example](#example-consuming-a-js-api-from-kotlin).
+
+Note: when calling a non-suspending method with return value, the caller thread will be blocked until the result has been returned.
+
+
+### Using Kotlin/Java objects from JS
+
+An interface extending `JsToNativeInterface` must be defined with the methods of the
+native object:
+
+```kotlin
+interface NativeApi : JsToNativeInterface {
+    fun method(a: Int, b: String): Double
+}
+
+val obj = object : NativeApi {
+    override fun method(a: Int, b: String): Double { ... }
+}
+
+// Create a JS proxy to the native object
+val nativeApi: JsValue = JsValue.fromNativeObject(jsBridge, obj)
+
+// Call native method from JS
+jsBridge.evaluateNoRetVal("globalThis.x = $nativeApi.method(1, 'two');")
+```
+
+See [Example](#example-consuming-a-js-api-from-kotlin).
+
+Note: the native methods are called from the "JS" thread and must properly
+manage the execution context (e.g.: going to the main thread when calling
+UI methods). To avoid blocking the JS thread for asynchronous operations, it
+is possible to return a Deferred.
+
+
+### Calling JS functions from Kotlin
+
+```kotlin
+val calcSumJs: suspend (Int, Int) -> Int = JsValue
+    .newFunction(jsBridge, "a", "b", "return a + b;")
     .mapToNativeFunction2()
 
 println("Sum is $calcSumJs(1, 2)")
 ```
-
-Note: the JS code runs asynchronously in a dedicated "JS" thread
 
 Available methods:
  * `JsValue.mapToNativeFunctionX()` (where X is the number of arguments)
  * `JsValue.mapToNativeBlockingFunctionX()`: blocks the current thread until the JS code has been evaluated
 
 
-### 4. Calling Kotlin functions from JS
+### Calling Kotlin functions from JS
 
 ```kotlin
 val calcSumNative = JsValue.fromNativeFunction2(jsBridge) { a: Int, b: Int -> a + b }
 
-jsBridge.evaluateNoRetVal("""
-  console.log("Sum is", $calcSumNative(1, 2));
-""".trimIndent())
+jsBridge.evaluateNoRetVal("console.log('Sum is', $calcSumNative(1, 2))");
 ```
 
 Note: the native function is triggered from the "JS" thread
 
 
-### 5. Using JS objects from Java/Kotlin
+### Extensions
 
-An interface extending `NativeToJsInterface` must be defined with the methods implemented by the
-JS object and mapped to a native object via:
-- `JsValue.mapToNativeObject()`  // suspending, check that all methods are defined in the JS object
-- `JsValue.mapToNativeObjectBlocking()`  // blocking, check that all methods are defined in the JS object
-- `JsValue.mapToNativeObjectUnchecked()`  // non-suspending function, no check
-- `JsValue.mapToNativeObjectBlocking(Class<*> javaClass, Boolean check)`  // from Java (blocking, with check)
-- `JsValue.mapToNativeObjectUnchecked(Class<*> javaClass)`  // from Java (no check)
+Extensions can be enabled/disabled via the JsBridgeConfig given to the JsBridge constructor.
 
-```kotlin
-interface JsApi: NativeToJsInterface {
-  fun calcSum(a: Int, b: Int): Deferred<Int>
-  fun setCallback(cb: (payload: JsonObjectWrapper) -> Unit)
-  fun triggerEvent()
-}
+- **setTimeout/setInterval(cb, interval):**<br/>
+Trigger JS callback using coroutines.delay internally.
 
-val jsApi: JsApi = JsValue(jsBridge, """({
-    calcSum: function(a, b) { return a + b; },
-    setCallback: function(cb) { this._cb = cb; },
-    triggerEvent: function() { if (_cb) cb({ value: 12 }); } 
-})""".trimIndent()).mapToNativeObject()
+- **console.log(), .warn(), ...:**<br/>
+Append output to the logcat (or to a custom block). Parameters are displayed either via string
+conversion or via JSON serialization. JSON serialization provides much more detailed output
+(including objects and Error instances) but is slower than the string variant (which displays
+objects as "[object Object]").
 
-val result = jsApi.calcSum(1, 2).await()
-jsApi.setCallback { payload -> println("Got JS event with payload $payload") }
-jsApi.triggerEvent()
-```
+- **XMLHtmlRequest (XHR):**<br/>
+Support for XmlHttpRequest network requests using `okhttp` client internally. The `okhttp` instance
+can be injected in the `JsBridgeConfig` object.
+_Note: not all HTTP methods are currently implemented, check the source code for details._
+Other network clients are not tested but should work as well (polyfill for
+[fetch](https://www.npmjs.com/package/whatwg-fetch),
+[axios](https://github.com/axios/axios#features) uses XHR in browser mode)
 
-Note:
-- the JS methods are running asynchronously in the "JS" thread
-- Kotlin: the return value of the methods may only be `Unit`/`void` or a `Deferred`. Suspending methods will
-be supported in the future.
-- Java: calling the method will block the caller thread (if it is not a `void` method) until the result has
-been returned.
+- **Promise:**<br/>
+Support for ES6 promises (Duktape: via polyfill, QuickJS: built-in). Pending jobs are triggered
+after each evaluation.
 
-
-
-### 6. Using Java/Kotlin objects from JS
-
-An interface extending `JsToNativeInterface` must be defined, implemented by the
-native object and mapped to a new JsValue via `JsValue.fromNativeObject()`.
-
-```kotlin
-interface NativeApi: JsToNativeInterface {
-  fun calcSum(a: Int, b: Int): Int
-  fun setCallback(cb: (payload: JsonObjectWrapper) -> Unit)
-  fun triggerEvent()
-}
-
-val nativeApi = object: NativeApi {
-  private var cb: ((JsonObjectWrapper) -> Unit)? = null
-
-  override fun calcSum(a: Int, b: Int) = a + b
-  override fun setCallback(cb: (payload: JsonObjectWrapper) -> Unit) {
-    this.cb = cb
-  }
-  override fun triggerEvent() {
-    val payload = JsonObjectWrapper("value" to 12)
-    cb?.invoke(payload)
-  }
-}
-
-val nativeApiJsValue = JsValue.fromNativeObject(jsBridge, nativeApi)
-
-jsBridge.evaluateNoRetVal("""
-    var result = $nativeApiJsValue.calcSum(1, 2)
-    $nativeApi.setCallback(function(payload) {
-      console.log("Got native event with value=" + payload.value);
-    })
-    $nativeApi.triggerEvent()
-""".trimIndent())
-```
-
-Note: the native methods are called from the "JS" thread and must properly
-manage the execution context (e.g.: going to the main thread when calling
-UI methods)
+- **JS Debugger:**<br/>
+JS debugger support (Duktape only via Visual Studio Code plugin)
 
 
 ## Supported types
 
-| Kotlin             | Java                | JS        | Note
-| ------------------ | ------------------- | --------- | ---
-| `Boolean`          | `boolean`, `Boolean`| `number`  |
-| `Int`              | `int`, `Integer`    | `number`  |
-| `Float`            | `float`, `Float`    | `number`  |
-| `Double`           | `double`, `Double`  | `number`  |
-| `String`           | `String`            | `string`  |
-| `BooleanArray`     | `boolean[]`         | `Array`   |
-| `IntArray`         | `int[]`             | `Array`   |
-| `FloatArray`       | `float[]`           | `Array`   |
-| `DoubleArray`      | `double[]`          | `Array`   |
-| `Array<T: Any>`    | `T[]`               | `Array`   | T must be a supported type
-| `Function<R>`      | n.a.                | `function`| lambda with supported types
-| `Deferred<T>`      | n.a.                | `Promise` | T must be a supported type
-| `JsonObjectWrapper`| `JsonObjectWrapper` | `object`  | serializes JS objects via JSON
-| `JsValue`          | `JsValue`           | any       | reference any JS value
+| Kotlin              | Java                 | JS         | Note
+| ------------------- | -------------------- | ---------- | ---
+| `Boolean`           | `boolean`, `Boolean` | `number`   |
+| `Int`               | `int`, `Integer`     | `number`   |
+| `Float`             | `float`, `Float`     | `number`   |
+| `Double`            | `double`, `Double`   | `number`   |
+| `String`            | `String`             | `string`   |
+| `BooleanArray`      | `boolean[]`          | `Array`    |
+| `IntArray`          | `int[]`              | `Array`    |
+| `FloatArray`        | `float[]`            | `Array`    |
+| `DoubleArray`       | `double[]`           | `Array`    |
+| `Array<T: Any>`     | `T[]`                | `Array`    | T must be a supported type
+| `Function<R>`       | n.a.                 | `function` | lambda with supported types
+| `Deferred<T>`       | n.a.                 | `Promise`  | T must be a supported type
+| `JsonObjectWrapper` | `JsonObjectWrapper`  | `object`   | serializes JS objects via JSON
+| `JsValue`           | `JsValue`            | any        | references any JS value
 
 
-## TODO:
-* publish to maven central
-* code samples
+## Example: consuming a JS API from Kotlin
 
+ JavaScript <=> Kotlin API:
+```kotlin
+interface JsApi : NativeToJsInterface {
+    suspend fun createMessage(): String
+    suspend fun calcSum(a: Int, b: Int): Int
+}
+
+interface NativeApi : JsToNativeInterface {
+    fun getPlatformName(): String
+    fun getTemperatureCelcius(): Deferred<Float>
+}
+```
+
+JavaScript API (js/api.js):
+<details>
+    <summary>ES5</summary>
+
+```js
+globalThis.createApi = function(nativeApi, config) {
+  return {
+    createMessage: function() {
+      const platformName = nativeApi.getPlatformName();
+      return nativeApi.getTemperatureCelcius().then(function(celcius) {
+        const value = config.useFahrenheit ? celcius * x + c : celcius;
+        const unit = config.useFahrenheit ? "degrees F" : "degrees C";
+        return "Hello " + platformName + "! The temperature is " + value + " " + unit + ".";
+      });
+    },
+    calcSum: function(a, b) {
+      return new Promise(function(resolve) { resolve(a + b); });
+    }
+  };
+};
+```
+</details>
+<details>
+    <summary>ES6</summary>
+
+```js
+globalThis.createApi = (nativeApi, config) => {(
+  createMessage: async () => {
+    const platformName = nativeApi.getPlatformName();
+    const celcius = await nativeApi.getTemperatureCelcius();
+    const value = config.useFahrenheit ? celcius * x + c : celcius;
+    const unit = config.useFahrenheit ? "degrees F" : "degrees C";
+    return `Hello ${platformName}! The temperature is ${value} ${unit}.`;
+  },
+  calcSum: async (a, b) => a + b
+});
+```
+</details>
+
+Kotlin API:
+```kotlin
+val nativeApi = object: NativeApi {
+    override fun getPlatformName() = "Android"
+    override fun getTemperatureCelcius() = async {
+        // Getting current temperature from sensor or via network service
+        37.2f
+    }
+}
+```
+
+Bridging JavaScript and Kotlin:
+```kotlin
+val jsBridge = JsBridge()
+jsBridge.evaluateLocalFile(context, "js/api.js")
+
+// JS "proxy" to native API
+val nativeApiJsValue = JsValue.fromNativeObject(jsBridge, nativeApi)
+
+// JS function createApi(nativeApi, config)
+val config = JsonObjectWrapper("debug" to true, "useFahrenheit" to false)  // {debug: true, useFahrenheit: false}
+val createJsApi: suspend (JsValue, JsonObjectWrapper) -> JsValue
+    = JsValue(jsBridge, "createApi").mapToNativeFunction2()
+    
+// Create native "proxy" to JS API
+val jsApi: JsApi = createJsApi(nativeApiJsValue, config).mapToNativeObject()
+```
+
+Consume API:
+```kotlin
+val msg = jsApi.createMessage()  // (suspending) "Hello Android, the temperature is 37.2 degrees C."
+val sum = jsApi.calcSum(3, 2)  // (suspending) 5
+```
 
 ## License
 
 ```
-Copyright (C) 2018-2019 ProSiebenSat1.Digital GmbH
+Copyright (C) 2018-2020 ProSiebenSat1.Digital GmbH
 🏝 Oasis Player team
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -311,11 +397,11 @@ Originally based on [Duktape Android][duktape-android] (Apache license, version 
 `Copyright (C) 2015 Square, Inc.`
 
 Includes C code from [Duktape][duktape] (MIT license)<br/>
-`Copyright (c) 2013-2019 by Duktape authors`
+`Copyright (c) 2013-2020 by Duktape authors`
 
 Includes C code from [QuickJS][quickjs] (MIT license)<br/>
-`Copyright (c) 2017-2019 Fabrice Bellard`<br/>
-`Copyright (c) 2017-2019 Charlie Gordon`
+`Copyright (c) 2017-2020 Fabrice Bellard`<br/>
+`Copyright (c) 2017-2010 Charlie Gordon`
 
 
  [duktape-android]: https://github.com/square/duktape-android/

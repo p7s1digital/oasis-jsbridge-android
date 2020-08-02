@@ -15,21 +15,20 @@
  */
 package de.prosiebensat1digital.oasisjsbridge.extensions
 
-import com.jaredrummler.android.device.DeviceName
 import de.prosiebensat1digital.oasisjsbridge.*
+import java.net.SocketTimeoutException
+import java.util.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.*
 import timber.log.Timber
-import java.net.SocketTimeoutException
-import java.util.*
 
-class XMLHttpRequestExtension(
+internal class XMLHttpRequestExtension(
     private val jsBridge: JsBridge,
-    okHttpClient: OkHttpClient?
+    val config: JsBridgeConfig.XMLHttpRequestConfig
 ) {
-    private var okHttpClient = okHttpClient ?: OkHttpClient.Builder().build()
+    private var okHttpClient = config.okHttpClient ?: OkHttpClient.Builder().build()
 
     init {
         // Register XMLHttpRequestNativeHelper_send()
@@ -37,11 +36,11 @@ class XMLHttpRequestExtension(
             .assignToGlobal("XMLHttpRequestExtension_send_native")
 
         // Evaluate JS file
-        jsBridge.evaluateLocalFile("js/xmlhttprequest.js")
+        jsBridge.evaluateNoRetVal(xhrJsCode)
     }
 
     fun release() {
-        jsBridge.evaluateNoRetVal("""delete global["XMLHttpRequestExtension_send_native"]""")
+        jsBridge.evaluateNoRetVal("""delete globalThis["XMLHttpRequestExtension_send_native"]""")
     }
 
     private fun nativeSend(httpMethod: String, url: String, headers: JsonObjectWrapper, data: String?, cb: (JsonObjectWrapper, String, String) -> Unit) {
@@ -58,13 +57,6 @@ class XMLHttpRequestExtension(
                     "get", "post", "put", "delete" -> Unit
                     else -> throw Throwable("Unsupported http method: $httpMethod")
                 }
-
-                // User agent
-                val userAgent = withContext(Dispatchers.Default) {
-                    val deviceInfo = DeviceName.getDeviceInfo(jsBridge.context)
-                    "${deviceInfo.manufacturer} ${deviceInfo.model} Android ${android.os.Build.VERSION.RELEASE}"
-                }
-                Timber.v("User agent is $userAgent")
 
                 val requestHeadersBuilder = Headers.Builder()
 
@@ -85,7 +77,7 @@ class XMLHttpRequestExtension(
 
                 // Add user argent header if not set
                 if (requestHeadersBuilder.get("user-agent") == null) {
-                    requestHeadersBuilder.add("User-Agent", userAgent)
+                    config.userAgent?.let { requestHeadersBuilder.add("User-Agent", it) }
                 }
                 val requestHeaders = requestHeadersBuilder.build()
 
@@ -132,10 +124,10 @@ class XMLHttpRequestExtension(
                 Timber.v("-> responseInfo = $responseInfo")
                 Timber.v("-> request headers = $requestHeaders")
             } catch (e: SocketTimeoutException) {
-                JsBridgeError.XhrError("$httpMethod $url", e).let { jsBridge.notifyErrorListeners(it) }
+                Timber.d("XHR timeout ($httpMethod $url): $e")
                 errorString = "timeout"
             } catch (t: Throwable) {
-                JsBridgeError.XhrError("$httpMethod $url", t).let { jsBridge.notifyErrorListeners(it) }
+                Timber.d("XHR error ($httpMethod $url): $t")
                 errorString = t.message ?: "unknown XHR error"
             }
 
@@ -147,4 +139,224 @@ class XMLHttpRequestExtension(
         }
     }
 }
+
+/*
+ * Based on bits and pieces from different OSS sources
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+const val xhrJsCode: String = """
+var XMLHttpRequest = function() {
+  this._send_native = XMLHttpRequestExtension_send_native;
+
+  this._httpMethod = null;
+  this._url = null;
+  this._requestHeaders = [];
+  this._responseHeaders = [];
+
+  this.response = null;
+  this.responseText = null;
+  this.responseXML = null;
+  this.responseType = "";
+  this.onreadystatechange = null;
+  this.onloadstart = null;
+  this.onprogress = null;
+  this.onabort = null;
+  this.onerror = null;
+  this.onload = null;
+  this.onloadend = null;
+  this.ontimeout = null;
+  this.readyState = 0;
+  this.status = 0;
+  this.statusText = "";
+  this.withCredentials = null;
+};
+
+// readystate enum
+XMLHttpRequest.UNSENT = 0;
+XMLHttpRequest.OPENED = 1;
+XMLHttpRequest.HEADERS = 2;
+XMLHttpRequest.LOADING = 3;
+XMLHttpRequest.DONE = 4;
+
+XMLHttpRequest.prototype.constructor = XMLHttpRequest;
+
+XMLHttpRequest.prototype.open = function(httpMethod, url) {
+  this._httpMethod = httpMethod;
+  this._url = url;
+
+  this.readyState = XMLHttpRequest.OPENED;
+  if (typeof this.onreadystatechange === "function") {
+    //console.log("Calling onreadystatechange(OPENED)...");
+    this.onreadystatechange();
+  }
+};
+
+XMLHttpRequest.prototype.send = function(data) {
+  this.readyState = XMLHttpRequest.LOADING;
+  if (typeof this.onreadystatechange === "function") {
+    //console.log("Calling onreadystatechange(LOADING)...");
+    this.onreadystatechange();
+  }
+
+  if (typeof this.onloadstart === "function") {
+    //console.log("Calling onloadstart()...");
+    this.onloadstart();
+  }
+
+  var that = this;
+  this._send_native(this._httpMethod, this._url, this._requestHeaders, data || null, function(responseInfo, responseText, error) {
+    that._send_native_callback(responseInfo, responseText, error);
+  });
+};
+
+XMLHttpRequest.prototype.abort = function() {
+  this.readyState = XMLHttpRequest.UNSENT;
+  // Note: this.onreadystatechange() is not supposed to be called according to the XHR specs
+}
+
+// responseInfo: {statusCode, statusText, responseHeaders}
+XMLHttpRequest.prototype._send_native_callback = function(responseInfo, responseText, error) {
+  //console.log("XMLHttpRequest._send_native_callback");
+  //console.log("- responseInfo =", JSON.stringify(responseInfo));
+  //console.log("- responseText =", responseText);
+  //console.log("- error =", error);
+
+  if (this.readyState === XMLHttpRequest.UNSENT) {
+    console.log("XHR native callback ignored because the request has been aborted");
+    if (typeof this.onabort === "function") {
+      //console.log("Calling onabort()...");
+      this.onabort();
+    }
+    return;
+  }
+
+  if (this.readyState != XMLHttpRequest.LOADING) {
+    // Request was not expected
+    console.log("XHR native callback ignored because the current state is not LOADING");
+    return;
+  }
+
+  // Response info
+  // TODO: responseXML?
+  this.responseURL = this._url;
+  this.status = responseInfo.statusCode;
+  this.statusText = responseInfo.statusText;
+  this._responseHeaders = responseInfo.responseHeaders || [];
+
+  this.readyState = XMLHttpRequest.DONE;
+
+  // Response
+  this.response = null;
+  this.responseText = null;
+  this.responseXML = null;
+  if (error) {
+    this.responseText = error;
+  } else {
+    this.responseText = responseText;
+
+    switch (this.responseType) {
+      case "":
+      case "text":
+        this.response = this.responseText;
+        break;
+      case "arraybuffer":
+        error = "XHR arraybuffer response is not supported!";
+        break;
+      case "document":
+        this.response = this.responseText;
+        this.responseXML = this.responseText;
+        break;
+      case "json":
+        try {
+            this.response = JSON.parse(responseText);
+        }
+        catch (e) {
+            error = "Could not parse JSON response: " + responseText;
+        }
+        break;
+      default:
+        error = "Unsupported responseType: " + responseInfo.responseType;
+    }
+  }
+
+  this.readyState = XMLHttpRequest.DONE;
+  if (typeof this.onreadystatechange === "function") {
+    //console.log("Calling onreadystatechange(DONE)...");
+    this.onreadystatechange();
+  }
+
+  if (error === "timeout") {
+    // Timeout
+    console.warn("Got XHR timeout");
+    if (typeof this.ontimeout === "function") {
+      //console.log("Calling ontimeout()...");
+      this.ontimeout();
+    }
+  } else if (error) {
+    // Error
+    console.warn("Got XHR error:", error);
+    if (typeof this.onerror === "function") {
+      //console.log("Calling onerror()...");
+      this.onerror();
+    }
+  } else {
+    // Success
+    //console.log("XHR success: response =", this.response);
+    if (typeof this.onload === "function") {
+      //console.log("Calling onload()...");
+      this.onload();
+    }
+  }
+
+  if (typeof this.onloadend === "function") {
+    //console.log("Calling onloadend()...");
+    this.onloadend();
+  }
+};
+
+XMLHttpRequest.prototype.setRequestHeader = function(header, value) {
+  this._requestHeaders.push([header, value]);
+};
+
+XMLHttpRequest.prototype.getAllResponseHeaders = function() {
+  var ret = "";
+
+  for (var i = 0; i < this._responseHeaders.length; i++) {
+    var keyValue = this._responseHeaders[i];
+    ret += keyValue[0] + ": " + keyValue[1] + "\r\n";
+  }
+
+  return ret;
+};
+
+XMLHttpRequest.prototype.getResponseHeader = function(name) {
+  var ret = "";
+
+  for (var i = 0; i < this._responseHeaders.length; i++) {
+    var keyValue = this._responseHeaders[i];
+    if (keyValue[0] !== name) continue;
+    if (ret === "") ret += ", ";
+    ret += keyValue[1];
+  }
+
+  return ret;
+};
+
+XMLHttpRequest.prototype.overrideMimeType = function() {
+  // TODO
+};
+
+globalThis.XMLHttpRequest = XMLHttpRequest;
+"""
 

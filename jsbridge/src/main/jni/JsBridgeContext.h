@@ -52,7 +52,7 @@ public:
   // Must be called immediately after the constructor
   void init(JniContext *jniContext, const JniLocalRef<jobject> &jsBridgeObject);
 
-  void startDebugger();
+  void startDebugger(int port);
   void cancelDebug();
 
   JValue evaluateString(const JStringLocalRef &strSourceCode, const JniLocalRef<jsBridgeParameter> &returnParameter,
@@ -66,12 +66,16 @@ public:
   void registerJsObject(const std::string &strName, const JObjectArrayLocalRef &methods, bool check);
   void registerJsLambda(const std::string &strName, const JniLocalRef<jsBridgeMethod> &method);
   JValue callJsMethod(const std::string &objectName, const JniLocalRef<jobject> &javaMethod,
-                              const JObjectArrayLocalRef &args);
+                              const JObjectArrayLocalRef &args, bool awaitJsPromise);
   JValue callJsLambda(const std::string &strFunctionName, const JObjectArrayLocalRef &args,
                               bool awaitJsPromise);
 
   void assignJsValue(const std::string &strGlobalName, const JStringLocalRef &strCode);
+  void deleteJsValue(const std::string &strGlobalName);
+  void copyJsValue(const std::string &strGlobalNameTo, const std::string &strGlobalNameFrom);
   void newJsFunction(const std::string &strGlobalName, const JObjectArrayLocalRef &args, const JStringLocalRef &strCode);
+
+  void convertJavaValueToJs(const std::string &strGlobalName, const JniLocalRef<jobject> &javaValue, const JniLocalRef<jsBridgeParameter> &parameter);
 
   void processPromiseQueue();
 

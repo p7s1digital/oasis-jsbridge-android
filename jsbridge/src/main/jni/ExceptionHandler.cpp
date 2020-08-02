@@ -59,8 +59,6 @@ JsException ExceptionHandler::getCurrentJsException() const {
   return std::move(ret);
 #elif defined(QUICKJS)
   JSValue exceptionValue = JS_GetException(m_jsBridgeContext->getQuickJsContext());
-  JS_AUTORELEASE_VALUE(m_jsBridgeContext->getQuickJsContext(), exceptionValue);
-
   return JsException(m_jsBridgeContext, exceptionValue);
 #endif
 }
@@ -135,7 +133,6 @@ JniLocalRef<jthrowable> ExceptionHandler::getJavaException(const JsException &js
   duk_pop(ctx);  // duplicated JS error
 
   std::size_t firstEndOfLine = stack.find('\n');
-  std::string strFirstLine = firstEndOfLine == std::string::npos ? stack : stack.substr(0, firstEndOfLine);
   std::string strJsStacktrace = firstEndOfLine == std::string::npos ? "" : stack.substr(firstEndOfLine, std::string::npos);
 
   // Is there an exception thrown from a Java method?
@@ -150,7 +147,7 @@ JniLocalRef<jthrowable> ExceptionHandler::getJavaException(const JsException &js
 
   return m_jsBridgeContext->getJniCache()->newJsException(
       jsonString,  // jsonValue
-      JStringLocalRef(jniContext, strFirstLine.c_str()),  // detailedMessage
+      JStringLocalRef(jniContext, jsException.what()),  // detailedMessage
       JStringLocalRef(jniContext, strJsStacktrace.c_str()),  // jsStackTrace
       cause
   );
@@ -164,47 +161,40 @@ JniLocalRef<jthrowable> ExceptionHandler::getJavaException(const JsException &js
 
   JSValue exceptionValue = jsException.getValue();
   JSValue jsonValue = custom_stringify(ctx, exceptionValue);
-  JStringLocalRef jsonString = utils->toJString(jsonValue);
+  JStringLocalRef jsonString;
+  if (JS_IsException(jsonValue)) {
+    JS_GetException(ctx);
+  } else {
+    jsonString = utils->toJString(jsonValue);
+  }
 
   // Is there an exception thrown from a Java method?
   JniLocalRef<jthrowable> cause;
-  JSValue javaExceptionValue = JS_GetPropertyStr(ctx, exceptionValue, JAVA_EXCEPTION_PROP_NAME);
-  if (!JS_IsUndefined(javaExceptionValue)) {
-    cause = utils->getJavaRef<jthrowable>(javaExceptionValue);
+  if (JS_IsObject(exceptionValue) && !JS_IsNull(exceptionValue)) {
+    JSValue javaExceptionValue = JS_GetPropertyStr(ctx, exceptionValue, JAVA_EXCEPTION_PROP_NAME);
+    if (!JS_IsUndefined(javaExceptionValue)) {
+      cause = utils->getJavaRef<jthrowable>(javaExceptionValue);
+      JS_FreeValue(ctx, javaExceptionValue);
+    }
   }
-  JS_FreeValue(ctx, javaExceptionValue);
+
+  std::string stack;
 
   if (JS_IsError(ctx, exceptionValue)) {
-    // Error message
-    std::string msg = utils->toString(JS_GetPropertyStr(ctx, exceptionValue, "message"));
-    std::string stack;
-
     // Get the stack trace
     JSValue stackValue = JS_GetPropertyStr(ctx, exceptionValue, "stack");
     if (!JS_IsUndefined(stackValue)) {
       stack = utils->toString(stackValue);
     }
     JS_FreeValue(ctx, stackValue);
-
-    ret = jniCache->newJsException(
-        jsonString,  // jsonValue
-        JStringLocalRef(jniContext, msg.c_str()),  // detailedMessage
-        JStringLocalRef(jniContext, stack.c_str()),  // jsStackTrace
-        cause
-    );
   }
 
-  if (ret.isNull()) {
-    // Not an error or no stacktrace, just convert to a string.
-    JStringLocalRef strThrownValue = utils->toJString(exceptionValue);
-
-    ret = jniCache->newJsException(
-        jsonString,  // jsonValue
-        strThrownValue,  // detailedMessage
-        JStringLocalRef(),  // jsStackTrace
-        cause
-    );
-  }
+  ret = jniCache->newJsException(
+      jsonString,  // jsonValue
+      JStringLocalRef(jniContext, jsException.what()),  // detailedMessage
+      JStringLocalRef(jniContext, stack.c_str()),  // jsStackTrace
+      cause
+  );
 
   JS_FreeValue(ctx, jsonValue);
   return ret;

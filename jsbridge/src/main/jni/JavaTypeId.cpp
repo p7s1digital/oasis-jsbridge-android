@@ -62,6 +62,7 @@ static thread_local std::unordered_map<std::u16string_view, JavaTypeId> sJavaNam
   { u"kotlin.jvm.functions.Function8", JavaTypeId::FunctionX },
   { u"kotlin.jvm.functions.Function9", JavaTypeId::FunctionX },
 
+  { u"de.prosiebensat1digital.oasisjsbridge.DebugString", JavaTypeId::DebugString },
   { u"de.prosiebensat1digital.oasisjsbridge.JsValue", JavaTypeId::JsValue },
   { u"de.prosiebensat1digital.oasisjsbridge.JsonObjectWrapper", JavaTypeId::JsonObjectWrapper },
 

@@ -48,6 +48,7 @@ enum class JavaTypeId {
   FloatArray = 63,
   DoubleArray = 64,
 
+  DebugString = 90,
   FunctionX = 100,
   JsValue = 101,
   JsonObjectWrapper = 102,

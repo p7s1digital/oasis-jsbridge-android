@@ -214,6 +214,11 @@ public:
     return JniLocalRef<RetT>(this, o);
   }
 
+  jsize getArrayLength(const JniLocalRef<jarray> &array) const {
+    JNIEnv *env = getJNIEnv();
+    return env->GetArrayLength(array.get());
+  }
+
 private:
   JNIEnv *m_currentJniEnv;
   JavaVM *m_jvm;

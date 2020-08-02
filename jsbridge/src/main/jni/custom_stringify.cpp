@@ -18,7 +18,7 @@
 static const char *customStringifyJs = R"(
 // Custom stringify which probably handles Error instances
 // See https://stackoverflow.com/questions/18391212/is-it-not-possible-to-stringify-an-error-using-json-stringify
-global.__jsBridge__stringify = function(value) {
+globalThis.__jsBridge__stringify = function(value) {
   if (value === undefined) return "";
 
   var replaceErrors = function(_key, value) {
@@ -77,7 +77,9 @@ JSValue custom_stringify(JSContext *ctx, JSValueConst v) {
 #if 0
   // 1. JSON stringify (but does not properly serialize Error instances!)
   JSValue jsonObject = JS_GetPropertyStr(ctx, globalObj, "JSON");
-  ret = JS_Invoke(ctx, jsonObject, JS_NewAtom(ctx, "stringify"), 1, &v);
+  JSAtom atom = JS_NewAtom(ctx, "stringify");
+  ret = JS_Invoke(ctx, jsonObject, atom, 1, &v);
+  JS_FreeAtom(ctx, atom);
   JS_FreeValue(ctx, jsonObject);
   return ret;
 #endif

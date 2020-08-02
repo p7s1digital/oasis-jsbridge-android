@@ -25,9 +25,7 @@
 #include "JavaScriptObject.h"
 #include "JniCache.h"
 #include "StackChecker.h"
-#include "custom_stringify.h"
 #include "log.h"
-#include "duk_console.h"
 #include "exceptions/JsException.h"
 #include "java-types/Deferred.h"
 #include "jni-helpers/JniGlobalRef.h"
@@ -96,24 +94,16 @@ void JsBridgeContext::init(JniContext *jniContext, const JniLocalRef<jobject> &j
   duk_push_pointer(m_ctx, this);
   duk_put_prop_string(m_ctx, -2, JSBRIDGE_CPP_CLASS_PROP_NAME);
   duk_pop(m_ctx);
-
-  // Set global + window (TODO)
-  // See also https://wiki.duktape.org/howtoglobalobjectreference
-  static const char *str1 = "var global = this; var window = this; window.open = function() {};\n";
-  duk_eval_string_noresult(m_ctx, str1);
-
-  // Console
-  duk_console_init(m_ctx, 0 /*flags*/);
 }
 
-void JsBridgeContext::startDebugger() {
+void JsBridgeContext::startDebugger(int port) {
 
   // Call Java onDebuggerPending()
   m_jniCache->getJsBridgeInterface().onDebuggerPending();
 
   alog_info("Debugger enabled, create socket and wait for connection\n");
-  duk_trans_socket_init();
-  duk_trans_socket_waitconn();
+  duk_trans_socket_init(port);
+  duk_trans_socket_waitconn(port);
   alog_info("Debugger connected, call duk_debugger_attach() and then execute requested file(s)/eval\n");
 
   // Call Java onDebuggerReady()
@@ -257,16 +247,6 @@ void JsBridgeContext::registerJsObject(const std::string &strName,
 
   duk_get_global_string(m_ctx, strName.c_str());
 
-  if (check && (!duk_is_object(m_ctx, -1) || duk_is_null(m_ctx, -1))) {
-    duk_pop(m_ctx);
-    throw std::invalid_argument("Cannot register " + strName + ". It does not exist or is not a valid object");
-  }
-
-  // Check that it is not a promise!
-  if (duk_is_object(m_ctx, -1) && duk_has_prop_string(m_ctx, -1, "then")) {
-    alog_warn("Attempting to register a JS promise (%s)... JsValue.await() should probably be called, first...");
-  }
-
   try {
     // Create the JavaScriptObject instance (which takes over jsObjectValue and will free it in its destructor)
     auto cppJsObject = new JavaScriptObject(this, strName, -1, methods, check);  // auto-deleted
@@ -287,11 +267,6 @@ void JsBridgeContext::registerJsLambda(const std::string &strName,
 
   duk_get_global_string(m_ctx, strName.c_str());
 
-  if (!duk_is_function(m_ctx, -1)) {
-    duk_pop(m_ctx);
-    throw std::invalid_argument("Cannot register " + strName + ". It does not exist or is not a valid function.");
-  }
-
   try {
     // Create the JavaScriptObject instance
     auto cppJsLambda = new JavaScriptLambda(this, method, strName, -1);  // auto-deleted
@@ -308,7 +283,8 @@ void JsBridgeContext::registerJsLambda(const std::string &strName,
 
 JValue JsBridgeContext::callJsMethod(const std::string &objectName,
                                      const JniLocalRef<jobject> &javaMethod,
-                                     const JObjectArrayLocalRef &args) {
+                                     const JObjectArrayLocalRef &args,
+                                     bool awaitJsPromise) {
   CHECK_STACK(m_ctx);
 
   // Get the JS object
@@ -327,7 +303,7 @@ JValue JsBridgeContext::callJsMethod(const std::string &objectName,
   }
 
   duk_pop(m_ctx);
-  return cppJsObject->call(javaMethod, args);
+  return cppJsObject->call(javaMethod, args, awaitJsPromise);
 }
 
 JValue JsBridgeContext::callJsLambda(const std::string &strFunctionName,
@@ -368,6 +344,23 @@ void JsBridgeContext::assignJsValue(const std::string &strGlobalName, const JStr
   duk_put_global_string(m_ctx, strGlobalName.c_str());
 }
 
+void JsBridgeContext::deleteJsValue(const std::string &strGlobalName) {
+  CHECK_STACK(m_ctx);
+
+  duk_push_global_object(m_ctx);
+  duk_del_prop_string(m_ctx, -1, strGlobalName.c_str());
+  duk_pop(m_ctx);
+}
+
+void JsBridgeContext::copyJsValue(const std::string &strGlobalNameTo, const std::string &strGlobalNameFrom) {
+  CHECK_STACK(m_ctx);
+
+  duk_push_global_object(m_ctx);
+  duk_get_prop_string(m_ctx, -1, strGlobalNameFrom.c_str());
+  duk_put_prop_string(m_ctx, -2, strGlobalNameTo.c_str());
+  duk_pop(m_ctx);
+}
+
 void JsBridgeContext::newJsFunction(const std::string &strGlobalName, const JObjectArrayLocalRef &args, const JStringLocalRef &strCode) {
   CHECK_STACK(m_ctx);
 
@@ -393,6 +386,14 @@ void JsBridgeContext::newJsFunction(const std::string &strGlobalName, const JObj
     throw m_exceptionHandler->getCurrentJsException();
   }
 
+  duk_put_global_string(m_ctx, strGlobalName.c_str());
+}
+
+void JsBridgeContext::convertJavaValueToJs(const std::string &strGlobalName, const JniLocalRef<jobject> &javaValue, const JniLocalRef<jsBridgeParameter> &parameter) {
+
+  auto type = m_javaTypeProvider.makeUniqueType(parameter, true /*boxed*/);
+
+  type->push(JValue(javaValue));
   duk_put_global_string(m_ctx, strGlobalName.c_str());
 }
 

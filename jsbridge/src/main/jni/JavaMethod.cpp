@@ -24,6 +24,7 @@
 #include "JniTypes.h"
 #include "JsBridgeContext.h"
 #include "exceptions/JniException.h"
+#include "log.h"
 #include "jni-helpers/JniLocalRef.h"
 #include "jni-helpers/JniLocalFrame.h"
 #include "jni-helpers/JniContext.h"
@@ -49,13 +50,10 @@ JavaMethod::JavaMethod(const JsBridgeContext *jsBridgeContext, const JniLocalRef
     JniLocalRef<jsBridgeParameter> parameter = parameters.getElement<jsBridgeParameter>(i);
 
     if (m_isVarArgs && i == numParameters - 1) {
-      // TODO: create the array component Parameter, maybe sth like Parameter.getArrayComponent()
-      //Parameter parameterInterface = jsBridgeContext->getJniCache()->getParameterInterface(parameter);
-      //jmethodID getVarArgParameter = jniContext->getMethodID(
-      //    jsBridgeParameterClass, "getVarArgParameter", "()Lde/prosiebensat1digital/oasisjsbridge/Parameter;");
-      //JniLocalRef<jsBridgeParameter> varArgParameter = jniContext->callObjectMethod<jsBridgeParameter>(javaClass, getVarArgParameter);
-      //auto javaType = jsBridgeContext->getJavaTypeProvider().makeUniqueType(varArgParameter, m_isLambda /*boxed*/);
-      //m_argumentTypes[i] = std::move(javaType);
+      ParameterInterface parameterInterface = jsBridgeContext->getJniCache()->getParameterInterface(parameter);
+      JniLocalRef<jsBridgeParameter> varArgParameter = parameterInterface.getComponentType();
+      auto javaType = jsBridgeContext->getJavaTypeProvider().makeUniqueType(varArgParameter, m_isLambda /*boxed*/);
+      m_argumentTypes[i] = std::move(javaType);
       break;
     }
 
@@ -110,8 +108,14 @@ duk_ret_t JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRe
       ? m_argumentTypes.size() - 1
       : m_argumentTypes.size();
 
-  if (argCount < minArgs || (!m_isVarArgs && argCount > minArgs)) {
-    throw std::invalid_argument(std::string() + "wrong number of arguments when calling Java method " + m_methodName + " (expected: " + std::to_string(minArgs) + ", received: " + std::to_string(argCount) + ")");
+  if (argCount < minArgs) {
+    // Not enough args
+    alog_warn("Not enough parameters when calling Java method %s (expected: %d, received: %d). Missing parameters will be set to null.", m_methodName.c_str(), minArgs, argCount);
+  }
+
+  if (!m_isVarArgs && argCount > minArgs) {
+    // Too many args
+    throw std::invalid_argument(std::string() + "Too many parameters when calling Java method " + m_methodName + " (expected: " + std::to_string(minArgs) + ", received: " + std::to_string(argCount) + ")");
   }
 
   std::vector<JValue> args(m_argumentTypes.size());
@@ -124,7 +128,13 @@ duk_ret_t JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRe
   }
   for (ssize_t i = minArgs - 1; i >= 0; --i) {
     const auto &argumentType = m_argumentTypes[i];
-    JValue value = argumentType->pop();
+    JValue value;
+    if (i >= argCount) {
+      // Parameter not given by JS: set it to null
+      // Note: we do not explicitly check if the parameter is nullable so the execution might throw!
+    } else {
+      value = argumentType->pop();
+    }
     args[i] = std::move(value);
   }
 
@@ -143,32 +153,42 @@ JSValue JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRef<
       : m_argumentTypes.size();
 
   if (argc < minArgs) {
-    // Not enough arguments
-    JS_ThrowRangeError(ctx, "Not enough parameters when calling Java method %s (got %d, expected %d)", m_methodName.c_str(), argc, minArgs);
-    return JS_UNDEFINED;
+    // Not enough args
+    alog_warn("Not enough parameters when calling Java method %s (expected: %d, received: %d). Missing parameters will be set to null.", m_methodName.c_str(), minArgs, argc);
   }
 
   if (!m_isVarArgs && argc > minArgs) {
-    // Too many arguments
-    JS_ThrowRangeError(ctx, "Too many parameters when calling Java method %s (got %d, expected %d)", m_methodName.c_str(), argc, minArgs);
-    return JS_UNDEFINED;
+    // Too many args
+    throw std::invalid_argument(std::string() + "Too many parameters when calling Java method " + m_methodName + " (expected: " + std::to_string(minArgs) + ", received: " + std::to_string(argc) + ")");
   }
 
   std::vector<JValue> args(m_argumentTypes.size());
 
-  // Load the arguments off the stack and convert to Java types.
-  if (m_isVarArgs) {
-    const auto &argumentType = m_argumentTypes.back();
-    // TODO: QuickJS varargs
-    assert(false);
-    //args[args.size() - 1] = argumentLoader->toJavaArray(argv[argc - 1], argc - minArgs, true);
-  }
-
+  // Load arguments and convert to Java types
   for (int i = 0; i < minArgs; ++i) {
     const auto &argumentType = m_argumentTypes[i];
-    JValue value = argumentType->toJava(argv[i]);
+    JValue value;
+    if (i >= argc) {
+      // Parameter not given by JS: set it to null
+      // Note: we do not explicitly check if the parameter is nullable so the execution might throw!
+    } else {
+      value = argumentType->toJava(argv[i]);
+    }
     args[i] = std::move(value);
   }
+
+  if (m_isVarArgs) {
+    // Move the varargs into a JS array before converting it to a Java array
+    const auto &argumentType = m_argumentTypes.back();
+    int varArgCount = argc - minArgs;
+    JSValue varArgArray = JS_NewArray(ctx);
+    for (int i = 0; i < varArgCount; ++i) {
+      JS_SetPropertyUint32(ctx, varArgArray, static_cast<uint32_t>(i), JS_DupValue(ctx, argv[minArgs + i]));
+    }
+    args[args.size() - 1] = argumentType->toJavaArray(varArgArray);
+    JS_FreeValue(ctx, varArgArray);
+  }
+
 
   return m_methodBody(javaThis, args);
 }

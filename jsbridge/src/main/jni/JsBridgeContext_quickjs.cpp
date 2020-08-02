@@ -26,7 +26,6 @@
 #include "QuickJsUtils.h"
 #include "custom_stringify.h"
 #include "log.h"
-#include "quickjs_console.h"
 #include "exceptions/JsException.h"
 #include "java-types/Deferred.h"
 #include "java-types/Object.h"
@@ -81,17 +80,9 @@ void JsBridgeContext::init(JniContext *jniContext, const JniLocalRef<jobject> &j
   JS_SetPropertyStr(m_ctx, globalObj, JSBRIDGE_CPP_CLASS_PROP_NAME, cppWrapperObj);
   // No JS_FreeValue(m_ctx, cppWrapperObj) after JS_SetPropertyStr()
   JS_FreeValue(m_ctx, globalObj);
-
-  // Set global + window (TODO)
-  // See also https://wiki.duktape.org/howtoglobalobjectreference
-  static const char *str1 = "var global = this; var window = this; window.open = function() {};\n";
-  JSValue e = JS_Eval(m_ctx, str1, strlen(str1), "JsBridgeContext.cpp", 0);
-  JS_FreeValue(m_ctx, e);
-
-  quickjs_console_init(m_ctx);
 }
 
-void JsBridgeContext::startDebugger() {
+void JsBridgeContext::startDebugger(int /*port*/) {
   // Not supported yet
 }
 
@@ -193,15 +184,6 @@ void JsBridgeContext::registerJsObject(const std::string &strName,
 
   JS_AUTORELEASE_VALUE(m_ctx, jsObjectValue);
 
-  if (!JS_IsObject(jsObjectValue) || JS_IsNull(jsObjectValue)) {
-    throw std::invalid_argument("Cannot register " + strName + ". It does not exist or is not a valid object.");
-  }
-
-  // Check that it is not a promise!
-  if (m_utils->hasPropertyStr(jsObjectValue, "then")) {
-    alog_warn("Attempting to register a JS promise (%s)... JsValue.await() should probably be called, first...");
-  }
-
   // Create the JavaScriptObject instance
   auto cppJsObject = new JavaScriptObject(this, strName, jsObjectValue, methods, check);  // auto-deleted
 
@@ -211,15 +193,12 @@ void JsBridgeContext::registerJsObject(const std::string &strName,
 
 void JsBridgeContext::registerJsLambda(const std::string &strName,
                                        const JniLocalRef<jsBridgeMethod> &method) {
+
   JSValue globalObj = JS_GetGlobalObject(m_ctx);
   JSValue jsLambdaValue = JS_GetPropertyStr(m_ctx, globalObj, strName.c_str());
   JS_FreeValue(m_ctx, globalObj);
 
   JS_AUTORELEASE_VALUE(m_ctx, jsLambdaValue);
-
-  if (!JS_IsFunction(m_ctx, jsLambdaValue)) {
-    throw std::invalid_argument("Cannot register " + strName + ". It does not exist or is not a valid function.");
-  }
 
   // Create the JavaScriptObject instance
   auto cppJsLambda = new JavaScriptLambda(this, method, strName, jsLambdaValue);  // auto-deleted
@@ -230,7 +209,8 @@ void JsBridgeContext::registerJsLambda(const std::string &strName,
 
 JValue JsBridgeContext::callJsMethod(const std::string &objectName,
                                      const JniLocalRef<jobject> &javaMethod,
-                                     const JObjectArrayLocalRef &args) {
+                                     const JObjectArrayLocalRef &args,
+                                     bool awaitJsPromise) {
 
   // Get the JS object
   JSValue globalObj = JS_GetGlobalObject(m_ctx);
@@ -250,7 +230,7 @@ JValue JsBridgeContext::callJsMethod(const std::string &objectName,
                                 " because it does not exist or has been deleted!");
   }
 
-  return cppJsObject->call(jsObjectValue, javaMethod, args);
+  return cppJsObject->call(jsObjectValue, javaMethod, args, awaitJsPromise);
 }
 
 JValue JsBridgeContext::callJsLambda(const std::string &strFunctionName,
@@ -278,7 +258,6 @@ JValue JsBridgeContext::callJsLambda(const std::string &strFunctionName,
 }
 
 void JsBridgeContext::assignJsValue(const std::string &strGlobalName, const JStringLocalRef &strCode) {
-
   JSValue v = JS_Eval(m_ctx, strCode.toUtf8Chars(), strCode.utf8Length(), strGlobalName.c_str(), 0);
   strCode.releaseChars();  // release chars now as we don't need them anymore
 
@@ -289,6 +268,21 @@ void JsBridgeContext::assignJsValue(const std::string &strGlobalName, const JStr
   JSValue globalObj = JS_GetGlobalObject(m_ctx);
   JS_SetPropertyStr(m_ctx, globalObj, strGlobalName.c_str(), v);
   // No JS_FreeValue(m_ctx, v) after JS_SetPropertyStr()
+  JS_FreeValue(m_ctx, globalObj);
+}
+
+void JsBridgeContext::deleteJsValue(const std::string &strGlobalName) {
+  JSValue globalObj = JS_GetGlobalObject(m_ctx);
+  JSAtom atom = JS_NewAtom(m_ctx, strGlobalName.c_str());
+  JS_DeleteProperty(m_ctx, globalObj, atom, 0);
+  JS_FreeAtom(m_ctx, atom);
+  JS_FreeValue(m_ctx, globalObj);
+}
+
+void JsBridgeContext::copyJsValue(const std::string &strGlobalNameTo, const std::string &strGlobalNameFrom) {
+  JSValue globalObj = JS_GetGlobalObject(m_ctx);
+  JSValue valueFrom = JS_GetPropertyStr(m_ctx, globalObj, strGlobalNameFrom.c_str());
+  JS_SetPropertyStr(m_ctx, globalObj, strGlobalNameTo.c_str(), valueFrom);
   JS_FreeValue(m_ctx, globalObj);
 }
 
@@ -322,6 +316,21 @@ void JsBridgeContext::newJsFunction(const std::string &strGlobalName, const JObj
 
   JS_SetPropertyStr(m_ctx, globalObj, strGlobalName.c_str(), functionValue);
   // No JS_FreeValue(m_ctx, functionValue) after JS_SetPropertyStr
+  JS_FreeValue(m_ctx, globalObj);
+}
+
+void JsBridgeContext::convertJavaValueToJs(const std::string &strGlobalName, const JniLocalRef<jobject> &javaValue, const JniLocalRef<jsBridgeParameter> &parameter) {
+
+  auto type = m_javaTypeProvider.makeUniqueType(parameter, true /*boxed*/);
+
+  JSValue value = type->fromJava(JValue(javaValue));
+  if (JS_IsException(value)) {
+    throw m_exceptionHandler->getCurrentJsException();
+  }
+
+  JSValue globalObj = JS_GetGlobalObject(m_ctx);
+  JS_SetPropertyStr(m_ctx, globalObj, strGlobalName.c_str(), value);
+  // No JS_FreeValue(m_ctx, value) after JS_SetPropertyStr
   JS_FreeValue(m_ctx, globalObj);
 }
 

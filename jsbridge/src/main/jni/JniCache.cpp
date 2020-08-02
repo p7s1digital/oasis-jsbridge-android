@@ -28,6 +28,7 @@ JniCache::JniCache(const JsBridgeContext *jsBridgeContext, const JniLocalRef<job
  , m_runtimeExceptionClass(m_jniContext->findClass("java/lang/RuntimeException"))
  , m_jsBridgeMethodClass(m_jniContext->findClass(JSBRIDGE_PKG_PATH "/Method"))
  , m_jsBridgeParameterClass(m_jniContext->findClass(JSBRIDGE_PKG_PATH "/Parameter"))
+ , m_jsBridgeDebugStringClass(getJavaClass(JavaTypeId::DebugString))
  , m_jsBridgeJsValueClass(getJavaClass(JavaTypeId::JsValue))
  , m_jsonObjectWrapperClass(getJavaClass(JavaTypeId::JsonObjectWrapper))
  , m_jsBridgeInterface(this, jsBridgeJavaObject) {
@@ -68,6 +69,24 @@ JniLocalRef<jthrowable> JniCache::newJsException(
       m_jsExceptionClass, "<init>", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)V");
 
   return m_jniContext->newObject<jthrowable>(m_jsExceptionClass, methodId, jsonValue, detailedMessage, jsStackTrace, cause);
+}
+
+
+// DebugString
+// ---
+
+JniLocalRef<jobject> JniCache::newDebugString(const char *s) const {
+  return newDebugString(JStringLocalRef(m_jniContext, s));
+}
+
+JniLocalRef<jobject> JniCache::newDebugString(const JStringLocalRef &s) const {
+  static thread_local jmethodID methodId = m_jniContext->getMethodID(m_jsBridgeDebugStringClass, "<init>", "(Ljava/lang/String;)V");
+  return m_jniContext->newObject<jobject>(m_jsBridgeDebugStringClass, methodId, s);
+}
+
+JStringLocalRef JniCache::getDebugStringString(const JniRef<jobject> &debugString) const {
+  static thread_local jmethodID getString = m_jniContext->getMethodID(m_jsBridgeDebugStringClass, "getString", "()Ljava/lang/String;");
+  return m_jniContext->callStringMethod(debugString, getString);
 }
 
 

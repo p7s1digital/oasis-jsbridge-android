@@ -95,9 +95,9 @@ void JsException::pushError() const {
 
 #elif defined(QUICKJS)
 
-JsException::JsException(const JsBridgeContext *jsBridgeContext, JSValueConst exceptionValue)
+JsException::JsException(const JsBridgeContext *jsBridgeContext, JSValue exceptionValue)
  : m_jsBridgeContext(jsBridgeContext)
- , m_value(JS_DupValue(m_jsBridgeContext->getQuickJsContext(), exceptionValue))
+ , m_value(exceptionValue)
  , m_what(createMessage(jsBridgeContext, exceptionValue)) {
 }
 

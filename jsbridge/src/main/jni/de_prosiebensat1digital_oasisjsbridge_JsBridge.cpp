@@ -70,10 +70,10 @@ JNIEXPORT jlong JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniC
 }
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniStartDebugger
-    (JNIEnv *env, jobject, jlong lctx) {
+    (JNIEnv *env, jobject, jlong lctx, jint port) {
 
   auto jsBridgeContext = getJsBridgeContext(env, lctx);
-  jsBridgeContext->startDebugger();
+  jsBridgeContext->startDebugger(port);
 }
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCancelDebug
@@ -205,7 +205,7 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
 }
 
 JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCallJsMethod
-    (JNIEnv *env, jobject, jlong lctx, jstring objectName, jobject javaMethod, jobjectArray args) {
+    (JNIEnv *env, jobject, jlong lctx, jstring objectName, jobject javaMethod, jobjectArray args, jboolean awaitJsPromise) {
 
   //alog("jniCallJsMethod()");
 
@@ -219,7 +219,8 @@ JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jn
   try {
     value = jsBridgeContext->callJsMethod(strObjectName,
                                           JniLocalRef<jobject>(jniContext, javaMethod, JniLocalRefMode::Borrowed),
-                                          JObjectArrayLocalRef(jniContext, args, JniLocalRefMode::Borrowed));
+                                          JObjectArrayLocalRef(jniContext, args, JniLocalRefMode::Borrowed),
+                                          awaitJsPromise);
   } catch (const std::exception &e) {
     jsBridgeContext->getExceptionHandler()->jniThrow(e);
   }
@@ -259,7 +260,7 @@ JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jn
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniAssignJsValue
     (JNIEnv *env, jobject, jlong lctx, jstring globalName, jstring jsCode) {
 
-  //alog("jniInitJsValue()");
+  //alog("jniAssignJsValue()");
 
   auto jsBridgeContext = getJsBridgeContext(env, lctx);
   auto jniContext = jsBridgeContext->getJniContext();
@@ -268,6 +269,41 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniAs
 
   try {
     jsBridgeContext->assignJsValue(strGlobalName, JStringLocalRef(jniContext, jsCode, JniLocalRefMode::Borrowed));
+  } catch (const std::exception &e) {
+    jsBridgeContext->getExceptionHandler()->jniThrow(e);
+  }
+}
+
+JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniDeleteJsValue
+    (JNIEnv *env, jobject, jlong lctx, jstring globalName) {
+
+  //alog("jniDeleteJsValue()");
+
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
+  auto jniContext = jsBridgeContext->getJniContext();
+
+  std::string strGlobalName = JStringLocalRef(jniContext, globalName, JniLocalRefMode::Borrowed).toUtf8Chars();
+
+  try {
+    jsBridgeContext->deleteJsValue(strGlobalName);
+  } catch (const std::exception &e) {
+    jsBridgeContext->getExceptionHandler()->jniThrow(e);
+  }
+}
+
+JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCopyJsValue
+    (JNIEnv *env, jobject, jlong lctx, jstring globalNameTo, jstring globalNameFrom) {
+
+  //alog("jniCopyJsValue()");
+
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
+  auto jniContext = jsBridgeContext->getJniContext();
+
+  std::string strGlobalNameTo = JStringLocalRef(jniContext, globalNameTo, JniLocalRefMode::Borrowed).toUtf8Chars();
+  std::string strGlobalNameFrom = JStringLocalRef(jniContext, globalNameFrom, JniLocalRefMode::Borrowed).toUtf8Chars();
+
+  try {
+    jsBridgeContext->copyJsValue(strGlobalNameTo, strGlobalNameFrom);
   } catch (const std::exception &e) {
     jsBridgeContext->getExceptionHandler()->jniThrow(e);
   }
@@ -287,6 +323,25 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniNe
 
   try {
     jsBridgeContext->newJsFunction(strGlobalName, objectArgs, strCode);
+  } catch (const std::exception &e) {
+    jsBridgeContext->getExceptionHandler()->jniThrow(e);
+  }
+}
+
+JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniConvertJavaValueToJs
+    (JNIEnv *env, jobject, jlong lctx, jstring globalName, jobject javaValue, jobject parameter) {
+
+  //alog("jniConvertJavaValueToJs()");
+
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
+  auto jniContext = jsBridgeContext->getJniContext();
+
+  std::string strGlobalName = JStringLocalRef(jniContext, globalName, JniLocalRefMode::Borrowed).toUtf8Chars();
+  JniLocalRef<jobject> javaValueRef(jniContext, javaValue, JniLocalRefMode::Borrowed);
+  JniLocalRef<jsBridgeParameter> parameterRef(jniContext, parameter, JniLocalRefMode::Borrowed);
+
+  try {
+    jsBridgeContext->convertJavaValueToJs(strGlobalName, javaValueRef, parameterRef);
   } catch (const std::exception &e) {
     jsBridgeContext->getExceptionHandler()->jniThrow(e);
   }

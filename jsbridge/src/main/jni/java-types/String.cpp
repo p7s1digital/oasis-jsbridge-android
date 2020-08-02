@@ -18,6 +18,7 @@
  */
 #include "String.h"
 #include "JsBridgeContext.h"
+#include "JniCache.h"
 
 #if defined(DUKTAPE)
 # include "StackChecker.h"
@@ -27,14 +28,33 @@
 
 namespace JavaTypes {
 
-String::String(const JsBridgeContext *jsBridgeContext)
- : JavaType(jsBridgeContext, JavaTypeId::String) {
+String::String(const JsBridgeContext *jsBridgeContext, bool forDebug)
+ : JavaType(jsBridgeContext, forDebug ? JavaTypeId::DebugString : JavaTypeId::String)
+ , m_forDebug(forDebug) {
 }
 
 #if defined(DUKTAPE)
 
 JValue String::pop() const {
   CHECK_STACK_OFFSET(m_ctx, -1);
+
+  // When m_forDebug == true, the return JValue is a DebugString instance
+  if (m_forDebug) {
+    const char *s;
+
+    if (duk_is_undefined(m_ctx, -1)) {
+      s = "undefined";
+    } else if (duk_is_null(m_ctx, -1)) {
+      s = "null";
+    } else {
+      s = duk_safe_to_string(m_ctx, -1);
+    }
+
+    auto debugString = m_jsBridgeContext->getJniCache()->newDebugString(s);
+
+    duk_pop(m_ctx);
+    return JValue(debugString);
+  }
 
   // Check if the caller passed in a null string.
   if (duk_is_null_or_undefined(m_ctx, -1)) {
@@ -55,7 +75,13 @@ duk_ret_t String::push(const JValue &value) const {
     return 1;
   }
 
-  JStringLocalRef jString(value.getLocalRef().staticCast<jstring>());
+  JStringLocalRef jString;
+  if (m_forDebug) {
+    jString = m_jsBridgeContext->getJniCache()->getDebugStringString(value.getLocalRef());
+  } else {
+    jString = JStringLocalRef(value.getLocalRef().staticCast<jstring>());
+  }
+
   if (jString.isNull()) {
     duk_push_null(m_ctx);
     return 1;
@@ -68,6 +94,22 @@ duk_ret_t String::push(const JValue &value) const {
 #elif defined(QUICKJS)
 
 JValue String::toJava(JSValueConst v) const {
+  // When m_forDebug == true, the return JValue is a DebugString instance
+  if (m_forDebug) {
+    JStringLocalRef js;
+
+    if (JS_IsUndefined(v)) {
+      js = JStringLocalRef(m_jniContext, "undefined");
+    } else if (JS_IsNull(v)) {
+      js = JStringLocalRef(m_jniContext, "null");
+    } else {
+      js = m_jsBridgeContext->getUtils()->toJString(v);
+    }
+
+    auto debugString = m_jsBridgeContext->getJniCache()->newDebugString(js);
+    return JValue(debugString);
+  }
+
   // Check if the caller passed in a null string.
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
     return JValue();
@@ -82,7 +124,13 @@ JSValue String::fromJava(const JValue &value) const {
     return JS_NULL;
   }
 
-  JStringLocalRef jString(value.getLocalRef().staticCast<jstring>());
+  JStringLocalRef jString;
+  if (m_forDebug) {
+    jString = m_jsBridgeContext->getJniCache()->getDebugStringString(value.getLocalRef());
+  } else {
+    jString = JStringLocalRef(value.getLocalRef().staticCast<jstring>());
+  }
+
   if (jString.isNull()) {
     return JS_NULL;
   }

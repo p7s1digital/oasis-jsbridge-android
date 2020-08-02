@@ -74,8 +74,15 @@ JValue Long::popArray(uint32_t count, bool expanded) const {
     if (!expanded) {
       duk_get_prop_index(m_ctx, -1, static_cast<duk_uarridx_t>(i));
     }
-    JValue value = pop();
-    elements[i] = value.getLong();
+    try {
+      JValue value = pop();
+      elements[i] = value.getLong();
+    } catch (const std::exception &e) {
+      if (!expanded) {
+        duk_pop(m_ctx);  // pop the array
+      }
+      throw;
+    }
   }
 
   if (!expanded) {
@@ -119,18 +126,18 @@ duk_ret_t Long::pushArray(const JniLocalRef<jarray> &values, bool expand) const 
 
 namespace {
   inline jlong getLong(JSContext *ctx, JSValue v) {
-    if (JS_IsBigInt(NULL, v)) {
+    int tag = JS_VALUE_GET_TAG(v);
+    if (tag == JS_TAG_INT) {
       int64_t i64;
       JS_ToInt64(ctx, &i64, v);
       return i64;
     }
 
-    if (JS_IsNumber(v)) {
+    if (JS_TAG_IS_FLOAT64(tag)) {
       return jlong(JS_VALUE_GET_FLOAT64(v));
     }
 
-    alog_warn("Cannot get long from JS: returning 0");  // TODO: proper exception handling
-    return jlong();
+    throw std::invalid_argument("Cannot convert JS value to Java long");
   }
 }
 

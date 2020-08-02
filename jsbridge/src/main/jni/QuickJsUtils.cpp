@@ -49,7 +49,6 @@ bool QuickJsUtils::hasPropertyStr(JSValueConst this_obj, const char *prop) const
   return ret;
 }
 
-// TODO: avoid double string allocation and re-use internal pointer in JSValue
 JStringLocalRef QuickJsUtils::toJString(JSValueConst v) const {
   const char *cstr = JS_ToCString(m_ctx, v);
   JStringLocalRef ret(m_jniContext, cstr);

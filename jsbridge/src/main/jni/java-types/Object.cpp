@@ -64,7 +64,7 @@ JValue Object::pop() const {
     }
 
     case DUK_TYPE_STRING: {
-      auto stringType = std::make_unique<String>(m_jsBridgeContext);
+      auto stringType = std::make_unique<String>(m_jsBridgeContext, false);
       return stringType->pop();
     }
 
@@ -124,7 +124,7 @@ JValue Object::toJava(JSValueConst v) const {
   }
 
   if (JS_IsString(v)) {
-    auto stringType = std::make_unique<String>(m_jsBridgeContext);
+    auto stringType = std::make_unique<String>(m_jsBridgeContext, false);
     return stringType->toJava(v);
   }
 
@@ -179,7 +179,9 @@ JavaType *Object::newJavaType(const JniLocalRef<jobject> &jobject) const {
     case JavaTypeId::BoxedDouble:
       return new BoxedPrimitive(m_jsBridgeContext, std::make_unique<Double>(m_jsBridgeContext));
     case JavaTypeId::String:
-      return new String(m_jsBridgeContext);
+      return new String(m_jsBridgeContext, false);
+    case JavaTypeId::DebugString:
+      return new String(m_jsBridgeContext, true);
     case JavaTypeId::JsonObjectWrapper:
       return new JsonObjectWrapper(m_jsBridgeContext, false /*isNullable*/);
     default:

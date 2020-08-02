@@ -16,6 +16,7 @@
 package de.prosiebensat1digital.oasisjsbridge
 
 import androidx.test.platform.app.InstrumentationRegistry
+import kotlin.test.assertEquals
 import kotlinx.coroutines.*
 import org.junit.After
 import org.junit.Before
@@ -36,8 +37,7 @@ class ReadmeTest {
 
     @Before
     fun setUp() {
-        jsBridge = JsBridge(InstrumentationRegistry.getInstrumentation().context)
-        jsBridge.start()
+        jsBridge = JsBridge(JsBridgeConfig.standardConfig())
     }
 
     @After
@@ -51,34 +51,10 @@ class ReadmeTest {
     }
 
     @Test
-    fun testUsageMinimal() {
-        jsBridge.evaluateNoRetVal("console.log('Hello world!');")
-    }
-
-    @Test
-    fun testUsageAdvanced() {
-        // Create a Kotlin proxy to a JS function
-        val helloJs: suspend (String) -> Unit = JsValue.newFunction(jsBridge, "s",
-            "console.log('Hello ' + s + '!');"
-        ).mapToNativeFunction1()
-
-        // Create a JS proxy to a Kotlin function
-        val toUpperCaseNative = JsValue.fromNativeFunction1(jsBridge) { s: String -> s.toUpperCase() }
-
+    fun testHelloWorld() {
         runBlocking {
-            // Evaluate JS promise calling Kotlin function "toUpperCaseNative()"
-            // (suspend function call) -> returns "WORLD" after 1s timeout
-            val world: String = jsBridge.evaluate("""new Promise(function(resolve) {
-              setTimeout(function() {
-                resolve($toUpperCaseNative('world'));
-              }, 1000);
-            })""".trimIndent())
-
-            // Manually release the JsValue after usage (otherwise handled by garbage collector)
-            toUpperCaseNative.release()
-
-            // Call JS function "helloJs()" -> displays "Hello WORLD!"
-            helloJs(world)
+            val msg: String = jsBridge.evaluate("'Hello world!'.toUpperCase()")
+            println(msg)  // HELLO WORLD!
         }
     }
 
@@ -86,42 +62,95 @@ class ReadmeTest {
     fun testEvaluation() {
         // Without return value:
         jsBridge.evaluateNoRetVal("console.log('hello');")
+        jsBridge.evaluateLocalFile(InstrumentationRegistry.getInstrumentation().context, "js/file.js")  // Android asset
 
-        // Blocking evaluation
-        val result1: Int = jsBridge.evaluateBlocking("1+2")  // generic type inferred
-        println("result1 = $result1")
-        val result2 = jsBridge.evaluateBlocking<Int>("1+2")  // with explicit generic type
-        println("result2 = $result2")
+        runBlocking {
+            // With return value:
+            val sum1: Int = jsBridge.evaluate("1+2")  // suspending call
+            val sum2: Int = jsBridge.evaluate("new Promise(function(resolve) { resolve(1+2); })")  // suspending call (JS promise)
+            val msg: String = jsBridge.evaluate("'message'.toUpperCase()")  // suspending call
+            val obj: JsonObjectWrapper =
+                jsBridge.evaluate("({one: 1, two: 'two'})")  // suspending call (wrapped JS object via JSON)
 
-        // Via coroutines:
-        GlobalScope.launch {
-            val result3: Int = jsBridge.evaluate("1+2")  // suspending call
-            println("result3 = $result3")
+            // Blocking evaluation:
+            val result1: Int = jsBridge.evaluateBlocking("1+2")  // generic type inferred
+            val result2 = jsBridge.evaluateBlocking<Int>("1+2")  // with explicit generic type
+
+            // Exception handling:
+            try {
+                jsBridge.evaluate<Unit>("""
+                  |function buggy() { throw new Error('wrong') }
+                  |buggy();
+                """.trimMargin())
+            } catch (jse: JsException) {
+                // jse.message = "wrong"
+                // jse.stackTrace = [JavaScript.buggy(eval:1), JavaScript.<eval>(eval:2), ....JsBridge.jniEvaluateString(Native Method), ...]
+            }
         }
     }
-
-    interface JsToNativeApi: JsToNativeInterface
 
     @Test
     fun testJsValue() {
-        val jsValue1 = JsValue(jsBridge)
-        val jsValue2 = JsValue(jsBridge, "'hello'.toUpperCase()")
-        val calcSumJs = JsValue.newFunction(jsBridge, "a", "b", "return a + b;")
-        val nativeFunctionJs = JsValue.fromNativeFunction2(jsBridge) { a: Int, b: Int -> a + b }
-        val nativeObjectJs = JsValue.fromNativeObject(jsBridge, object: JsToNativeApi {})
-
         runBlocking {
-            val sum: Int = jsBridge.evaluate("$calcSumJs(2, 3)")
-            println("Sum is $sum")
+            val jsInt1 = JsValue(jsBridge, "123")
+            val jsInt2 = JsValue.fromNativeValue(jsBridge, 123)
+            val jsString1 = JsValue(jsBridge, "'hello'.toUpperCase()")
+            val jsString2 = JsValue.fromNativeValue(jsBridge, "HELLO")
+            val jsObject1 = JsValue(jsBridge, "({one: 1, two: 'two'})")
+            val jsObject2 = JsValue.fromNativeValue(jsBridge, JsonObjectWrapper("one" to 1, "two" to "two"))
+            val calcSumJs1 = JsValue(jsBridge, "(function(a, b) { return a + b; })")
+            val calcSumJs2 = JsValue.newFunction(jsBridge, "a", "b", "return a + b;")
+            val calcSumJs3 = JsValue.fromNativeFunction2(jsBridge) { a: Int, b: Int -> a + b }
 
-            jsBridge.evaluate<Unit>("global['nativeApi'] = $nativeObjectJs")
+            val sum: Int = jsBridge.evaluate("$calcSumJs1(2, 3)")
+
+            val s1 = jsString1.evaluate<String>()  // suspending function + explicit generic parameter
+            val s2: String = jsString1.evaluate()  // suspending function + inferred generic parameter
+            val s3: String = jsString1.evaluateBlocking()  // blocking
         }
+    }
 
-        nativeObjectJs.assignToGlobal("nativeApi")
+    interface JsApi1 : NativeToJsInterface {
+        fun method1(a: Int, b: String)
+        suspend fun method2(c: Double): String
     }
 
     @Test
-    fun testKotlinToJsFunction() {
+    fun testJsObjectsFromKotlin() {
+        val jsObject = JsValue(jsBridge, """({
+          method1: function(a, b) { /*...*/ },
+          method2: function(c) { return "Value: " + c; }
+        })""")
+
+        val jsApi1: JsApi1 = jsObject.mapToNativeObject()  // no check
+        runBlocking {
+            val jsApi2: JsApi1 = jsObject.mapToNativeObject(check = true)  // suspending, optionally check that all methods are defined in the JS object
+        }
+        val jsApi3: JsApi1 = jsObject.mapToNativeObjectBlocking(check = true)  // blocking (with optional check)
+
+        jsApi1.method1(1, "two")
+        runBlocking {
+            val s = jsApi1.method2(3.456)  // suspending
+        }
+    }
+
+    interface NativeApi1 : JsToNativeInterface {
+        fun method(a: Int, b: String): Double
+    }
+
+    @Test
+    fun testKotlinObjectsFromJs() {
+        val obj = object : NativeApi1 {
+            override fun method(a: Int, b: String): Double { return 123.456 }
+        }
+
+        val nativeApi: JsValue = JsValue.fromNativeObject(jsBridge, obj)
+
+        jsBridge.evaluateNoRetVal("globalThis.x = $nativeApi.method(1, 'two');")
+    }
+
+    @Test
+    fun testJsFunctionFromKotlin() {
         val calcSumJs: suspend (Int, Int) -> Int = JsValue.newFunction(jsBridge, "a", "b", """
           return a + b;
           """.trimIndent()
@@ -131,7 +160,7 @@ class ReadmeTest {
     }
 
     @Test
-    fun testJsToKotlinFunction() {
+    fun testKotlinFunctionFromJs() {
         val calcSumNative = JsValue.fromNativeFunction2(jsBridge) { a: Int, b: Int -> a + b }
 
         jsBridge.evaluateNoRetVal("""
@@ -139,58 +168,44 @@ class ReadmeTest {
           """.trimIndent())
     }
 
-    interface JsApi: NativeToJsInterface {
-        fun calcSum(a: Int, b: Int): Deferred<Int>
-        fun setCallback(cb: (payload: JsonObjectWrapper) -> Unit)
-        fun triggerEvent()
+    interface JsApi : NativeToJsInterface {
+        suspend fun createMessage(): String
+        suspend fun calcSum(a: Int, b: Int): Int
+    }
+
+    interface NativeApi : JsToNativeInterface {
+        fun getPlatformName(): String
+        fun getTemperatureCelcius(): Deferred<Float>
     }
 
     @Test
-    fun testNativeToJsInterface() {
-        runBlocking {
-            val jsApi: JsApi = JsValue(jsBridge, """({
-                calcSum: function(a, b) { return a + b; },
-                setCallback: function(cb) { this._cb = cb; },
-                triggerEvent: function() { if (_cb) cb({ value: 12 }); } 
-            })""".trimIndent()).mapToNativeObject()
+    fun testUsageAdvanced() {
+        jsBridge.evaluateLocalFile(InstrumentationRegistry.getInstrumentation().context, "js/api.js")
 
-            val result = jsApi.calcSum(1, 2).await()
-            println("sum is = $result")
-            jsApi.setCallback { payload -> println("Got JS event with payload $payload") }
-            jsApi.triggerEvent()
-        }
-    }
-
-    interface NativeApi: JsToNativeInterface {
-        fun calcSum(a: Int, b: Int): Int
-        fun setCallback(cb: (payload: JsonObjectWrapper) -> Unit)
-        fun triggerEvent()
-    }
-
-    @Test
-    fun testJsToNativeInterface() {
+        // Implement native API
         val nativeApi = object: NativeApi {
-            private var cb: ((JsonObjectWrapper) -> Unit)? = null
-
-            override fun calcSum(a: Int, b: Int) = a + b
-            override fun setCallback(cb: (payload: JsonObjectWrapper) -> Unit) {
-                this.cb = cb
-            }
-            override fun triggerEvent() {
-                val payload = JsonObjectWrapper("value" to 12)
-                cb?.invoke(payload)
+            override fun getPlatformName() = "Android"
+            override fun getTemperatureCelcius() = GlobalScope.async {
+                // Getting current temperature from sensor or via network service
+                37.2f
             }
         }
-
         val nativeApiJsValue = JsValue.fromNativeObject(jsBridge, nativeApi)
 
-        jsBridge.evaluateNoRetVal("""
-          var result = $nativeApiJsValue.calcSum(1, 2)
-          $nativeApi.setCallback(function(payload) {
-            console.log("Got native event with value=" + payload.value);
-          })
-          $nativeApi.triggerEvent()
-        """.trimIndent())
+        // Create JS API
+        val config = JsonObjectWrapper("debug" to true, "useFahrenheit" to false)  // {debug: true, useFahrenheit: false}
+        runBlocking {
+            val createJsApi: suspend (JsValue, JsonObjectWrapper) -> JsValue
+                    = JsValue(jsBridge, "createApi").mapToNativeFunction2()  // JS: global.createApi(nativeApi, config)
+            val jsApi: JsApi = createJsApi(nativeApiJsValue, config).mapToNativeObject()
+
+            // Call JS API methods
+            val msg = jsApi.createMessage()  // (suspending) "Hello Android, the temperature is 37.2 degrees C."
+            val sum = jsApi.calcSum(3, 2)  // (suspending) 5
+
+            assertEquals(msg, "Hello Android! The temperature is 37.2 degrees C.")
+            assertEquals(sum, 5)
+        }
     }
 
     // Wait until the JS queue is empty
@@ -198,8 +213,6 @@ class ReadmeTest {
         try {
             withContext(jsBridge.coroutineContext) {
                 // ensure that triggered coroutines are processed
-                yield()
-                yield()
                 yield()
             }
         } catch (e: CancellationException) {

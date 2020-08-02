@@ -79,7 +79,7 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
       return createPrimitive<Double>(m_jsBridgeContext, boxed);
 
     case JavaTypeId::BoxedVoid:
-      return new Void(m_jsBridgeContext, id, false /*boxed*/);  // TODO: check it
+      return new Void(m_jsBridgeContext, id, false /*boxed*/);  // Java "Void" object behaves like the unboxed version
     case JavaTypeId::BoxedBoolean:
       return createPrimitive<Boolean>(m_jsBridgeContext, true);
     case JavaTypeId::BoxedInt:
@@ -92,7 +92,9 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
       return createPrimitive<Double>(m_jsBridgeContext, true);
 
     case JavaTypeId::String:
-      return new String(m_jsBridgeContext);
+      return new String(m_jsBridgeContext, false);
+    case JavaTypeId::DebugString:
+      return new String(m_jsBridgeContext, true);
     case JavaTypeId::Object:
       return new Object(m_jsBridgeContext);
 
@@ -153,6 +155,7 @@ JavaTypeId JavaTypeProvider::getJavaTypeId(const JniRef<jsBridgeParameter> &para
 
   JavaTypeId id = getJavaTypeIdByJavaName(javaName.getUtf16View());
   if (id == JavaTypeId::Unknown) {
+    // TODO: check if implements NativeToJsInterface or JsToNativeInterface
     throw std::invalid_argument(std::string("Unsupported Java type: ") + javaName.toUtf8Chars());
   }
 

@@ -29,7 +29,7 @@ JNIEXPORT jlong JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniC
   (JNIEnv *, jobject);
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniStartDebug
-    (JNIEnv *, jobject, jlong);
+    (JNIEnv *, jobject, jlong, jint);
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCancelDebug
     (JNIEnv *, jobject, jlong);
@@ -56,16 +56,25 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRe
     (JNIEnv *, jobject, jlong, jstring, jobject);
 
 JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCallJsMethod
-    (JNIEnv *, jobject, jlong, jstring, jobject, jobjectArray);
+    (JNIEnv *, jobject, jlong, jstring, jobject, jobjectArray, jboolean awaitJsPromise);
 
 JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCallJsLambda
     (JNIEnv *, jobject, jlong, jstring, jobjectArray, jboolean);
 
-JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCassignJsValue
+JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniAssignJsValue
 (JNIEnv *, jobject, jlong, jstring, jstring);
+
+JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniDeleteJsValue
+    (JNIEnv *, jobject, jlong, jstring);
+
+JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCopyJsValue
+    (JNIEnv *, jobject, jlong, jstring, jstring);
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniNewJsFunction
 (JNIEnv *, jobject, jlong, jstring, jobjectArray, jstring);
+
+JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniConvertJavaValueToJs
+    (JNIEnv *, jobject, jlong, jstring, jobject, jobject);
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCompleteJsPromise
     (JNIEnv *, jobject, jlong, jstring, jboolean, jobject);

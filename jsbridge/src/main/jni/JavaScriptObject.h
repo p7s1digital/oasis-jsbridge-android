@@ -47,11 +47,11 @@ public:
 #if defined(DUKTAPE)
   JavaScriptObject(const JsBridgeContext *, std::string strName, duk_idx_t jsObjectIndex, const JObjectArrayLocalRef &methods, bool check);
 
-  JValue call(const JniLocalRef<jobject> &javaMethod, const JObjectArrayLocalRef &args) const;
+  JValue call(const JniLocalRef<jobject> &javaMethod, const JObjectArrayLocalRef &args, bool awaitJsPromise) const;
 #elif defined(QUICKJS)
   JavaScriptObject(const JsBridgeContext *, std::string strName, JSValueConst jsObjectValue, const JObjectArrayLocalRef &methods, bool check);
 
-  JValue call(JSValueConst jsObjectValue, const JniLocalRef<jobject> &javaMethod, const JObjectArrayLocalRef &args) const;
+  JValue call(JSValueConst jsObjectValue, const JniLocalRef<jobject> &javaMethod, const JObjectArrayLocalRef &args, bool awaitJsPromise) const;
 #endif
 
   JavaScriptObject() = delete;

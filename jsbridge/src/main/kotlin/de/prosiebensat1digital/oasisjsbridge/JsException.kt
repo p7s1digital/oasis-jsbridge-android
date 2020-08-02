@@ -18,7 +18,6 @@
  */
 package de.prosiebensat1digital.oasisjsbridge
 
-import java.util.regex.Pattern
 import timber.log.Timber
 
 @Suppress("UNUSED")  // Called from JNI
@@ -36,36 +35,64 @@ class JsException(val jsonValue: String? = null, detailedMessage: String, jsStac
     }
 
     companion object {
-        // - Duktape stack trace strings have multiple lines of the format "    at func (file.ext:line)".
-        // - QuickJS stack trace strings have multiple lines of the format "    at func (file.ext)".
-        // "func" is optional, but we'll omit frames without a function, since it means the frame is in
-        // native code.
-        private val STACK_TRACE_PATTERN: Pattern
-        /** Java StackTraceElements require a class name.  We don't have one in JS, so use this.  */
+        // e.g.: "   at [methodName] (file.js:13)"
+        private val STACK_TRACE_METHOD_FILE: Regex = "\\s*at\\s+\\[([^\\]\\s]+)\\]\\s+\\(([^:\\s\\)]+):(\\d+)\\).*".toRegex()
+
+        // e.g.: "   at functionName (file.js:13)"
+        private val STACK_TRACE_FUNCTION_FILE: Regex = "\\s*at\\s+([^\\]\\s]+)\\s+\\(([^:\\s\\)]+):(\\d+)\\).*".toRegex()
+
+        // e.g.: "   at methodName (object3)"
+        private val STACK_TRACE_METHOD_OBJECT: Regex = "\\s*at\\s+([^\\]\\s]+)\\s+\\(([^\\s\\)]+)\\).*".toRegex()
+
+        // e.g.: "   at file.js:13"
+        private val STACK_TRACE_FILE: Regex = "\\s*at\\s+([^:\\s]+):([^\\s]+).*".toRegex()
+
+        // Java StackTraceElements require a class name.  We don't have one in JS, so use this.
         private const val STACK_TRACE_CLASS_NAME = "JavaScript"
 
-        init {
-            STACK_TRACE_PATTERN = if (BuildConfig.FLAVOR == "duktape")
-                Pattern.compile("\\s*at ([^\\s^\\[]+) *\\(?([^\\s:]+):?(\\d+)?\\).*$")
-            else if (BuildConfig.FLAVOR == "quickjs")
-                Pattern.compile("\\s*at ([^\\s^\\[]+) *\\(([^\\s]+):(\\d+)\\).*$");
-            else
-                throw JsBridgeError.InternalError(customMessage = "Unsupported flavor: ${BuildConfig.FLAVOR}")
-        }
-
         private fun toStackTraceElement(s: String): StackTraceElement? {
-            val m = STACK_TRACE_PATTERN.matcher(s)
+            var className: String? = null
+            val methodName: String
+            val fileName: String
+            val lineNumber: Int
 
-            if (!m.matches()) {
-                // Nothing interesting on this line.
+            val methodFileGroups by lazy { STACK_TRACE_METHOD_FILE.matchEntire(s)?.groups }
+            val functionFileGroups by lazy { STACK_TRACE_FUNCTION_FILE.matchEntire(s)?.groups }
+            val methodObjectGroups by lazy { STACK_TRACE_METHOD_OBJECT.matchEntire(s)?.groups }
+            val fileGroups by lazy { STACK_TRACE_FILE.matchEntire(s)?.groups }
+
+            if (methodFileGroups != null) {
+                val groups = methodFileGroups!!
+                methodName = groups[1]?.value ?: "<unknown method>"
+                fileName = groups[2]?.value ?: "<unknown file>"
+                lineNumber = groups[3]?.value?.toIntOrNull() ?: 0
+            } else if (functionFileGroups != null) {
+                val groups = functionFileGroups!!
+                methodName = groups[1]?.value ?: "<unknown func>"
+                fileName = groups[2]?.value ?: "<unknown file>"
+                lineNumber = groups[3]?.value?.toIntOrNull() ?: 0
+            } else if (methodObjectGroups != null) {
+                val groups = methodObjectGroups!!
+                methodName = groups[1]?.value ?: "<unknown func>"
+                className = groups[2]?.value ?: "<unknown file>"
+                fileName = "eval"
+                lineNumber = 0
+            } else if (fileGroups != null) {
+                val groups = fileGroups!!
+                methodName = "global"
+                fileName = groups[1]?.value ?: return null
+                lineNumber = groups[2]?.value?.toIntOrNull() ?: 0
+            } else {
                 return null
             }
 
-            val m3 = if (m.groupCount() >= 3) m.group(3) else null
-            return StackTraceElement(
-                STACK_TRACE_CLASS_NAME, m.group(1) ?: "<unknown func>", m.group(2),
-                m3?.toInt() ?: 0
-            )
+            if (fileName.endsWith(".cpp") || fileName.endsWith(".c")) {
+                // Internal error
+                return null
+            }
+
+            val stackTraceClassName = if (className == null) STACK_TRACE_CLASS_NAME else "$STACK_TRACE_CLASS_NAME/$className"
+            return StackTraceElement(stackTraceClassName, methodName, fileName, lineNumber)
         }
     }
 }

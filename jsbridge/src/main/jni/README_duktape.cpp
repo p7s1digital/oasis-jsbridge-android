@@ -9,6 +9,23 @@ $ python tools/configure.py --source-directory src-input --output-directory tmp-
   -DDUK_USE_CPP_EXCEPTIONS
 - copy duktape.h, duktape.c, duk_config.c from tmp-output into jsbridge/src/duktape/cpp/duktape
 - rename duktape.c into duktape.cpp
+- manually fix issue in duktape.cpp which causes an issue on Android API 24 devices:
+  replace DUK_SPRINTF call in duk_bi_symbol_constructor_shared() into DUK_SNPRINTF as follows:
+
+  DUK_INTERNAL duk_ret_t duk_bi_symbol_constructor_shared(duk_hthread *thr) {
+     ...
+     // CRASHES ON API 24:
+     //p += DUK_SPRINTF((char *) p, "\xFF" "%lx-%lx",
+		 //                 (unsigned long) thr->heap->sym_counter[1],
+		 //                 (unsigned long) thr->heap->sym_counter[0]);
+
+     // FIX FOR API 24:
+     p += DUK_SNPRINTF((char *) p, 18, "\xFF" "%lx-%lx",
+		                  (unsigned long) thr->heap->sym_counter[1],
+		                  (unsigned long) thr->heap->sym_counter[0]);
+     ...
+  }
+
 
 
 Note 1: duk_console is based on the version in duktape/extras/console but adjusted to use Timber via JNI

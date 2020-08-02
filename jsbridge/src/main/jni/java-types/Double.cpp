@@ -70,8 +70,15 @@ JValue Double::popArray(uint32_t count, bool expanded) const {
     if (!expanded) {
       duk_get_prop_index(m_ctx, -1, static_cast<duk_uarridx_t>(i));
     }
-    JValue value = pop();
-    elements[i] = value.getDouble();
+    try {
+      JValue value = pop();
+      elements[i] = value.getDouble();
+    } catch (const std::exception &e) {
+      if (!expanded) {
+        duk_pop(m_ctx);  // pop the array
+      }
+      throw;
+    }
   }
 
   if (!expanded) {
@@ -115,22 +122,22 @@ duk_ret_t Double::pushArray(const JniLocalRef<jarray> &values, bool expand) cons
 
 namespace {
   inline jdouble getDouble(JSValue v) {
-    if (JS_IsBigInt(NULL, v)) {
-      return JS_VALUE_GET_INT(v);
+    int tag = JS_VALUE_GET_TAG(v);
+    if (tag == JS_TAG_INT) {
+        return JS_VALUE_GET_INT(v);
     }
 
-    if (JS_IsNumber(v)) {
+    if (JS_TAG_IS_FLOAT64(tag)) {
       return static_cast<jdouble>(JS_VALUE_GET_FLOAT64(v));
     }
 
-    alog_warn("Cannot get double from JS: returning 0");  // TODO: proper exception handling
-    return jdouble();
+    throw std::invalid_argument("Cannot convert JS value to Java double");
   }
 }
 
 JValue Double::toJava(JSValueConst v) const {
   if (!JS_IsNumber(v)) {
-    throw std::invalid_argument("Cannot convert return value to double");
+    throw std::invalid_argument("Cannot convert JS value to double");
   }
 
   if (JS_IsNull(v) || JS_IsUndefined(v)) {

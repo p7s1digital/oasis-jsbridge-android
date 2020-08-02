@@ -29,15 +29,16 @@ import java.math.BigInteger
 import java.net.InetAddress
 import java.nio.ByteOrder
 
-class JsDebuggerExtension(private val jsBridge: JsBridge) {
+internal class JsDebuggerExtension(
+    private val jsBridge: JsBridge,
+    val config: JsBridgeConfig.JsDebuggerConfig
+) {
     // Activity (only needed to display the debugging dialog)
     private var activityRef = WeakReference<Activity?>(null)
     var activity: Activity?
         get() = activityRef.get()
         set(value) { activityRef = WeakReference(value) }
 
-    var isActive = false
-        private set
     private var debuggerDialog: Dialog? = null
 
     fun release() {
@@ -71,19 +72,17 @@ class JsDebuggerExtension(private val jsBridge: JsBridge) {
     internal fun onDebuggerPending() {
         Timber.v("onDebuggerPending")
 
-        isActive = true
         val activity = this.activityRef.get() ?: return
 
         jsBridge.launch(Dispatchers.Main) {
             Timber.v("onDebuggerPending - launch")
 
             val builder = AlertDialog.Builder(activity)
-            val port = BuildConfig.DUKTAPE_DEBUGGER_SERVER_PORT
 
             builder.setMessage("""
                 |Please attach to the Duktape debugger:
                 |- go to the "jsbridge/src/duktape" folder
-                |- run "./startDebugger.sh -i ${getLocalIpAddress()} -p $port --open-browser"
+                |- run "./startDebugger.sh -i ${getLocalIpAddress()} -p ${config.port} --open-browser"
                 |- click on "attach" in the browser window
 
                 |Or under VS Code:
@@ -91,12 +90,12 @@ class JsDebuggerExtension(private val jsBridge: JsBridge) {
                 |- open project root folder
                 |- set up launch.json (or press the 'wheel' icon in the debugger tab)
                 |  - "address" = "${getLocalIpAddress()}"
-                |  - "port" = $port
+                |  - "port" = ${config.port}
                 |  - "outDir" = "${"$"}{workspaceRoot}/path/to/js/assets"
                 |- attach debugger
 
                 |If you are using the simulator, use "localhost" and first execute:
-                |- adb forward tcp:$port tcp:$port
+                |- adb forward tcp:${config.port} tcp:${config.port}
             """.trimMargin())
                 .setTitle("Waiting for debugger")
                 .setNegativeButton("Stop debugging") { _, _ ->

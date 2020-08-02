@@ -40,7 +40,7 @@ JavaScriptLambda::JavaScriptLambda(const JsBridgeContext *jsBridgeContext, const
 
   if (!duk_is_function(ctx, -1)) {
     duk_pop(ctx);
-    throw std::runtime_error("JavaScript object " + strName + "cannot be accessed");
+    throw std::invalid_argument("JavaScript object " + strName + " cannot be accessed");
   }
 
   m_method = new JavaScriptMethod(jsBridgeContext, method, std::move(strName), true);
@@ -60,7 +60,7 @@ JavaScriptLambda::JavaScriptLambda(const JsBridgeContext *jsBridgeContext, const
   m_ctx = jsBridgeContext->getQuickJsContext();
 
   if (!JS_IsFunction(m_ctx, jsLambdaValue)) {
-    throw std::runtime_error("JavaScript lambda " + strName + " cannot be accessed (not a function)");
+    throw std::invalid_argument("JavaScript lambda " + strName + " cannot be accessed (not a function)");
   }
 
   m_method = new JavaScriptMethod(jsBridgeContext, method, strName, true);
