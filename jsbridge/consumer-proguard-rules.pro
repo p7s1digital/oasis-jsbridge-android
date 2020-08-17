@@ -1,5 +1,6 @@
-# JS bridge
--keep class de.prosiebensat1digital.oasisjsbridge.** { *; }
+# All Js <-> JVM interfaces must be kept in order to make reflection work
+-keep interface * implements de.prosiebensat1digital.oasisjsbridge.JsToNativeInterface { *; }
+-keep interface * implements de.prosiebensat1digital.oasisjsbridge.NativeToJsInterface { *; }
 
 # Fix coroutines throw IllegalAccessError at
 # "kotlin.coroutines.intrinsics.IntrinsicsKt__IntrinsicsKt__Clinit"
@@ -13,3 +14,4 @@
 
 # OKHTTP
 -dontwarn okhttp3.**
+

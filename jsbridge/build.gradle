@@ -15,8 +15,7 @@ android {
         targetSdkVersion rootProject.ext.versions.target_sdk
         minSdkVersion rootProject.ext.versions.min_sdk
 
-        // export proguard rules
-        consumerProguardFiles  '../proguard-rules.pro'
+        consumerProguardFiles file('consumer-proguard-rules.pro')
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
@@ -30,7 +29,6 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
 
