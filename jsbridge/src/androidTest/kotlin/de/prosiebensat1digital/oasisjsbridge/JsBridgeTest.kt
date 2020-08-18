@@ -2112,6 +2112,34 @@ class JsBridgeTest {
         }
     }
 
+    @Test
+    fun test_todo() {
+        // GIVEN
+        var hasMessage = false
+        val config = JsBridgeConfig.bareConfig().apply {
+            consoleConfig.enabled = true
+            consoleConfig.mode = JsBridgeConfig.ConsoleConfig.Mode.AsJson
+        }
+
+        val subject = JsBridge(config)
+        jsBridge = subject
+
+        // WHEN
+        val js = """
+           var obj = {};
+           obj.a = { b: obj };
+           console.log("BW - before call");
+           console.log("BW - will err", obj);
+           console.log("BW - after call");
+    │   """
+        subject.evaluateNoRetVal(js)
+
+        runBlocking { waitForDone(subject) }
+
+        // THEN
+        assertTrue(errors.isEmpty())
+    }
+
 
     // Private methods
     // ---

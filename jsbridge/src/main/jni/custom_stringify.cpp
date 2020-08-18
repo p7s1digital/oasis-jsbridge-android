@@ -76,12 +76,10 @@ JSValue custom_stringify(JSContext *ctx, JSValueConst v) {
 
 #if 0
   // 1. JSON stringify (but does not properly serialize Error instances!)
-  JSValue jsonObject = JS_GetPropertyStr(ctx, globalObj, "JSON");
-  JSAtom atom = JS_NewAtom(ctx, "stringify");
-  ret = JS_Invoke(ctx, jsonObject, atom, 1, &v);
-  JS_FreeAtom(ctx, atom);
-  JS_FreeValue(ctx, jsonObject);
-  return ret;
+   alog("BW - before stringify");                                   │
+   ret = JS_JSONStringify(ctx, v, JS_UNDEFINED, JS_UNDEFINED);      │
+   alog("BW - after stringify");
+   return ret;
 #endif
 
   // 2. Custom stringify which properly serializes Error instances
