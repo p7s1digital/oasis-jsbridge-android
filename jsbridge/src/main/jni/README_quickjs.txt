@@ -3,7 +3,7 @@ $ download source code from https://bellard.org/quickjs/
 $ cd quickjs-XXXX-XX-XX
 - copy VERSION, cutils.c, libregexp-opcode.h, libregexp.h, libunicode.c, list.h, quickjs-opcode.h,
 quickjs.h, cutils.h, libregexp.c, libunicode-table.h, libunicode.h, quickjs-atom.h, quickjs.c
-into jsbridge/src/main/jni/quickjs
+into jsbridge/quickjs/jni/quickjs
 - apply the following change in quickjs.c:
 
 --- original quickjs.c	2019-08-18 11:50:45.000000000 +0200
