@@ -23,20 +23,36 @@ import kotlin.reflect.full.memberFunctions
 // - Java Class which has the reflection info without generic type info
 @PublishedApi
 internal open class Parameter private constructor(
+    private val parentMethod: Method?,
     internal val kotlinType: KType?,
     private val javaClass: Class<*>?,
-    val name: String?
+    val name: String?,
+    val isOptional: Boolean
 ) {
     constructor(kotlinType: KType)
-        : this(kotlinType, findJavaClass(kotlinType), null)
+        : this(null, kotlinType, findJavaClass(kotlinType), null, false)
+
+    constructor(parentMethod: Method, kotlinType: KType)
+            : this(parentMethod, kotlinType, findJavaClass(kotlinType), null, false)
 
     constructor(kotlinParameter: KParameter) : this(
+        null,
         kotlinParameter.type,
         findJavaClass(kotlinParameter.type),
-        kotlinParameter.name
+        kotlinParameter.name,
+        kotlinParameter.isOptional
     )
 
-    constructor(javaClass: Class<*>) : this(null, javaClass, javaClass.name)
+    constructor(parentMethod: Method, kotlinParameter: KParameter) : this(
+        parentMethod,
+        kotlinParameter.type,
+        findJavaClass(kotlinParameter.type),
+        kotlinParameter.name,
+        kotlinParameter.isOptional
+    )
+
+    constructor(javaClass: Class<*>) : this(null, null, javaClass, javaClass.name, false)
+    constructor(parentMethod: Method, javaClass: Class<*>) : this(parentMethod, null, javaClass, javaClass.name, false)
 
     @Suppress("UNUSED")  // Called from JNI
     fun getJava(): Class<*>? {
@@ -51,6 +67,13 @@ internal open class Parameter private constructor(
     @Suppress("UNUSED")  // Called from JNI
     fun isNullable(): Boolean {
         return kotlinType?.isMarkedNullable == true
+    }
+
+    @Suppress("UNUSED")  // Called from JNI
+    fun getParentMethodName(): String {
+        val className = parentMethod?.javaMethod?.declaringClass?.name ?: "<Unknown>"
+        val methodName = parentMethod?.name ?: "<Unknown>"
+        return "$className::$methodName"
     }
 
 

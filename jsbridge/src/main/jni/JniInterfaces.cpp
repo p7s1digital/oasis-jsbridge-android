@@ -178,3 +178,8 @@ JStringLocalRef ParameterInterface::getName() const {
   static thread_local jmethodID methodId = m_jniCache->getJniContext()->getMethodID(m_class, "getName", "()Ljava/lang/String;");
   return m_jniCache->getJniContext()->callStringMethod(m_object, methodId);
 }
+
+JStringLocalRef ParameterInterface::getParentMethodName() const {
+  static thread_local jmethodID methodId = m_jniCache->getJniContext()->getMethodID(m_class, "getParentMethodName", "()Ljava/lang/String;");
+  return m_jniCache->getJniContext()->callStringMethod(m_object, methodId);
+}
