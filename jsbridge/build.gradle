@@ -2,9 +2,11 @@ apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
 apply from: "${rootDir}/scripts/javadoc.gradle"
-apply from: "${rootDir}/scripts/quality.gradle"
 apply from: "${rootDir}/scripts/publishing.gradle"
 apply from: "${rootDir}/scripts/semantic_versioning.gradle"
+
+// Temporarily removed before switching to spotbugs
+//apply from: "${rootDir}/scripts/quality.gradle"
 
 group = 'de.prosiebensat1digital'
 
