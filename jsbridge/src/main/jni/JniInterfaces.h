@@ -80,6 +80,7 @@ public:
   JniLocalRef<jsBridgeParameter> getComponentType() const;
   JniLocalRef<jsBridgeParameter> getGenericParameter() const;
   JStringLocalRef getName() const;
+  JStringLocalRef getParentMethodName() const;
 };
 
 #endif

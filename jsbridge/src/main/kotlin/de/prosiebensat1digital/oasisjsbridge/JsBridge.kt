@@ -740,6 +740,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
         try {
             // Collect class Methods using Kotlin reflection
             for (kFunction in apiInterface.kotlin.declaredMemberFunctions) {
+                // TODO: check that there is no optional!
                 val method = Method(kFunction, false)
                 if (methods.put(kFunction.name, method) != null) {
                     throw JsToNativeRegistrationError(type, customMessage = ("${kFunction.name} is overloaded in $type"))

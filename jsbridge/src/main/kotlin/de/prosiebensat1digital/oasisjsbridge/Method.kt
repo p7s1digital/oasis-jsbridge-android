@@ -49,9 +49,9 @@ internal class Method {
 
         // The return type of Unit functions must be "Unit" for lambdas but "Void" for methods
         val returnType = if (!isLambda && kotlinFunction.returnType.classifier == Unit::class) Void::class.createType() else kotlinFunction.returnType
-        this.returnParameter = Parameter(returnType)
+        this.returnParameter = Parameter(this, returnType)
 
-        this.parameters = kotlinFunction.valueParameters.map { Parameter(it) }.toTypedArray()
+        this.parameters = kotlinFunction.valueParameters.map { Parameter(this, it) }.toTypedArray()
         this.isVarArgs = kotlinFunction.valueParameters.lastOrNull()?.isVararg == true
     }
 
@@ -59,8 +59,8 @@ internal class Method {
     constructor(javaMethod: JavaMethod) {
         this.name = javaMethod.name
         this.javaMethod = javaMethod
-        this.returnParameter = Parameter(javaClass = javaMethod.returnType)
-        this.parameters = javaMethod.parameterTypes.map { Parameter(it) }.toTypedArray()
+        this.returnParameter = Parameter(this, javaMethod.returnType)
+        this.parameters = javaMethod.parameterTypes.map { Parameter(this, it) }.toTypedArray()
         this.isVarArgs = javaMethod.isVarArgs
     }
 
@@ -103,10 +103,10 @@ internal class Method {
         if (!isLambda && outParameterType?.classifier == Unit::class) outParameterType = Void::class.createType()
 
         // Create the parameters and always wrap them as Object
-        this.returnParameter = outParameterType?.let { Parameter(it) }
-            ?: Parameter(Unit.javaClass)
+        this.returnParameter = outParameterType?.let { Parameter(this, it) }
+            ?: Parameter(this, Unit.javaClass)
 
-        this.parameters = inParameterTypes.map { Parameter(it) }
+        this.parameters = inParameterTypes.map { Parameter(this, it) }
             .toTypedArray()
     }
 
