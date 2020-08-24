@@ -122,7 +122,7 @@ JniLocalRef<jthrowable> ExceptionHandler::getJavaException(const JsException &js
 
   // Create the JSON string
   const char *jsonStringRaw = nullptr;
-  if (custom_stringify(ctx, -1) == DUK_EXEC_SUCCESS) {
+  if (custom_stringify(ctx, -1, false /*keepErrorStack*/) == DUK_EXEC_SUCCESS) {
     jsonStringRaw = duk_get_string(ctx, -1);
   }
   JStringLocalRef jsonString(jniContext, jsonStringRaw);

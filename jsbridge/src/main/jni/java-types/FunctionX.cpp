@@ -34,6 +34,8 @@
 # include "QuickJsUtils.h"
 #endif
 
+#define EXTRA_QUALIFIED_FUNCTION_NAME
+
 namespace {
   const char *JS_FUNCTION_GLOBAL_NAME_PREFIX = "__javaTypes_functionX_";  // Note: initial "\xff\xff" removed because of JNI string conversion issues
   const char *PAYLOAD_PROP_NAME = "\xff\xffpayload";
@@ -302,12 +304,14 @@ const std::shared_ptr<JavaMethod> &FunctionX::getCppJavaMethod() const {
     return m_lazyCppJavaMethod;
   }
 
-#ifdef NDEBUG
-  static const char *functionXName = "<FunctionX>";
-#else
+#ifdef EXTRACT_QUALIFIED_FUNCTION_NAME
+  // Use JNI + reflection to extract a function name in the form: <FunctionX>/methodName::callback
+  // It makes it much easier to know where the lambda error is coming from but has a (small) performance cost
   std::string methodName = getJniCache()->getParameterInterface(m_parameter).getParentMethodName().toUtf8Chars();
   std::string paramName = getJniCache()->getParameterInterface(m_parameter).getName().toUtf8Chars();
   std::string functionXName = "<FunctionX>/" + methodName + "::" + paramName;
+#else
+  static const char *functionXName = "<FunctionX>";
 #endif
 
   m_lazyCppJavaMethod = std::make_shared<JavaMethod>(m_jsBridgeContext, getJniJavaMethod(), functionXName, true /*isLambda*/);
