@@ -160,7 +160,7 @@ JniLocalRef<jthrowable> ExceptionHandler::getJavaException(const JsException &js
   JniLocalRef<jthrowable> ret;
 
   JSValue exceptionValue = jsException.getValue();
-  JSValue jsonValue = custom_stringify(ctx, exceptionValue);
+  JSValue jsonValue = custom_stringify(ctx, exceptionValue, false /*keepErrorStack*/);
   JStringLocalRef jsonString;
   if (JS_IsException(jsonValue)) {
     JS_GetException(ctx);

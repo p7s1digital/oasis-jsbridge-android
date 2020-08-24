@@ -2026,19 +2026,19 @@ class JsBridgeTest {
             console.error("This is an error:", new Error("completely wrong"));
             console.assert(1 == 1, "should not be displayed");
             console.assert(1 == 2, "should be displayed");
-            """
+            """.trimMargin()
         subject.evaluateNoRetVal(js)
 
         runBlocking { waitForDone(subject) }
 
         // THEN
-        assertEquals(listOf(
-            Log.DEBUG to "This is a log with undefined and null: undefined - null",
-            Log.INFO to "This is an info with 2 integers: 1664 and 69",
-            Log.WARN to """This is a warning with an object: {"one":1,"two":"two"}""",
-            Log.ERROR to """This is an error: {"message":"completely wrong"}""",
-            Log.ASSERT to """Assertion failed: should be displayed"""
-        ), messages)
+        assertEquals(5, messages.size)
+        assertEquals(Log.DEBUG to "This is a log with undefined and null: undefined - null", messages[0])
+        assertEquals(Log.INFO to "This is an info with 2 integers: 1664 and 69", messages[1])
+        assertEquals(Log.WARN to """This is a warning with an object: {"one":1,"two":"two"}""", messages[2])
+        assertEquals(Log.ERROR, messages[3].first)
+        assertTrue(messages[3].second.matches("""^This is an error: \{.*"message":"completely wrong".*\}$""".toRegex()))
+        assertEquals(Log.ASSERT to "Assertion failed: should be displayed", messages[4])
         assertTrue(errors.isEmpty())
     }
 

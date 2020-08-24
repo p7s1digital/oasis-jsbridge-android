@@ -52,7 +52,7 @@ JValue JsonObjectWrapper::pop() const {
     return JValue();
   }
 
-  if (custom_stringify(m_ctx, -1) != DUK_EXEC_SUCCESS) {
+  if (custom_stringify(m_ctx, -1, true /*keepErrorStack*/) != DUK_EXEC_SUCCESS) {
     duk_remove(m_ctx, -2);
     throw getExceptionHandler()->getCurrentJsException();
   }
@@ -107,7 +107,7 @@ JValue JsonObjectWrapper::toJava(JSValueConst v) const {
     return JValue();
   }
 
-  JSValue jsonValue = custom_stringify(m_ctx, v);
+  JSValue jsonValue = custom_stringify(m_ctx, v, true /*keepErrorStack*/);
   if (JS_IsException(jsonValue)) {
     throw getExceptionHandler()->getCurrentJsException();
   }

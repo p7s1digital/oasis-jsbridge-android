@@ -20,13 +20,13 @@
 
 # include "duktape/duktape.h"
 
-duk_int_t custom_stringify(duk_context *, duk_idx_t);
+duk_int_t custom_stringify(duk_context *, duk_idx_t, bool keepErrorStack);
 
 #elif defined(QUICKJS)
 
 # include "quickjs/quickjs.h"
 
-JSValue custom_stringify(JSContext *, JSValueConst);
+JSValue custom_stringify(JSContext *, JSValueConst, bool keepErrorStack);
 
 #endif
 #endif

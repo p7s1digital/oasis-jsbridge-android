@@ -13,19 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 #include "custom_stringify.h"
+#include <cstring>
 
 static const char *customStringifyJs = R"(
 // Custom stringify which probably handles Error instances
 // See https://stackoverflow.com/questions/18391212/is-it-not-possible-to-stringify-an-error-using-json-stringify
-globalThis.__jsBridge__stringify = function(value) {
+globalThis.__jsBridge__stringify = function(value, keepErrorStack) {
   if (value === undefined) return "";
 
   var replaceErrors = function(_key, value) {
-    if (_key === "stack") return;  // TODO: don't hard-code it!
     if (value instanceof Error) {
       // Replace Error instance into plain JS objects using Error own properties
       return Object.getOwnPropertyNames(value).reduce(function(acc, key) {
+        if (!keepErrorStack && key === "stack") return acc;
         acc[key] = value[key];
         return acc;
       }, {});
@@ -42,7 +44,7 @@ globalThis.__jsBridge__stringify = function(value) {
 #include "StackChecker.h"
 
 // [... object ...] -> [... object ... jsonString]
-duk_int_t custom_stringify(duk_context *ctx, duk_idx_t idx) {
+duk_int_t custom_stringify(duk_context *ctx, duk_idx_t idx, bool keepErrorStack) {
   CHECK_STACK_OFFSET(ctx, 1);
 
   idx = duk_normalize_index(ctx, idx);
@@ -62,40 +64,37 @@ duk_int_t custom_stringify(duk_context *ctx, duk_idx_t idx) {
   }
 
   duk_dup(ctx, idx);
-  return duk_pcall(ctx, 1);
+  duk_push_boolean(ctx, keepErrorStack);
+  return duk_pcall(ctx, 2);
 #endif
 }
 
 #elif defined(QUICKJS)
 
-#include <cstring>
-
-JSValue custom_stringify(JSContext *ctx, JSValueConst v) {
+JSValue custom_stringify(JSContext *ctx, JSValueConst v, bool keepErrorStack) {
   JSValue ret;
-  JSValue globalObj = JS_GetGlobalObject(ctx);
 
 #if 0
   // 1. JSON stringify (but does not properly serialize Error instances!)
-  JSValue jsonObject = JS_GetPropertyStr(ctx, globalObj, "JSON");
-  JSAtom atom = JS_NewAtom(ctx, "stringify");
-  ret = JS_Invoke(ctx, jsonObject, atom, 1, &v);
-  JS_FreeAtom(ctx, atom);
-  JS_FreeValue(ctx, jsonObject);
-  return ret;
-#endif
-
+  ret = JS_JSONStringify(ctx, v, JS_UNDEFINED, JS_UNDEFINED);
+#else
   // 2. Custom stringify which properly serializes Error instances
+  JSValue globalObj = JS_GetGlobalObject(ctx);
   JSValue jsbridgeStringifyValue = JS_GetPropertyStr(ctx, globalObj, "__jsBridge__stringify");
   if (JS_IsUndefined(jsbridgeStringifyValue)) {
     jsbridgeStringifyValue = JS_Eval(ctx, customStringifyJs, strlen(customStringifyJs), "custom_stringify.cpp", 0);
     JS_SetPropertyStr(ctx, globalObj, "__jsBridge__stringify", JS_DupValue(ctx, jsbridgeStringifyValue));
   }
 
-  ret = JS_Call(ctx, jsbridgeStringifyValue, JS_NULL, 1, &v);
+  JSValue args[] = { v, JS_NewBool(ctx, keepErrorStack) };
+  ret = JS_Call(ctx, jsbridgeStringifyValue, JS_NULL, 2, args);
 
   JS_FreeValue(ctx, jsbridgeStringifyValue);
   JS_FreeValue(ctx, globalObj);
+#endif
   return ret;
 }
+
+#include <cstring>
 
 #endif
