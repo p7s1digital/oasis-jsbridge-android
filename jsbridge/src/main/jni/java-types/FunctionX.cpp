@@ -34,7 +34,7 @@
 # include "QuickJsUtils.h"
 #endif
 
-#define EXTRA_QUALIFIED_FUNCTION_NAME
+#define EXTRACT_QUALIFIED_FUNCTION_NAME
 
 namespace {
   const char *JS_FUNCTION_GLOBAL_NAME_PREFIX = "__javaTypes_functionX_";  // Note: initial "\xff\xff" removed because of JNI string conversion issues
