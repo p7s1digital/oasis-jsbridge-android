@@ -8,6 +8,11 @@
   void $$clinit();
 }
 
+# Keep JNI methods
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
+
 # Need access by package in JNI code
 -keep class kotlin.** { *; }
 -keep class kotlinx.** { *; }
