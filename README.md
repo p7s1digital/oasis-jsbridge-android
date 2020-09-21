@@ -43,8 +43,8 @@ allprojects {
 
 Add jsbridge dependency (module gradle):
 ```
-implementation "de.prosiebensat1digital:oasis-jsbridge-quickjs:<version>"  // QuickJS flavor
-// OR: implementation "de.prosiebensat1digital:oasis-jsbridge-quickjs:<version>"  // Duktape flavor
+implementation "de.prosiebensat1digital.oasis-jsbridge-android:oasis-jsbridge-quickjs:<version>"  // QuickJS flavor
+// OR: implementation "de.prosiebensat1digital.oasis-jsbridge-android:oasis-jsbridge-quickjs:<version>"  // Duktape flavor
 ```
 
 
