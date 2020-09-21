@@ -7,6 +7,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DDEBUGGER_SERVER_PORT=${DEBUGGER_SERVER_POR
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -DANDROID_STL=c++_static -DANDROID_TOOLCHAIN=clang -DDEBUGGER_SERVER_PORT=${DEBUGGER_SERVER_PORT}")
 
 message("CMake - Flavor = ${FLAVOR}")
+message("CMake - Build type = ${CMAKE_BUILD_TYPE}")
 
 include_directories(
     src/main/jni
