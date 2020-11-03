@@ -32,6 +32,10 @@ internal class SetTimeoutExtension(private val jsBridge: JsBridge) {
         // As setTimeout(cb, ms, args...) can also receive arguments passed to the given callback,
         // we need to convert them to an array and wrap the callback lambda
         JsValue.newFunction(jsBridge, "cb", "msecs", """
+            // undefined, null and wrong variable type (e.g. string) are also valid values for timeout == no delay
+            if (typeof msecs != 'number') {
+              msecs = 0;
+            }
             var argArray = [].slice.call(arguments, 2);
             var cbWrapper = function() {
               cb.apply(null, argArray);
@@ -45,6 +49,10 @@ internal class SetTimeoutExtension(private val jsBridge: JsBridge) {
 
         // Same as for setTimeout but with setTimeoutHelper repeat parameter set to true
         JsValue.newFunction(jsBridge, "cb", "msecs", """
+            // undefined, null and wrong variable type (e.g. string) are also valid values for timeout == no delay
+            if (typeof msecs != 'number') {
+              msecs = 0;
+            }
             var argArray = [].slice.call(arguments, 2);
             var cbWrapper = function() {
               cb.apply(null, argArray);
