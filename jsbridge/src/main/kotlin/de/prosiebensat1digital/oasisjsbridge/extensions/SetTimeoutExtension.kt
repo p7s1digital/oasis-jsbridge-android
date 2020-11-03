@@ -32,9 +32,12 @@ internal class SetTimeoutExtension(private val jsBridge: JsBridge) {
         // As setTimeout(cb, ms, args...) can also receive arguments passed to the given callback,
         // we need to convert them to an array and wrap the callback lambda
         JsValue.newFunction(jsBridge, "cb", "msecs", """
-            // undefined, null and wrong variable type (e.g. string) are also valid values for timeout == no delay
-            if (typeof msecs != 'number') {
-              msecs = 0;
+            // undefined, null and wrong variable type (e.g. string) are valid values for timeout == no delay
+            // "1000" string is converted into a number
+            const TIMEOUT_MAX = 2 ** 31 - 1;
+            msecs *= 1; // Coalesce to number or NaN
+            if (!(msecs >= 1 && msecs <= TIMEOUT_MAX)) {
+                msecs = 0;
             }
             var argArray = [].slice.call(arguments, 2);
             var cbWrapper = function() {
@@ -49,9 +52,12 @@ internal class SetTimeoutExtension(private val jsBridge: JsBridge) {
 
         // Same as for setTimeout but with setTimeoutHelper repeat parameter set to true
         JsValue.newFunction(jsBridge, "cb", "msecs", """
-            // undefined, null and wrong variable type (e.g. string) are also valid values for timeout == no delay
-            if (typeof msecs != 'number') {
-              msecs = 0;
+            // undefined, null and wrong variable type (e.g. string) are valid values for timeout == no delay
+            // "1000" string is converted into a number
+            const TIMEOUT_MAX = 2 ** 31 - 1;
+            msecs *= 1; // Coalesce to number or NaN
+            if (!(msecs >= 1 && msecs <= TIMEOUT_MAX)) {
+                msecs = 0;
             }
             var argArray = [].slice.call(arguments, 2);
             var cbWrapper = function() {

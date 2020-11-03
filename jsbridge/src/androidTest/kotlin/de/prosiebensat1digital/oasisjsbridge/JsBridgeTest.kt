@@ -1820,6 +1820,35 @@ class JsBridgeTest {
 
     @Test
     @Feature_SetTimeout
+    fun testSetTimeoutWithArgsAndStringNumberTimeout() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+        val jsExpectations = JsExpectations()
+        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+
+        // WHEN
+        val js = """
+            setTimeout(function(a, b, c) {
+                $jsExpectationsJsValue.addExpectation("a", a);
+                $jsExpectationsJsValue.addExpectation("b", b);
+                $jsExpectationsJsValue.addExpectation("c", c);
+            }, "100", "aString", null, 69);
+        """.trimIndent()
+
+        subject.evaluateNoRetVal(js)
+
+        runBlocking { delay(1000); waitForDone(subject) }
+
+        // THEN
+        jsExpectations.checkEquals("a", "aString")
+        jsExpectations.checkEquals("b", JsonObjectWrapper("null"))
+        jsExpectations.checkEquals("c", 69)
+
+        assertTrue(errors.isEmpty())
+    }
+
+    @Test
+    @Feature_SetTimeout
     fun testSetTimeoutWithArgsAndWrongTypeTimeout() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
@@ -2032,6 +2061,48 @@ class JsBridgeTest {
               }
               i++;
             }, "not_a_number_is_zero_timeout");
+        """
+
+        subject.evaluateNoRetVal(js)
+
+        runBlocking { waitForDone(subject) }
+
+        // THEN
+        // Note: mockk verify with ordering currently has some issues on API < 24
+        if (android.os.Build.VERSION.SDK_INT >= 24) {
+            verify(ordering = Ordering.SEQUENCE, timeout = 1000) {
+                jsToNativeFunctionMock(eq("interval1"))
+                jsToNativeFunctionMock(eq("interval2"))
+                jsToNativeFunctionMock(eq("interval3"))
+            }
+        }
+
+        // Stop *after* interval3
+        // Note: mockk verify with timeout has some issues on API < 24
+        if (android.os.Build.VERSION.SDK_INT >= 24) {
+            verify(inverse = true, timeout = 1000) { jsToNativeFunctionMock(eq("interval4")) }
+        }
+
+        assertTrue(errors.isEmpty())
+    }
+
+    @Test
+    @Feature_SetTimeout
+    fun testSetAndClearIntervalWithStringNumberTimeout() {
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        val js = """
+            var i = 1;
+            var timeoutId = null;
+            timeoutId = setInterval(function() {
+              console.log("Inside interval");
+              nativeFunctionMock("interval" + i);
+              if (i == 3) {
+                clearInterval(timeoutId);
+              }
+              i++;
+            }, "100");
         """
 
         subject.evaluateNoRetVal(js)
