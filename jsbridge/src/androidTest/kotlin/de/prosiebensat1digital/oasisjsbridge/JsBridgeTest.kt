@@ -2018,7 +2018,7 @@ class JsBridgeTest {
                 clearInterval(timeoutId);
               }
               i++;
-            }, null);
+            }, undefined);
         """
 
         subject.evaluateNoRetVal(js)
