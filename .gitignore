@@ -3,6 +3,7 @@ build
 captures
 semanticVersion
 .externalNativeBuild
+.cxx
 
 # JS
 node_modules
