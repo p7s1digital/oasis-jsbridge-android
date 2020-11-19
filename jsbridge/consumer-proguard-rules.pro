@@ -2,6 +2,9 @@
 -keep interface * implements de.prosiebensat1digital.oasisjsbridge.JsToNativeInterface { *; }
 -keep interface * implements de.prosiebensat1digital.oasisjsbridge.NativeToJsInterface { *; }
 
+# Classes like de.prosiebensat1digital.oasisjsbridge.Method must be kept
+-keep class de.prosiebensat1digital.oasisjsbridge.** { *; }
+
 # Fix coroutines throw IllegalAccessError at
 # "kotlin.coroutines.intrinsics.IntrinsicsKt__IntrinsicsKt__Clinit"
 -keepclassmembers class * {
