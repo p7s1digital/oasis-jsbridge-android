@@ -22,6 +22,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.*
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 import timber.log.Timber
 
 internal class XMLHttpRequestExtension(
@@ -76,7 +79,7 @@ internal class XMLHttpRequestExtension(
                 }
 
                 // Add user argent header if not set
-                if (requestHeadersBuilder.get("user-agent") == null) {
+                if (requestHeadersBuilder["user-agent"] == null) {
                     config.userAgent?.let { requestHeadersBuilder.add("User-Agent", it) }
                 }
                 val requestHeaders = requestHeadersBuilder.build()
@@ -84,14 +87,14 @@ internal class XMLHttpRequestExtension(
                 // Request body
                 val contentType = requestHeaders["content-type"] ?: ""
                 val requestBody = data?.let {
-                    RequestBody.create(MediaType.parse(contentType), data)
+                    data.toRequestBody(contentType.toMediaTypeOrNull())
                 }
 
                 Timber.d("Performing XHR request (query: $url)...")
 
                 // Send request via OkHttp
                 lateinit var request: Request
-                val httpUrl = HttpUrl.parse(url) ?: throw Throwable("Cannot parse URL: $url")
+                val httpUrl = url.toHttpUrlOrNull() ?: throw Throwable("Cannot parse URL: $url")
                 request = Request.Builder()
                     .url(httpUrl)
                     .headers(requestHeaders)
@@ -101,7 +104,7 @@ internal class XMLHttpRequestExtension(
 
                 // Convert header mutlimap (key -> [value1, value2, ...]) into a list of [key, value] arrays
                 val headerKeyValues = response
-                    .headers()
+                    .headers
                     .toMultimap()
                     .flatMap { (key, values) ->
                         values
@@ -114,11 +117,11 @@ internal class XMLHttpRequestExtension(
                     }
 
                 responseInfo = JsonObjectWrapper(
-                    "statusCode" to response.code(),
-                    "statusText" to response.message(),
+                    "statusCode" to response.code,
+                    "statusText" to response.message,
                     "responseHeaders" to headerKeyValues.toTypedArray()
                 )
-                responseText = response.body()?.string()
+                responseText = response.body?.string()
 
                 Timber.d("Successfully fetched XHR response (query: $url)")
                 Timber.v("-> responseInfo = $responseInfo")

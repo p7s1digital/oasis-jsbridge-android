@@ -16,16 +16,19 @@
 package de.prosiebensat1digital.oasisjsbridge
 
 import okhttp3.*
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.json.JSONObject
 
 class TestHttpInterceptor : Interceptor {
 
     private val urlResponseMocks = mutableMapOf<HttpUrl, Response>()
 
-    fun mockRequest(url: String, responseText: String, responseHeadersJson: String? = "{}") {
+    fun mockRequest(url: String, responseText: String, responseHeadersJson: String = "{}") {
         val request = Request.Builder().url(url).build()
         val protocol = Protocol.HTTP_1_1
-        val responseBody = ResponseBody.create(MediaType.parse("application/json"), responseText)
+        val responseBody = responseText.toResponseBody("application/json".toMediaTypeOrNull())
         val responseHeaders = Headers.Builder().also { headersBuilder ->
             JSONObject(responseHeadersJson).let { headersObject ->
                 headersObject.keys().forEach { key ->
@@ -34,7 +37,7 @@ class TestHttpInterceptor : Interceptor {
             }
         }.build()
         val response = Response.Builder().request(request).headers(responseHeaders).body(responseBody).protocol(protocol).code(200).message("OK").build()
-        val httpUrl = HttpUrl.parse(url)!!
+        val httpUrl = url.toHttpUrlOrNull()!!
 
         urlResponseMocks[httpUrl] = response
     }
@@ -42,7 +45,7 @@ class TestHttpInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
 
         val request = chain.request()
-        val response = urlResponseMocks[request.url()]
+        val response = urlResponseMocks[request.url]
 
         return response ?: chain.proceed(request)
     }
