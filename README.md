@@ -373,6 +373,10 @@ val msg = jsApi.createMessage()  // (suspending) "Hello Android, the temperature
 val sum = jsApi.calcSum(3, 2)  // (suspending) 5
 ```
 
+## Changelog
+Until we have a proper Changelog file, you can use a convenient way to see changes between 2 tags in GitHub, e.g.  
+https://github.com/p7s1digital/oasis-jsbridge-android/compare/0.13.0...0.14.2
+
 ## License
 
 ```
