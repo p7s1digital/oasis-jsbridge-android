@@ -78,7 +78,7 @@ internal class XMLHttpRequestExtension(
                     }
                 }
 
-                // Add user argent header if not set
+                // Add user agent header if not set
                 if (requestHeadersBuilder["user-agent"] == null) {
                     config.userAgent?.let { requestHeadersBuilder.add("User-Agent", it) }
                 }
@@ -86,9 +86,7 @@ internal class XMLHttpRequestExtension(
 
                 // Request body
                 val contentType = requestHeaders["content-type"] ?: ""
-                val requestBody = data?.let {
-                    data.toRequestBody(contentType.toMediaTypeOrNull())
-                }
+                val requestBody = safeRequestBody(data, contentType)
 
                 Timber.d("Performing XHR request (query: $url)...")
 
@@ -141,6 +139,9 @@ internal class XMLHttpRequestExtension(
             }
         }
     }
+
+    private fun safeRequestBody(data : String?, contentType: String): RequestBody =
+        data?.toRequestBody(contentType.toMediaTypeOrNull()) ?: "".toRequestBody(contentType.toMediaTypeOrNull())
 }
 
 /*
