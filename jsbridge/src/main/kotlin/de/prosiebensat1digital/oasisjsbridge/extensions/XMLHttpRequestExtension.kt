@@ -46,7 +46,13 @@ internal class XMLHttpRequestExtension(
         jsBridge.evaluateNoRetVal("""delete globalThis["XMLHttpRequestExtension_send_native"]""")
     }
 
-    private fun nativeSend(httpMethod: String, url: String, headers: JsonObjectWrapper, data: String?, cb: (JsonObjectWrapper, String, String) -> Unit) {
+    private fun nativeSend(
+        httpMethod: String,
+        url: String,
+        headers: JsonObjectWrapper,
+        data: String?,
+        cb: (JsonObjectWrapper, String, String) -> Unit
+    ) {
         Timber.v("nativeSend($httpMethod, $url, $headers)")
 
         jsBridge.launch(Dispatchers.IO) {
@@ -78,7 +84,7 @@ internal class XMLHttpRequestExtension(
                     }
                 }
 
-                // Add user argent header if not set
+                // Add user agent header if not set
                 if (requestHeadersBuilder["user-agent"] == null) {
                     config.userAgent?.let { requestHeadersBuilder.add("User-Agent", it) }
                 }
@@ -86,8 +92,17 @@ internal class XMLHttpRequestExtension(
 
                 // Request body
                 val contentType = requestHeaders["content-type"] ?: ""
-                val requestBody = data?.let {
-                    data.toRequestBody(contentType.toMediaTypeOrNull())
+                val requestBody = when {
+                    /* in specific case when we want to send an empty post request,
+                     we should instead send request with body with no data.
+                     Otherwise, OkHttp will throw an exception:
+                     "Method post must have a request body */
+                    data == null && httpMethod.toLowerCase(Locale.ROOT) == "post" -> {
+                        "".toRequestBody(contentType.toMediaTypeOrNull())
+                    }
+                    else -> {
+                        data?.toRequestBody(contentType.toMediaTypeOrNull())
+                    }
                 }
 
                 Timber.d("Performing XHR request (query: $url)...")
@@ -141,6 +156,7 @@ internal class XMLHttpRequestExtension(
             }
         }
     }
+
 }
 
 /*
