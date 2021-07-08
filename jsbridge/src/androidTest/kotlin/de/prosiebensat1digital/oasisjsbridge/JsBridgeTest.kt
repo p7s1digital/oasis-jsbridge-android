@@ -2161,7 +2161,72 @@ class JsBridgeTest {
         subject.evaluateNoRetVal(js)
 
         // THEN
-        // Note: mockk verify with ordering currently has some issues on API < 24
+        // Note: mock verify with ordering currently has some issues on API < 24
+        if (android.os.Build.VERSION.SDK_INT >= 24) {
+            verify(timeout = 2000, ordering = Ordering.SEQUENCE) {
+                jsToNativeFunctionMock(match { responseJson ->
+                    assertNotNull(responseJson)
+                    val responseObject = PayloadObject.fromJsonString(responseJson as String)
+                    assertNotNull(responseObject)
+                    assertEquals(2, responseObject.keyCount)
+                    assertEquals("testValue1", responseObject.getString("testKey1"))
+                    assertEquals("testValue2", responseObject.getString("testKey2"))
+                    true
+                })
+
+                jsToNativeFunctionMock(match { headersJson ->
+                    val responseHeadersObject = PayloadObject.fromJsonString(headersJson as String)
+                    assertNotNull(responseHeadersObject)
+                    assertEquals(2, responseHeadersObject.keyCount)
+                    assertEquals(
+                        "testResponseHeaderValue1",
+                        responseHeadersObject.getString("testresponseheaderkey1")
+                    )
+                    assertEquals(
+                        "testResponseHeaderValue2",
+                        responseHeadersObject.getString("testresponseheaderkey2")
+                    )
+                    true
+                })
+            }
+        }
+        assertTrue(errors.isEmpty())
+    }
+
+    @Test
+    fun testXmlHttpEmptyBodyPostRequest() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        val url = "https://test.url/api/request"
+        val requestHeaders = hashMapOf("testRequestHeaderKey1" to "testRequestHeaderValue1", "testRequestHeaderKey2" to "testRequestHeaderValue2")
+        val responseText = """{"testKey1": "testValue1", "testKey2": "testValue2"}"""
+        val responseHeaders = """{"testResponseHeaderKey1": "testResponseHeaderValue1", "testResponseHeaderKey2": "testResponseHeaderValue2"}"""
+        httpInterceptor.mockRequest(url, responseText, responseHeaders)
+
+        // WHEN
+        val js = """
+            |var xhr = new XMLHttpRequest();
+            |${requestHeaders.map {
+                 """xhr.setRequestHeader("${it.key}", "${it.value}");"""
+             }.joinToString("\n")}
+            |xhr.responseType = "json";
+            |xhr.open("POST", "$url");
+            |xhr.send();
+            |xhr.onload = function() {
+            |  // Convert XHR headers value into JSON (see https://stackoverflow.com/a/37934624/9947065)
+            |  var headers = xhr.getAllResponseHeaders().split('\r\n').reduce(function (acc, current, i) {
+            |    var parts = current.split(new RegExp(' *: *'));
+            |    if (parts.length === 2) acc[parts[0]] = parts[1];
+            |    return acc;
+            |  }, {});
+            |  nativeFunctionMock(JSON.stringify(xhr.response));
+            |  nativeFunctionMock(JSON.stringify(headers));
+            |}""".trimMargin()
+        subject.evaluateNoRetVal(js)
+
+        // THEN
+        // Note: mock verify with ordering currently has some issues on API < 24
         if (android.os.Build.VERSION.SDK_INT >= 24) {
             verify(timeout = 2000, ordering = Ordering.SEQUENCE) {
                 jsToNativeFunctionMock(match { responseJson ->

@@ -46,7 +46,13 @@ internal class XMLHttpRequestExtension(
         jsBridge.evaluateNoRetVal("""delete globalThis["XMLHttpRequestExtension_send_native"]""")
     }
 
-    private fun nativeSend(httpMethod: String, url: String, headers: JsonObjectWrapper, data: String?, cb: (JsonObjectWrapper, String, String) -> Unit) {
+    private fun nativeSend(
+        httpMethod: String,
+        url: String,
+        headers: JsonObjectWrapper,
+        data: String?,
+        cb: (JsonObjectWrapper, String, String) -> Unit
+    ) {
         Timber.v("nativeSend($httpMethod, $url, $headers)")
 
         jsBridge.launch(Dispatchers.IO) {
@@ -86,7 +92,18 @@ internal class XMLHttpRequestExtension(
 
                 // Request body
                 val contentType = requestHeaders["content-type"] ?: ""
-                val requestBody = safeRequestBody(data, contentType)
+                val requestBody = when {
+                    /* in specific case when we want to send an empty post request,
+                     we should instead send request with body with no data.
+                     Otherwise, OkHttp will throw an exception:
+                     "Method post must have a request body */
+                    data == null && httpMethod.toLowerCase(Locale.ROOT) == "post" -> {
+                        "".toRequestBody(contentType.toMediaTypeOrNull())
+                    }
+                    else -> {
+                        data?.toRequestBody(contentType.toMediaTypeOrNull())
+                    }
+                }
 
                 Timber.d("Performing XHR request (query: $url)...")
 
@@ -140,8 +157,6 @@ internal class XMLHttpRequestExtension(
         }
     }
 
-    private fun safeRequestBody(data : String?, contentType: String): RequestBody =
-        data?.toRequestBody(contentType.toMediaTypeOrNull()) ?: "".toRequestBody(contentType.toMediaTypeOrNull())
 }
 
 /*
