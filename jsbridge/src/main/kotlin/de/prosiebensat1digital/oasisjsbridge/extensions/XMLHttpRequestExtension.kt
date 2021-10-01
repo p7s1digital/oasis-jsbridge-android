@@ -176,6 +176,7 @@ internal class XMLHttpRequestExtension(
  */
 const val xhrJsCode: String = """
 (function() {
+  var sendNative = XMLHttpRequestExtension_send_native;
 
 function isListenerWithMatchingName(eventName) {
     return function (listener) {
@@ -227,9 +228,8 @@ function createProgressEventPayload(options) {
     };
 }
 
-var XMLHttpRequest = function() {
-  this._send_native = XMLHttpRequestExtension_send_native;
 
+var XMLHttpRequest = function() {
   this._httpMethod = null;
   this._url = null;
   this._requestHeaders = [];
@@ -287,7 +287,7 @@ XMLHttpRequest.prototype.send = function(data) {
   }
 
   var that = this;
-  this._send_native(this._httpMethod, this._url, this._requestHeaders, data || null, function(responseInfo, responseText, error) {
+  sendNative(this._httpMethod, this._url, this._requestHeaders, data || null, function(responseInfo, responseText, error) {
     that._send_native_callback(responseInfo, responseText, error);
   });
 };
