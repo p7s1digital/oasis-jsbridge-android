@@ -175,6 +175,7 @@ internal class XMLHttpRequestExtension(
  * limitations under the License.
  */
 const val xhrJsCode: String = """
+(function() {
 var XMLHttpRequest = function() {
   this._send_native = XMLHttpRequestExtension_send_native;
 
@@ -377,5 +378,6 @@ XMLHttpRequest.prototype.overrideMimeType = function() {
 };
 
 globalThis.XMLHttpRequest = XMLHttpRequest;
+}());
 """
 
