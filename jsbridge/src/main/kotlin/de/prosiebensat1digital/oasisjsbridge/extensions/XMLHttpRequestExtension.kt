@@ -422,16 +422,17 @@ XMLHttpRequest.prototype.getAllResponseHeaders = function() {
 };
 
 XMLHttpRequest.prototype.getResponseHeader = function(name) {
-  var ret = "";
+  var ret = [];
 
   for (var i = 0; i < this._responseHeaders.length; i++) {
     var keyValue = this._responseHeaders[i];
     if (keyValue[0] !== name) continue;
-    if (ret === "") ret += ", ";
-    ret += keyValue[1];
+    if (keyValue[1] !== "") {
+        ret.push(keyValue[1]);
+    }
   }
 
-  return ret;
+  return ret.join(", ");
 };
 
 XMLHttpRequest.prototype.overrideMimeType = function() {
