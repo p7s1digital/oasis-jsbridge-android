@@ -175,13 +175,66 @@ internal class XMLHttpRequestExtension(
  * limitations under the License.
  */
 const val xhrJsCode: String = """
-var XMLHttpRequest = function() {
-  this._send_native = XMLHttpRequestExtension_send_native;
+(function() {
+  var sendNative = XMLHttpRequestExtension_send_native;
 
+function isListenerWithMatchingName(eventName) {
+    return function (listener) {
+        return listener.name === eventName;
+    };
+}
+
+function extractHandler(listener) {
+    return listener.handler;
+}
+
+function invokeHandler(eventPayload) {
+    return function (handler) {
+        handler(eventPayload);
+    };
+}
+
+function emit(eventListeners, eventName, eventPayload) {
+    var matchingListeners = eventListeners.filter(isListenerWithMatchingName(eventName)),
+        matchingHandlers = matchingListeners.map(extractHandler);
+
+    matchingHandlers.forEach(invokeHandler(eventPayload));
+}
+
+function noop() {}
+
+function createProgressEventPayload(options) {
+    return {
+        type: options.type,
+        bubbles: false,
+        cancelBubble: false,
+        cancelable: false,
+        composed: false,
+        defaultPrevented: false,
+        eventPhase: 0,
+        isTrusted: true,
+        lengthComputable: false,
+        loaded: -1,
+        path: [],
+        returnValue: true,
+        srcElement: options.xhr,
+        currentTarget: options.xhr,
+        target: options.xhr,
+        timeStamp: 0,
+        total: -1,
+        preventDefault: noop,
+        stopImmediatePropagation: noop,
+        stopPropagation: noop
+    };
+}
+
+
+var XMLHttpRequest = function() {
   this._httpMethod = null;
   this._url = null;
   this._requestHeaders = [];
   this._responseHeaders = [];
+  this._eventListeners = [];
 
   this.response = null;
   this.responseText = null;
@@ -234,9 +287,13 @@ XMLHttpRequest.prototype.send = function(data) {
   }
 
   var that = this;
-  this._send_native(this._httpMethod, this._url, this._requestHeaders, data || null, function(responseInfo, responseText, error) {
+  sendNative(this._httpMethod, this._url, this._requestHeaders, data || null, function(responseInfo, responseText, error) {
     that._send_native_callback(responseInfo, responseText, error);
   });
+};
+
+XMLHttpRequest.prototype.addEventListener = function(eventName, handler) {
+    this._eventListeners.push({ name: eventName, handler: handler });
 };
 
 XMLHttpRequest.prototype.abort = function() {
@@ -257,6 +314,7 @@ XMLHttpRequest.prototype._send_native_callback = function(responseInfo, response
       //console.log("Calling onabort()...");
       this.onabort();
     }
+    emit(this._eventListeners, 'abort', createProgressEventPayload({ type: 'abort', xhr: this }));
     return;
   }
 
@@ -322,6 +380,7 @@ XMLHttpRequest.prototype._send_native_callback = function(responseInfo, response
       //console.log("Calling ontimeout()...");
       this.ontimeout();
     }
+    emit(this._eventListeners, 'error', createProgressEventPayload({ type: 'error', xhr: this }));
   } else if (error) {
     // Error
     console.warn("Got XHR error:", error);
@@ -329,6 +388,7 @@ XMLHttpRequest.prototype._send_native_callback = function(responseInfo, response
       //console.log("Calling onerror()...");
       this.onerror();
     }
+    emit(this._eventListeners, 'error', createProgressEventPayload({ type: 'error', xhr: this }));
   } else {
     // Success
     //console.log("XHR success: response =", this.response);
@@ -336,12 +396,14 @@ XMLHttpRequest.prototype._send_native_callback = function(responseInfo, response
       //console.log("Calling onload()...");
       this.onload();
     }
+    emit(this._eventListeners, 'load', createProgressEventPayload({ type: 'load', xhr: this }));
   }
 
   if (typeof this.onloadend === "function") {
     //console.log("Calling onloadend()...");
     this.onloadend();
   }
+  emit(this._eventListeners, 'loadend', createProgressEventPayload({ type: 'loadend', xhr: this }));
 };
 
 XMLHttpRequest.prototype.setRequestHeader = function(header, value) {
@@ -360,16 +422,17 @@ XMLHttpRequest.prototype.getAllResponseHeaders = function() {
 };
 
 XMLHttpRequest.prototype.getResponseHeader = function(name) {
-  var ret = "";
+  var ret = [];
 
   for (var i = 0; i < this._responseHeaders.length; i++) {
     var keyValue = this._responseHeaders[i];
     if (keyValue[0] !== name) continue;
-    if (ret === "") ret += ", ";
-    ret += keyValue[1];
+    if (keyValue[1] !== "") {
+        ret.push(keyValue[1]);
+    }
   }
 
-  return ret;
+  return ret.join(", ");
 };
 
 XMLHttpRequest.prototype.overrideMimeType = function() {
@@ -377,5 +440,6 @@ XMLHttpRequest.prototype.overrideMimeType = function() {
 };
 
 globalThis.XMLHttpRequest = XMLHttpRequest;
+}());
 """
 
