@@ -56,11 +56,9 @@ import timber.log.Timber
 // can be safely called in a "synchronous" way. though, because their executions are guaranteed
 // to be performed sequentially (via an internal queue).
 class JsBridge
-@JvmOverloads
 constructor(config: JsBridgeConfig): CoroutineScope {
 
     companion object {
-        private const val CONSOLE_TAG = "JsBridgeConsole"
         private var isLibraryLoaded = false
     }
 
@@ -310,26 +308,26 @@ constructor(config: JsBridgeConfig): CoroutineScope {
 
     // Evaluate the given JS code without and return the value as a Deferred
     fun <T: Any?> evaluateAsync(js: String, type: KType?): Deferred<T> = async {
-        evaluate<T>(js, type, false)
+        evaluate(js, type, false)
     }
 
-    @UseExperimental(ExperimentalStdlibApi::class)
+    @OptIn(ExperimentalStdlibApi::class)
     inline fun <reified T: Any?> evaluateAsync(js: String): Deferred<T> {
         return evaluateAsync(js, typeOf<T>())
     }
 
-    @UseExperimental(ExperimentalStdlibApi::class)
+    @OptIn(ExperimentalStdlibApi::class)
     suspend inline fun <reified T: Any?> evaluate(js: String): T {
         return evaluate(js, typeOf<T>(), true)
     }
 
-    @UseExperimental(ExperimentalStdlibApi::class)
+    @OptIn(ExperimentalStdlibApi::class)
     inline fun <reified T: Any?> evaluateBlocking(js: String, context: CoroutineContext = EmptyCoroutineContext): T {
         return runBlocking(context) {
             if (isMainThread()) {
                 Timber.w("WARNING: evaluating JS code in the main thread! Consider using non-blocking API or evaluating JS code in another thread!")
             }
-            evaluate<T>(js, typeOf<T>(), true)
+            evaluate(js, typeOf<T>(), true)
         }
     }
 
@@ -389,7 +387,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
     // Evaluate the given JS value and return the result as a deferred
     @PublishedApi
     internal fun <T: Any?> evaluateJsValueAsync(jsValue: JsValue, type: KType?): Deferred<T> = async {
-        evaluateJsValue<T>(jsValue, type, true)
+        evaluateJsValue(jsValue, type, true)
     }
 
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
@@ -419,14 +417,6 @@ constructor(config: JsBridgeConfig): CoroutineScope {
         return registerNativeToJsInterfaceHelper(jsValue, type, check, true)
     }
 
-    // Register a "JS" interface called by native (unchecked)
-    @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
-    fun <T : NativeToJsInterface> registerNativeToJsInterfaceUnchecked(jsValue: JsValue, type: KClass<T>, check: Boolean): T {
-        return runBlocking(Dispatchers.Unconfined) {
-            registerNativeToJsInterfaceHelper(jsValue, type, false, false)
-        }
-    }
-
     // Register a "JS" interface called by native (blocking)
     //
     // When check = false, the proxy object will be directly returned
@@ -434,10 +424,9 @@ constructor(config: JsBridgeConfig): CoroutineScope {
     // done and then return the proxy object
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
     fun <T : NativeToJsInterface> registerNativeToJsInterfaceBlocking(jsValue: JsValue, type: KClass<T>, check: Boolean, context: CoroutineContext?): T {
-        val waitForRegistration = check
 
         return runBlocking(context ?: Dispatchers.Unconfined) {
-            registerNativeToJsInterfaceHelper(jsValue, type, check, waitForRegistration)
+            registerNativeToJsInterfaceHelper(jsValue, type, check, waitForRegistration = check)
         }
     }
 
@@ -572,7 +561,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
         return jniCallJsLambda(jniJsContext, lambdaJsValue.associatedJsName, args, awaitJsPromise)
     }
 
-    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
     fun registerJsToNativeFunction(func: Function<*>, types: List<KType>): JsValue {
         val suffix = internalCounter.incrementAndGet()
         val jsFunctionName = "__jsBridge_nativeFunction$suffix"
@@ -628,7 +617,6 @@ constructor(config: JsBridgeConfig): CoroutineScope {
 
     @PublishedApi
     internal fun convertJavaValueToJs(value: Any?, parameter: Parameter): JsValue {
-        val suffix = internalCounter.incrementAndGet()
         val jsValue = JsValue(this)
 
         jsValue.codeEvaluationDeferred = async {
@@ -922,7 +910,6 @@ constructor(config: JsBridgeConfig): CoroutineScope {
                         .also(::notifyErrorListeners)
                 }
             }
-            Unit
         }
     }
 
@@ -949,7 +936,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
         launch {
             val jniJsContext = jniJsContextOrThrow()
 
-            var isFulfilled: Boolean = false
+            var isFulfilled = false
 
             val promiseValue = try {
                 val result = deferred.await()
@@ -989,7 +976,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
 
     @PublishedApi
     internal fun isMainThread(): Boolean = (Looper.myLooper() == Looper.getMainLooper())
-    internal fun isJsThread(): Boolean = (Thread.currentThread().id == jsThreadId)
+    private fun isJsThread(): Boolean = (Thread.currentThread().id == jsThreadId)
 
     private fun jniJsContextOrThrow() = jniJsContext ?: throw InternalError("Missing JNI JS context!")
 

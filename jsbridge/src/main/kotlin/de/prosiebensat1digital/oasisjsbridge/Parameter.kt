@@ -24,7 +24,7 @@ import kotlin.reflect.full.memberFunctions
 @PublishedApi
 internal open class Parameter private constructor(
     private val parentMethod: Method?,
-    internal val kotlinType: KType?,
+    private val kotlinType: KType?,
     private val javaClass: Class<*>?,
     val name: String?,
     val isOptional: Boolean

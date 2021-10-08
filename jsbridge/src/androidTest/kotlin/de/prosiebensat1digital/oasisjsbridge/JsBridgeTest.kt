@@ -26,7 +26,10 @@ import io.mockk.verify
 import kotlin.test.*
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
-import org.junit.*
+import org.junit.After
+import org.junit.Before
+import org.junit.BeforeClass
+import org.junit.Test
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.fail
 import timber.log.Timber
