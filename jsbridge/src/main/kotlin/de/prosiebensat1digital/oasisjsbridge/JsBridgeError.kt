@@ -93,9 +93,9 @@ sealed class JsBridgeError(message: String? = null, cause: Throwable?): Exceptio
         } while (current != null)
 
         val stackTraceString = stackTraces.fold("") { acc, stackTrace ->
-            val s = stackTrace.map { e ->
+            val s = stackTrace.joinToString("\n") { e ->
                 "      at ${e.className}::${e.methodName}(${e.fileName}:${e.lineNumber})"
-            }.joinToString("\n")
+            }
 
             if (acc.isEmpty()) s else "$acc\nCause:\n$s"
         }

@@ -128,4 +128,5 @@ dependencies {
     androidTestImplementation "androidx.test:runner:$versions.androidx.test"
     androidTestImplementation "org.jetbrains.kotlin:kotlin-test:$versions.kotlin.kotlin"
     androidTestImplementation "io.mockk:mockk-android:$versions.mockk"
+    //androidTestImplementation 'org.junit.jupiter:junit-jupiter'
 }

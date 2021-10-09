@@ -152,7 +152,7 @@ internal class Method {
     //    cb(arrayOf(name, age))
     // }
     @Throws
-    fun asFunctionWithArgArray(cb: (args: Array<Any?>) -> Any?): Function<Any?>? {
+    fun asFunctionWithArgArray(cb: (args: Array<Any?>) -> Any?): Function<Any?> {
         return when (parameters.count()) {
             0 -> ({
                 cb(arrayOf())
