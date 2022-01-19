@@ -17,6 +17,7 @@
 
 #include "JniCache.h"
 #include "JsBridgeContext.h"
+#include "java-types/AidlInterface.h"
 #include "java-types/Array.h"
 #include "java-types/BoxedPrimitive.h"
 #include "java-types/Boolean.h"
@@ -65,6 +66,7 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
     case JavaTypeId::Unknown:
       return nullptr;
     case JavaTypeId::Void:
+      return new Void(m_jsBridgeContext, id, false /*boxed*/);  // TODO: check it
     case JavaTypeId::Unit:
       return new Void(m_jsBridgeContext, id, boxed);
     case JavaTypeId::Boolean:
@@ -121,11 +123,15 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
       return new JsonObjectWrapper(m_jsBridgeContext, isParameterNullable(parameter));
     case JavaTypeId::Deferred:
       return new Deferred(m_jsBridgeContext, getGenericParameterType(parameter));
+
+    case JavaTypeId::AidlInterface:
+      return new AidlInterface(m_jsBridgeContext, parameter);
   }
 }
 
 std::unique_ptr<const JavaType> JavaTypeProvider::makeUniqueType(const JniRef<jsBridgeParameter> &parameter, bool boxed) const {
-  return std::unique_ptr<const JavaType>(newType(parameter, boxed));
+  const JavaType *t = newType(parameter, boxed);
+  return t ? std::unique_ptr<const JavaType>(t) : std::unique_ptr<const JavaType>();
 }
 
 const std::unique_ptr<const JavaType> &JavaTypeProvider::getObjectType() const {
@@ -155,8 +161,14 @@ JavaTypeId JavaTypeProvider::getJavaTypeId(const JniRef<jsBridgeParameter> &para
 
   JavaTypeId id = getJavaTypeIdByJavaName(javaName.getUtf16View());
   if (id == JavaTypeId::Unknown) {
+    // AIDL types
+    ParameterInterface parameterInterface = m_jsBridgeContext->getJniCache()->getParameterInterface(parameter);
+    if (parameterInterface.isAidlInterface()) {
+      return JavaTypeId::AidlInterface;
+    }
+
     // TODO: check if implements NativeToJsInterface or JsToNativeInterface
-    throw std::invalid_argument(std::string("Unsupported Java type: ") + javaName.toUtf8Chars());
+    throw std::invalid_argument(std::string("Unsupported Java type: ") + javaName.toStdString());
   }
 
   return id;

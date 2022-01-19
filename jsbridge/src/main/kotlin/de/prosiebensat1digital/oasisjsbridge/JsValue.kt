@@ -84,6 +84,16 @@ internal constructor(
             return jsBridge.registerJsToNativeInterface(T::class, nativeObject)
         }
 
+        // Create a JsValue which is a JS proxy to an AIDL interface instance.
+        // Note:
+        // - aidl must be an AIDL interface directly implementing android.os.IInterface
+        //   (e.g. your.AidlInterface.Stub.asInterface(...))
+        // - the native methods will be called in the JS thread!
+        inline fun <reified T> fromAidl(jsBridge: JsBridge, aidl: T): JsValue
+        where T: android.os.IInterface {
+            return jsBridge.registerNativeAidlInterface(T::class, aidl)
+        }
+
         // Create a JsValue which is a JS proxy to a native object.
         // Notes:
         // - jsToNativeinterface must be an interface implementing JsToNativeInterface

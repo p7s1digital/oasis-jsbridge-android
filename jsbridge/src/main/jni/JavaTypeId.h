@@ -52,7 +52,10 @@ enum class JavaTypeId {
   FunctionX = 100,
   JsValue = 101,
   JsonObjectWrapper = 102,
-  Deferred = 103
+  Deferred = 103,
+
+  AidlInterface = 201,
+  AidlParcelable = 202,
 };
 
 JavaTypeId getJavaTypeIdByJavaName(std::u16string_view javaName);

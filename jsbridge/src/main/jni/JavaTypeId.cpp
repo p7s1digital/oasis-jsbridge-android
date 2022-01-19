@@ -33,6 +33,7 @@ static thread_local std::unordered_map<std::u16string_view, JavaTypeId> sJavaNam
   { u"long", JavaTypeId::Long },
   { u"float", JavaTypeId::Float },
   { u"double", JavaTypeId::Double },
+  { u"void", JavaTypeId::Void },
 
   { u"java.lang.Boolean", JavaTypeId::BoxedBoolean },
   { u"java.lang.Integer", JavaTypeId::BoxedInt },

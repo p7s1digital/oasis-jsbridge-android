@@ -307,8 +307,8 @@ const std::shared_ptr<JavaMethod> &FunctionX::getCppJavaMethod() const {
 #ifdef EXTRACT_QUALIFIED_FUNCTION_NAME
   // Use JNI + reflection to extract a function name in the form: <FunctionX>/methodName::callback
   // It makes it much easier to know where the lambda error is coming from but has a (small) performance cost
-  std::string methodName = getJniCache()->getParameterInterface(m_parameter).getParentMethodName().toUtf8Chars();
-  std::string paramName = getJniCache()->getParameterInterface(m_parameter).getName().toUtf8Chars();
+  std::string methodName = getJniCache()->getParameterInterface(m_parameter).getParentMethodName().toStdString();
+  std::string paramName = getJniCache()->getParameterInterface(m_parameter).getName().toStdString();
   std::string functionXName = "<FunctionX>/" + methodName + "::" + paramName;
 #else
   static const char *functionXName = "<FunctionX>";

@@ -50,6 +50,16 @@ JniLocalRef<jobject> JsBridgeInterface::createJsLambdaProxy(
   return m_jniCache->getJniContext()->callObjectMethod(m_object, methodId, globalName, method);
 }
 
+JniLocalRef<jobject> JsBridgeInterface::createAidlInterfaceProxy(
+    const JStringLocalRef &globalName, const JniRef<jsBridgeParameter> &aidlStub) const {
+
+  static thread_local jmethodID methodId = m_jniCache->getJniContext()->getMethodID(
+          m_class, "createAidlInterfaceProxy",
+          "(Ljava/lang/String;L" JSBRIDGE_PKG_PATH "/Parameter;)Ljava/lang/Object;");
+
+  return m_jniCache->getJniContext()->callObjectMethod(m_object, methodId, globalName, aidlStub);
+}
+
 void JsBridgeInterface::consoleLogHelper(const JStringLocalRef &logType, const JStringLocalRef &msg) const {
   static thread_local jmethodID methodId = m_jniCache->getJniContext()->getMethodID(
       m_class, "consoleLogHelper", "(Ljava/lang/String;Ljava/lang/String;)V");
@@ -149,6 +159,17 @@ JniLocalRef<jsBridgeMethod> ParameterInterface::getInvokeMethod() const {
   return m_jniCache->getJniContext()->callObjectMethod<jsBridgeMethod>(m_object, methodId);
 }
 
+JObjectArrayLocalRef ParameterInterface::getMethods() const {
+  static thread_local jmethodID methodId = m_jniCache->getJniContext()->getMethodID(
+          m_class,
+          "getMethods",
+          "()[L" JSBRIDGE_PKG_PATH "/Method;"
+  );
+
+  auto localRef = m_jniCache->getJniContext()->callObjectMethod<jobjectArray>(m_object, methodId);
+  return JObjectArrayLocalRef(localRef);
+}
+
 JniLocalRef<jobject> ParameterInterface::getJava() const {
   static thread_local jmethodID methodId = m_jniCache->getJniContext()->getMethodID(m_class, "getJava", "()Ljava/lang/Class;");
   return m_jniCache->getJniContext()->callObjectMethod(m_object, methodId);
@@ -182,4 +203,9 @@ JStringLocalRef ParameterInterface::getName() const {
 JStringLocalRef ParameterInterface::getParentMethodName() const {
   static thread_local jmethodID methodId = m_jniCache->getJniContext()->getMethodID(m_class, "getParentMethodName", "()Ljava/lang/String;");
   return m_jniCache->getJniContext()->callStringMethod(m_object, methodId);
+}
+
+jboolean ParameterInterface::isAidlInterface() const {
+  static thread_local jmethodID methodId = m_jniCache->getJniContext()->getMethodID(m_class, "isAidlInterface", "()Z");
+  return m_jniCache->getJniContext()->callBooleanMethod(m_object, methodId);
 }

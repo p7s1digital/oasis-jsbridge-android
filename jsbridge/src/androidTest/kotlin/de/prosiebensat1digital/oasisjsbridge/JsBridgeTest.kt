@@ -2430,6 +2430,38 @@ class JsBridgeTest {
         assertTrue(errors.isEmpty())
     }
 
+    @Test
+    fun testAidl() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        val aidlInstanceJsValue = JsValue.fromAidl(subject, object: TestAidlInterface.Default() {
+            override fun hello(o: TestAidlCallback) {
+                o.onDone()
+            }
+
+            override fun servus(payload: TestAidlParcelable) {
+
+            }
+        })
+
+        val js = """
+            $aidlInstanceJsValue.hello({
+              onDone: function() {
+                nativeFunctionMock("servus");
+              }
+            });
+            """
+        subject.evaluateNoRetVal(js)
+
+        runBlocking { waitForDone(subject) }
+
+        // THEN
+        assertTrue(errors.isEmpty())
+        verify { jsToNativeFunctionMock(eq("servus")) }
+    }
+
 
     // JsExpectations
     // ---

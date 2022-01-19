@@ -22,6 +22,7 @@
 #include "JavaMethod.h"
 #include "JavaType.h"
 #include "JniCache.h"
+#include "exceptions/JniException.h"
 #include "JsBridgeContext.h"
 
 #if defined(DUKTAPE)
@@ -196,15 +197,19 @@ duk_ret_t JavaObject::push(const JsBridgeContext *jsBridgeContext, const std::st
     JniLocalRef<jsBridgeMethod> method = methods.getElement<jsBridgeMethod>(i);
     MethodInterface methodInterface = jsBridgeContext->getJniCache()->getMethodInterface(method);
 
-    std::string strMethodName = methodInterface.getName().toUtf8Chars();
+    std::string strMethodName = methodInterface.getName().toStdString();
     std::string qualifiedMethodName = qualifiedMethodPrefix + strMethodName;
 
     std::unique_ptr<JavaMethod> javaMethod;
     try {
       javaMethod = std::make_unique<JavaMethod>(jsBridgeContext, method, qualifiedMethodName, false /*isLambda*/);
     } catch (const std::invalid_argument &e) {
-      duk_pop(ctx);  // object being bound
+      // Remove finalizer
       duk_push_undefined(ctx);
+      duk_set_finalizer(ctx, objIndex);
+      CHECK_STACK_NOW();
+      duk_pop(ctx);  // object being bound
+
       throw std::invalid_argument(std::string() + "In bound method \"" + qualifiedMethodName + "\": " + e.what());
     }
 
@@ -240,7 +245,7 @@ duk_ret_t JavaObject::pushLambda(const JsBridgeContext *jsBridgeContext, const s
 
   MethodInterface methodInterface = jsBridgeContext->getJniCache()->getMethodInterface(method);
 
-  std::string strMethodName = methodInterface.getName().toUtf8Chars();
+  std::string strMethodName = methodInterface.getName().toStdString();
   std::string qualifiedMethodName = strName + "::" + strMethodName;
 
   std::unique_ptr<JavaMethod> javaMethod;
@@ -319,7 +324,7 @@ JSValue JavaObject::create(const JsBridgeContext *jsBridgeContext, const std::st
     JniLocalRef<jsBridgeMethod> method = methods.getElement<jsBridgeMethod>(i);
     MethodInterface methodInterface = jsBridgeContext->getJniCache()->getMethodInterface(method);
 
-    std::string strMethodName = methodInterface.getName().toUtf8Chars();
+    std::string strMethodName = methodInterface.getName().toStdString();
     std::string qualifiedMethodName = qualifiedMethodPrefix + strMethodName;
 
     std::unique_ptr<JavaMethod> javaMethod;
@@ -362,7 +367,7 @@ JSValue JavaObject::createLambda(const JsBridgeContext *jsBridgeContext, const s
 
   MethodInterface methodInterface = jsBridgeContext->getJniCache()->getMethodInterface(method);
 
-  std::string strMethodName = methodInterface.getName().toUtf8Chars();
+  std::string strMethodName = methodInterface.getName().toStdString();
   std::string qualifiedMethodName = strName + "::" + strMethodName;
 
   std::unique_ptr<JavaMethod> javaMethod;

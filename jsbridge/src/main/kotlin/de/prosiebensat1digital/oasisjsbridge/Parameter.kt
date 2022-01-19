@@ -16,7 +16,9 @@
 package de.prosiebensat1digital.oasisjsbridge
 
 import kotlin.reflect.*
+import kotlin.reflect.full.declaredFunctions
 import kotlin.reflect.full.memberFunctions
+import kotlin.reflect.jvm.javaMethod
 
 // Represents a (reflected) function parameter (or return value) with its (optional) name based on:
 // - (ideally) Kotlin KParameter or KType which has the (full) reflection info
@@ -24,8 +26,8 @@ import kotlin.reflect.full.memberFunctions
 @PublishedApi
 internal open class Parameter private constructor(
     private val parentMethod: Method?,
-    private val kotlinType: KType?,
-    private val javaClass: Class<*>?,
+    internal val kotlinType: KType?,
+    internal val javaClass: Class<*>?,
     val name: String?,
     val isOptional: Boolean
 ) {
@@ -150,6 +152,42 @@ internal open class Parameter private constructor(
                 Parameter(genericParameterType)
             }
         }
+    }
+
+
+    // For AIDL
+    // ---
+
+    @Suppress("UNUSED")  // Called from JNI
+    fun isAidlInterface(): Boolean {
+        return javaClass?.interfaces?.singleOrNull { it == android.os.IInterface::class.java } != null
+    }
+
+    @Suppress("UNUSED")  // Called from JNI
+    fun isAidlParcelable(): Boolean {
+        return javaClass?.interfaces?.singleOrNull { it == android.os.Parcelable::class.java } != null
+    }
+
+    // Return the an AIDL interface stub as a Parameter
+    internal val aidlInterfaceStub: Parameter? by lazy {
+        try {
+            if (kotlinType != null) {
+                val kotlinClass = kotlinType.classifier as? KClass<*>
+                val stubKotlinClass = kotlinClass?.nestedClasses?.singleOrNull { it.simpleName == "Stub" }
+                return@lazy stubKotlinClass?.let { Parameter(it.java) }
+            }
+        } catch (t: Throwable) {}
+
+        // TODO
+        null
+    }
+
+    // Return the methods of an AIDL interface parameter or null if it is not a lambda
+    // (because the lambda parameter is a FunctionX object with an invoke() method)
+    //
+    @Suppress("UNUSED")  // Called from JNI
+    val methods: Array<Method>? by lazy {
+        javaClass?.methods?.filter { it.declaringClass == javaClass }?.map { Method(it) }?.toTypedArray()
     }
 }
 

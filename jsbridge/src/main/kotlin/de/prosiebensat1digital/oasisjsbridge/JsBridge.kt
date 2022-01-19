@@ -450,7 +450,21 @@ constructor(config: JsBridgeConfig): CoroutineScope {
 
         launch {
             val jniJsContext = jniJsContextOrThrow()
-            registerJsToNativeInterfaceHelper(jniJsContext, jsValue, kClass, obj)
+            registerJsToNativeInterfaceHelper(jniJsContext, jsValue, kClass, obj, false)
+        }
+
+        return jsValue
+    }
+
+    @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
+    fun registerNativeAidlInterface(kClass: KClass<*>, obj: Any): JsValue {
+        val suffix = internalCounter.incrementAndGet()
+        val jsObjectName = "__jsBridge_aidl_${kClass.simpleName ?: "unnamed_class"}$suffix"
+        val jsValue = JsValue(this, null, associatedJsName = jsObjectName)
+
+        launch {
+            val jniJsContext = jniJsContextOrThrow()
+            registerJsToNativeInterfaceHelper(jniJsContext, jsValue, kClass, obj, true)
         }
 
         return jsValue
@@ -712,12 +726,12 @@ constructor(config: JsBridgeConfig): CoroutineScope {
     }
 
     @Throws(JsToNativeRegistrationError::class)
-    private fun registerJsToNativeInterfaceHelper(jniJsContext: Long, jsValue: JsValue, type: KClass<*>, obj: Any) {
+    private fun registerJsToNativeInterfaceHelper(jniJsContext: Long, jsValue: JsValue, type: KClass<*>, obj: Any, isAidl: Boolean) {
         checkJsThread()
 
-        // Pick up the most "bottom" interface which implements JsToNativeInterface
-        val apiInterface = findApiInterface(obj::class.java)
-                ?: throw JsToNativeRegistrationError(this::class, customMessage = "Cannot map native object to JS because it does not implement any JsToNativeInterface-based interface")
+        // Pick up the most "bottom" interface which implements JsToNativeInterface (or android.os.IInterface)
+        val apiInterface = findApiInterface(obj::class.java, isAidl)
+                ?: throw JsToNativeRegistrationError(this::class, customMessage = "Cannot map native object to JS because it does not implement JsToNativeInterface or android.os.IInterface")
 
         if (!type.isInstance(obj)) {
             throw JsToNativeRegistrationError(type, Throwable("${obj.javaClass.name} is not an instance of $type"))
@@ -757,14 +771,22 @@ constructor(config: JsBridgeConfig): CoroutineScope {
         }
     }
 
-    private fun findApiInterface(clazz: Class<*>): Class<*>? {
-        clazz.interfaces.firstOrNull { it == JsToNativeInterface::class.java }?.let { return clazz }
-        clazz.interfaces.firstOrNull { findApiInterface(it) != null }?.let { return it }
+    private fun findApiInterface(clazz: Class<*>, isAidl: Boolean): Class<*>? {
+        if (isAidl) {
+            val superclazz = clazz.superclass ?: return null
+            val maybeAidlInterface = superclazz.interfaces.singleOrNull() ?: return null
+            maybeAidlInterface.interfaces.singleOrNull { it == android.os.IInterface::class.java } ?: return null
+            return maybeAidlInterface
+        } else {
+            clazz.interfaces.firstOrNull { it == JsToNativeInterface::class.java }?.let { return clazz }
+            clazz.interfaces.firstOrNull { findApiInterface(it, false) != null }?.let { return it }
+        }
+
         return null
     }
 
-    // - If async = true, the proxy object is returned directly the registration itself is
-    // launched asynchronously a
+    // - If async = true, the proxy object is returned directly (the registration will be
+    // done asynchronously)
     // - If async = false, the proxy object is only returned after a successful registration
     @Throws
     private suspend fun <T: Any> registerNativeToJsInterfaceHelper(jsValue: JsValue, type: KClass<T>, check: Boolean, waitForRegistration: Boolean): T {
@@ -789,7 +811,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
 
                 // Except only 1 super interface and return it
                 // -> KClass<*>
-                .single()
+                .singleOrNull()
                 .also {
                     it?.java?.isInterface
                             ?: throw NativeToJsRegistrationError(type, customMessage = "$type and its super interfaces must extend exactly 1 interface")
@@ -800,7 +822,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
         }
 
         val methods = interfaces
-            // Collect all member functions of all interface
+            // Collect all member functions of all interfaces
             // -> Sequence<KFunction<*>>
             .flatMap { it.declaredMemberFunctions.asSequence() }
 
@@ -913,6 +935,34 @@ constructor(config: JsBridgeConfig): CoroutineScope {
         }
     }
 
+    // Create a native proxy to a JS function defined by a reflected (lambda) Method. The function
+    // will be called from Java/Kotlin and will trigger execution of the JS lambda.
+    //
+    // This is used for example when a JsToNative interface with a lambda parameter is registered,
+    // e.g.:
+    // interface MyNativeApi {
+    //   fun myNativeMethod(cb: (p: Int) -> Unit)
+    // }
+    //
+    // When JS code calls "myNativeMethod()", the cb parameter will be passed to the native after being
+    // created via createJsLambdaProxy().
+    //
+    // Note: as it triggers a JS function running in the JS thread, the lambda needs to be started
+    // asynchronously and shall not block the current thread. As a result, only JS lambdas without
+    // return value are supported (which is usually fine for callbacks).
+    @Suppress("UNUSED")  // Called from JNI
+    private fun createAidlInterfaceProxy(globalObjectName: String, parameter: Parameter): Any? {
+        checkJsThread()
+
+        val jsValue = JsValue(this, globalObjectName, globalObjectName)
+        val proxyListener = ProxyListener(jsValue, parameter.javaClass as Class<*>)
+
+        val proxy = Proxy.newProxyInstance(parameter.aidlInterfaceStub!!.javaClass!!.classLoader, arrayOf(parameter.javaClass), proxyListener)
+        Timber.v("Created proxy instance for ${parameter.javaClass.name}, js value name: $jsValue")
+
+        return proxy
+    }
+
     @Suppress("UNUSED")  // Called from JNI
     private fun createCompletableDeferred(): CompletableDeferred<Any?> {
         checkJsThread()
@@ -990,7 +1040,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
     private external fun jniEvaluateFileContent(context: Long, js: String, filename: String)
     private external fun jniRegisterJavaLambda(context: Long, name: String, obj: Any, method: Any)
     private external fun jniRegisterJavaObject(context: Long, name: String, obj: Any, methods: Array<Any>)
-    private external fun jniRegisterJsObject(context: Long, name: String, methods: Array<Any>, check: Boolean)
+    private external fun jniRegisterJsObject(context: Long, name: String, methods: Array<out Any>, check: Boolean)
     private external fun jniRegisterJsLambda(context: Long, name: String, method: Any)
     private external fun jniCallJsMethod(context: Long, objectName: String, javaMethod: JavaMethod, args: Array<Any?>): Any?
     private external fun jniCallJsMethod(context: Long, objectName: String, javaMethod: JavaMethod, args: Array<Any?>, awaitJsPromise: Boolean): Any?
