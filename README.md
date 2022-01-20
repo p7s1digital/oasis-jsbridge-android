@@ -270,11 +270,13 @@ JS debugger support (Duktape only via Visual Studio Code plugin)
 | Kotlin              | Java                 | JS         | Note
 | ------------------- | -------------------- | ---------- | ---
 | `Boolean`           | `boolean`, `Boolean` | `number`   |
+| `Byte`              | `byte`, `Byte`       | `number`   |
 | `Int`               | `int`, `Integer`     | `number`   |
 | `Float`             | `float`, `Float`     | `number`   |
 | `Double`            | `double`, `Double`   | `number`   |
 | `String`            | `String`             | `string`   |
 | `BooleanArray`      | `boolean[]`          | `Array`    |
+| `ByteArray`         | `byte[]`             | `Array`    |
 | `IntArray`          | `int[]`              | `Array`    |
 | `FloatArray`        | `float[]`            | `Array`    |
 | `DoubleArray`       | `double[]`           | `Array`    |

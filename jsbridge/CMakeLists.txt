@@ -37,6 +37,7 @@ add_library(
     src/main/jni/java-types/Array.cpp
     src/main/jni/java-types/Boolean.cpp
     src/main/jni/java-types/BoxedPrimitive.cpp
+    src/main/jni/java-types/Byte.cpp
     src/main/jni/java-types/Double.cpp
     src/main/jni/java-types/Float.cpp
     src/main/jni/java-types/FunctionX.cpp

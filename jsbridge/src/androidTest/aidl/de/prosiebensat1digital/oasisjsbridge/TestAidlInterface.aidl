@@ -9,4 +9,5 @@ interface TestAidlInterface {
     void setParcelable(in TestAidlParcelable p);
     void setEnum(in TestAidlEnum e);
     TestAidlParcelable getParcelable();
+    TestAidlEnum getEnum();
 }

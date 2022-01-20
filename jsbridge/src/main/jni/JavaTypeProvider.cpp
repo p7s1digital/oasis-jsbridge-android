@@ -22,6 +22,7 @@
 #include "java-types/Array.h"
 #include "java-types/BoxedPrimitive.h"
 #include "java-types/Boolean.h"
+#include "java-types/Byte.h"
 #include "java-types/Deferred.h"
 #include "java-types/Double.h"
 #include "java-types/Float.h"
@@ -72,6 +73,8 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
       return new Void(m_jsBridgeContext, id, boxed);
     case JavaTypeId::Boolean:
       return createPrimitive<Boolean>(m_jsBridgeContext, boxed);
+    case JavaTypeId::Byte:
+      return createPrimitive<Byte>(m_jsBridgeContext, boxed);
     case JavaTypeId::Int:
       return createPrimitive<Integer>(m_jsBridgeContext, boxed);
     case JavaTypeId::Long:
@@ -85,6 +88,8 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
       return new Void(m_jsBridgeContext, id, false /*boxed*/);  // Java "Void" object behaves like the unboxed version
     case JavaTypeId::BoxedBoolean:
       return createPrimitive<Boolean>(m_jsBridgeContext, true);
+    case JavaTypeId::BoxedByte:
+      return createPrimitive<Byte>(m_jsBridgeContext, true);
     case JavaTypeId::BoxedInt:
       return createPrimitive<Integer>(m_jsBridgeContext, true);
     case JavaTypeId::BoxedLong:
@@ -107,6 +112,8 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
     }
     case JavaTypeId::BooleanArray:
       return createPrimitiveArray<Boolean>(m_jsBridgeContext);
+    case JavaTypeId::ByteArray:
+      return createPrimitiveArray<Byte>(m_jsBridgeContext);
     case JavaTypeId::IntArray:
       return createPrimitiveArray<Integer>(m_jsBridgeContext);
     case JavaTypeId::LongArray:

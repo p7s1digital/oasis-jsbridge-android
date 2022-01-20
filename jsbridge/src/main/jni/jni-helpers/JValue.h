@@ -36,27 +36,32 @@ public:
   }
 
   explicit JValue(jint i)
+   : m_value() {
+   m_value.i = i;
+  }
+
+  explicit JValue(jbyte b)
     : m_value() {
-    m_value.i = i;
+    m_value.b = b;
   }
 
   explicit JValue(jlong l)
-   : m_value() {
+    : m_value() {
     m_value.j = l;
   }
 
   explicit JValue(jdouble d)
-   : m_value() {
+    : m_value() {
     m_value.d = d;
   }
 
   explicit JValue(jfloat f)
-      : m_value() {
+    : m_value() {
     m_value.f = f;
   }
 
   explicit JValue(JniLocalRef<jobject> &&localRef)
-      : m_value() {
+    : m_value() {
 
     m_localRef.swap(localRef);
     m_value.l = m_localRef.get();
@@ -104,6 +109,7 @@ public:
   bool isNull() const { return m_value.l == nullptr; }
 
   jboolean getBool() const { return m_value.z; }
+  jbyte getByte() const { return m_value.b; }
   jint getInt() const { return m_value.i; }
   jlong getLong() const { return m_value.j; }
   jdouble getDouble() const { return m_value.d; }

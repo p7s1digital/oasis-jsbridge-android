@@ -110,6 +110,21 @@ public:
   }
 
   template <class ObjT, typename ...InputArgs>
+  jint callByteMethod(const JniRef<ObjT> &t, jmethodID methodId, InputArgs &&...args) const {
+    JNIEnv *env = getJNIEnv();
+    return env->CallByteMethod(t.get(), methodId, JniValueConverter::toJniValues(std::forward<InputArgs>(args))...);
+  }
+
+  template <class ObjT>
+  jbyte callByteMethodA(const JniRef<ObjT> &t, jmethodID methodId, const std::vector<JValue> &args) const {
+    JNIEnv *env = getJNIEnv();
+    jvalue *rawArgs = JValue::createArray(args);
+    jbyte ret = env->CallByteMethodA(t.get(), methodId, rawArgs);
+    delete[] rawArgs;
+    return ret;
+  }
+
+  template <class ObjT, typename ...InputArgs>
   jint callIntMethod(const JniRef<ObjT> &t, jmethodID methodId, InputArgs &&...args) const {
     JNIEnv *env = getJNIEnv();
     return env->CallIntMethod(t.get(), methodId, JniValueConverter::toJniValues(std::forward<InputArgs>(args))...);

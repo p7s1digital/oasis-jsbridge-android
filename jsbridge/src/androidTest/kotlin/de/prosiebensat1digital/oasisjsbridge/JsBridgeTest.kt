@@ -197,6 +197,7 @@ class JsBridgeTest {
             assertNull(subject.evaluate("undefined"))
 
             assertEquals("1.5+1", subject.evaluate("\"1.5+1\""))  // String
+            assertEquals(2.toByte(), subject.evaluate("1.5+1"))  // Byte
             assertEquals(2, subject.evaluate("1.5+1"))  // Int
             assertEquals(2L, subject.evaluate("1.5+1"))  // Long
             assertEquals(2.5, subject.evaluate("1.5+1"))  // Double
@@ -249,7 +250,9 @@ class JsBridgeTest {
             // Array
             assertArrayEquals(arrayOf("a", "b", "c"), subject.evaluate<Array<String>>("""["a", "b", "c"]"""))  // Array<String>
             assertArrayEquals(booleanArrayOf(true, false, true), subject.evaluate("""[true, false, true]"""))  // BooleanArray
-            assertArrayEquals(subject.evaluate<Array<Boolean>>("""[true, false, true]"""), arrayOf(true, false, true))  // Array<Boolean>
+            assertArrayEquals(arrayOf(true, false, true), subject.evaluate<Array<Boolean>>("""[true, false, true]"""))  // Array<Boolean>
+            assertArrayEquals(byteArrayOf(1, 2, 3), subject.evaluate("""[1.0, 2.2, 3.8]"""))  // ByteArray
+            assertArrayEquals(arrayOf(1.toByte(), 2.toByte(), 3.toByte()), subject.evaluate<Array<Byte>>("""[1.0, 2.2, 3.8]"""))  // Array<Byte>
             assertArrayEquals(intArrayOf(1, 2, 3), subject.evaluate("""[1.0, 2.2, 3.8]"""))  // IntArray
             assertArrayEquals(arrayOf(1, 2, 3), subject.evaluate<Array<Int>>("""[1.0, 2.2, 3.8]"""))  // Array<Int>
             assertArrayEquals(longArrayOf(1L, 2L, 3L), subject.evaluate("""[1.0, 2.2, 3.8]"""))  // LongArray
@@ -267,6 +270,7 @@ class JsBridgeTest {
             // Array with optionals
             assertArrayEquals(arrayOf("a", null, "c"), subject.evaluate<Array<String?>>("""["a", null, "c"]"""))  // Array<String?>
             assertArrayEquals(arrayOf(false, null, true), subject.evaluate<Array<Boolean?>>("""[false, null, true]"""))  // Array<Boolean?>
+            assertArrayEquals(arrayOf(1.toByte(), null, 3.toByte()), subject.evaluate<Array<Byte?>>("""[1.0, null, 3.8]"""))  // Array<Byte?>
             assertArrayEquals(arrayOf(1, null, 3), subject.evaluate<Array<Int?>>("""[1.0, null, 3.8]"""))  // Array<Int?>
             assertArrayEquals(arrayOf(1.0, null, 3.8), subject.evaluate<Array<Double?>>("""[1.0, null, 3.8]"""))  // Array<Double?>
             assertArrayEquals(arrayOf(1.0f, null, 3.8f), subject.evaluate<Array<Float?>>("""[1.0, null, 3.8]"""))  // Array<Float?>
@@ -658,6 +662,9 @@ class JsBridgeTest {
             subject.evaluateBlocking<BooleanArray>("new Array($arrayLength);")
         }
         assertFailsWith<OutOfMemoryError> {
+            subject.evaluateBlocking<ByteArray>("new Array($arrayLength);")
+        }
+        assertFailsWith<OutOfMemoryError> {
             subject.evaluateBlocking<IntArray>("new Array($arrayLength);")
         }
         assertFailsWith<OutOfMemoryError> {
@@ -689,6 +696,13 @@ class JsBridgeTest {
             val jsString = JsValue.fromNativeValue(subject, "nativeString")
             assertEquals("nativeString", jsString.evaluate())
 
+            val jsByte = JsValue.fromNativeValue(subject, 5.toByte())
+            val jsNullableByte = JsValue.fromNativeValue<Byte?>(subject, 5)
+            val jsNullByte = JsValue.fromNativeValue<Byte?>(subject, null)
+            assertEquals(5.toByte(), jsByte.evaluate())
+            assertEquals(5.toByte(), jsNullableByte.evaluate())
+            assertEquals(null, jsNullByte.evaluate<Byte?>())
+
             val jsInt = JsValue.fromNativeValue(subject, 123)
             val jsNullableInt = JsValue.fromNativeValue<Int?>(subject, 123)
             val jsNullInt = JsValue.fromNativeValue<Int?>(subject, null)
@@ -714,6 +728,11 @@ class JsBridgeTest {
             val jsArrayNullableBoolean = JsValue.fromNativeValue(subject, arrayOf(true, null, false))
             assertArrayEquals(booleanArrayOf(true, true, false), jsArrayBoolean.evaluate())
             assertArrayEquals(arrayOf(true, null, false), jsArrayNullableBoolean.evaluate())
+
+            val jsArrayByte = JsValue.fromNativeValue(subject, byteArrayOf(1, 2, 3))
+            val jsArrayNullableByte = JsValue.fromNativeValue(subject, arrayOf(1.toByte(), null, 3.toByte()))
+            assertArrayEquals(byteArrayOf(1, 2, 3), jsArrayByte.evaluate())
+            assertArrayEquals(arrayOf(1.toByte(), null, 3.toByte()), jsArrayNullableByte.evaluate<Array<Byte?>>())
 
             val jsArrayInt = JsValue.fromNativeValue(subject, intArrayOf(1, 2, 3))
             val jsArrayNullableInt = JsValue.fromNativeValue(subject, arrayOf(1, null, 3))
@@ -758,6 +777,9 @@ class JsBridgeTest {
 
             assertFailsWith<IllegalArgumentException> {
                 subject.evaluate<BooleanArray>("[true, false, 'patate']")
+            }
+            assertFailsWith<IllegalArgumentException> {
+                subject.evaluate<ByteArray>("[1, 2, 'patate']")
             }
             assertFailsWith<IllegalArgumentException> {
                 subject.evaluate<IntArray>("[1, 2, 'patate']")
@@ -2438,7 +2460,9 @@ class JsBridgeTest {
             p.intField = 12
             p.stringField = "twelve"
         }
+        val kotlinEnum = TestAidlEnum.SECOND
         var jsParcelable: TestAidlParcelable? = null
+        var jsEnum: Byte? = null
 
         // WHEN
         val aidlInstance = object: TestAidlInterface.Default() {
@@ -2446,8 +2470,14 @@ class JsBridgeTest {
             override fun setParcelable(payload: TestAidlParcelable) {
                 jsParcelable = payload
             }
+            override fun setEnum(payload: Byte) {
+                jsEnum = payload
+            }
             override fun getParcelable(): TestAidlParcelable? {
                 return kotlinParcelable
+            }
+            override fun getEnum(): Byte {
+                return kotlinEnum
             }
         }
         val aidlInstanceJsValue = JsValue.fromAidl(subject, aidlInstance)
@@ -2456,17 +2486,24 @@ class JsBridgeTest {
             // Call AIDL interface method and receive callback
             $aidlInstanceJsValue.triggerCallback({
               onDone: function() {
-                nativeFunctionMock("servus");
+                nativeFunctionMock("callback");
               },
             });
             
             // Pass parcelable to AIDL interface method
             $aidlInstanceJsValue.setParcelable({intField: 1, stringField: "one"});
             
+            // Pass enum to AIDL interface method
+            $aidlInstanceJsValue.setEnum(${TestAidlEnum.FIRST});
+            
             // Get parcelable as return value of AIDL interface method
             var kotlinParcelable = $aidlInstanceJsValue.getParcelable();
             nativeFunctionMock(kotlinParcelable.intField);
             nativeFunctionMock(kotlinParcelable.stringField);
+            
+            // Get enum as return value of AIDL interface method
+            var kotlinEnum = $aidlInstanceJsValue.getEnum();
+            nativeFunctionMock(kotlinEnum);
             """
         subject.evaluateNoRetVal(js)
 
@@ -2476,10 +2513,12 @@ class JsBridgeTest {
         assertTrue(errors.isEmpty())
         assertEquals(jsParcelable?.intField, 1)
         assertEquals(jsParcelable?.stringField, "one")
+        assertEquals(jsEnum, TestAidlEnum.FIRST)
         verify {
-            jsToNativeFunctionMock(eq("servus"))
+            jsToNativeFunctionMock(eq("callback"))
             jsToNativeFunctionMock(eq(12.0))
             jsToNativeFunctionMock(eq("twelve"))
+            jsToNativeFunctionMock(eq(kotlinEnum.toDouble()))
         }
     }
 

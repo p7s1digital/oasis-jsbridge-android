@@ -24,6 +24,7 @@
 namespace JniValueConverter {
   // Explicitly define conversion for supported types (forbid jstring, jobject, ...)
   static jboolean toJniValue(jboolean v) { return v; }
+  static jbyte toJniValue(jbyte v) { return v; }
   static jint toJniValue(jint v) { return v; }
   static jlong toJniValue(jlong v) { return v; }
   static jfloat toJniValue(jfloat v) { return v; }

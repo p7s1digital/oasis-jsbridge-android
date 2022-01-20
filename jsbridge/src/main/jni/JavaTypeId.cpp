@@ -29,6 +29,7 @@ static thread_local std::unordered_map<std::u16string_view, JavaTypeId> sJavaNam
   { u"kotlin.Unit", JavaTypeId::Unit },
 
   { u"boolean", JavaTypeId::Boolean },
+  { u"byte", JavaTypeId::Byte },
   { u"int", JavaTypeId::Int },
   { u"long", JavaTypeId::Long },
   { u"float", JavaTypeId::Float },
@@ -36,6 +37,7 @@ static thread_local std::unordered_map<std::u16string_view, JavaTypeId> sJavaNam
   { u"void", JavaTypeId::Void },
 
   { u"java.lang.Boolean", JavaTypeId::BoxedBoolean },
+  { u"java.lang.Byte", JavaTypeId::BoxedByte },
   { u"java.lang.Integer", JavaTypeId::BoxedInt },
   { u"java.lang.Long", JavaTypeId::BoxedLong },
   { u"java.lang.Float", JavaTypeId::BoxedFloat },
@@ -47,6 +49,7 @@ static thread_local std::unordered_map<std::u16string_view, JavaTypeId> sJavaNam
   { u"[Ljava.lang.Object;",JavaTypeId::ObjectArray },
 
   { u"[Z", JavaTypeId::BooleanArray },
+  { u"[B", JavaTypeId::ByteArray },
   { u"[I", JavaTypeId::IntArray },
   { u"[J", JavaTypeId::LongArray },
   { u"[F", JavaTypeId::FloatArray },
