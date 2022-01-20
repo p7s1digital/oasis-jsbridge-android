@@ -52,15 +52,8 @@ const JniGlobalRef<jclass> &JniCache::getJavaClass(JavaTypeId id) const {
     jniContext->exceptionClear();
     JniLocalRef<jclass> classClass = jniContext->findClass("java/lang/Class");
     jmethodID getPrimitiveClass = jniContext->getStaticMethodID(classClass, "getPrimitiveClass", "(Ljava/lang/String;)Ljava/lang/Class;");
-    if (jniContext->exceptionCheck()) {
-      alog("Es geht doch gar nicht!");
-    }
 
     javaClass = jniContext->callStaticObjectMethod<jclass>(classClass, getPrimitiveClass, JStringLocalRef(jniContext, javaName));
-
-    if (jniContext->exceptionCheck()) {
-      alog("Es geht noch weniger!");
-    }
   }
   return m_javaClasses.emplace(id, JniGlobalRef<jclass>(javaClass)).first->second;
 }

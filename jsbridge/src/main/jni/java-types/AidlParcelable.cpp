@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "JsonObjectWrapper.h"
+#include "AidlParcelable.h"
 
 #include "ExceptionHandler.h"
 #include "JniCache.h"
@@ -26,8 +26,9 @@
 
 namespace JavaTypes {
 
-JsonObjectWrapper::JsonObjectWrapper(const JsBridgeContext *jsBridgeContext, bool isNullable)
+AidlParcelable::AidlParcelable(const JsBridgeContext *jsBridgeContext, const JniRef<jsBridgeParameter> &parameter, bool isNullable)
  : JavaType(jsBridgeContext, JavaTypeId::JsonObjectWrapper)
+ , m_parameter(parameter)
  , m_isNullable(isNullable) {
 }
 
@@ -37,13 +38,13 @@ JsonObjectWrapper::JsonObjectWrapper(const JsBridgeContext *jsBridgeContext, boo
 
 namespace {
   extern "C"
-  duk_ret_t tryJsonDecode(duk_context *ctx, void *) {
+  duk_ret_t tryJsonDecode2(duk_context *ctx, void *) {
     duk_json_decode(ctx, -1);
     return 1;
   }
 }
 
-JValue JsonObjectWrapper::pop() const {
+JValue AidlParcelable::pop() const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
   // Check if the caller passed in a null string.
@@ -60,7 +61,8 @@ JValue JsonObjectWrapper::pop() const {
   JStringLocalRef str(m_jniContext, duk_require_string(m_ctx, -1));
   duk_pop(m_ctx);
 
-  JniLocalRef<jobject> localRef = getJniCache()->newJsonObjectWrapper(str);
+  ParameterInterface parameterInterface = m_jsBridgeContext->getJniCache()->getParameterInterface(m_parameter);
+  JniLocalRef<jobject> localRef = parameterInterface.newAidlParcelable(str);
 
   if (m_jniContext->exceptionCheck()) {
     throw JniException(m_jniContext);
@@ -70,34 +72,34 @@ JValue JsonObjectWrapper::pop() const {
   return JValue(localRef);
 }
 
-duk_ret_t JsonObjectWrapper::push(const JValue &value) const {
+duk_ret_t AidlParcelable::push(const JValue &value) const {
   CHECK_STACK_OFFSET(m_ctx, 1);
 
-  const JniLocalRef<jobject> &jWrapper = value.getLocalRef();
-  if (jWrapper.isNull()) {
+  const JniLocalRef<jobject> &jParcelable = value.getLocalRef();
+  if (jParcelable.isNull()) {
     duk_push_null(m_ctx);
     return 1;
   }
 
-  JStringLocalRef strRef = getJniCache()->getJsonObjectWrapperString(jWrapper);
+  ParameterInterface parameterInterface = m_jsBridgeContext->getJniCache()->getParameterInterface(m_parameter);
+  JStringLocalRef strRef = parameterInterface.getAidlParcelableJsonString(jParcelable);
   const char *str = strRef.toUtf8Chars();
 
   if (m_jniContext->exceptionCheck()) {
     throw JniException(m_jniContext);
   }
 
-  // Undefined values are returned as an empty string
-  if (!str || strlen(str) == 0) {
+  if (!str) {
     duk_push_undefined(m_ctx);
     return 1;
   }
 
   duk_push_string(m_ctx, str);
 
-  if (duk_safe_call(m_ctx, tryJsonDecode, nullptr, 1, 1) != DUK_EXEC_SUCCESS) {
+  if (duk_safe_call(m_ctx, tryJsonDecode2, nullptr, 1, 1) != DUK_EXEC_SUCCESS) {
     CHECK_STACK_NOW();
     duk_pop(m_ctx);
-    auto msg = std::string() + "Error while reading JsonObjectWrapper value (\"" + str + "\")";
+    auto msg = std::string() + "Error while reading Parcelable value (\"" + str + "\")";
     throw std::invalid_argument(msg);
   }
 
@@ -106,7 +108,7 @@ duk_ret_t JsonObjectWrapper::push(const JValue &value) const {
 
 #elif defined(QUICKJS)
 
-JValue JsonObjectWrapper::toJava(JSValueConst v) const {
+JValue AidlParcelable::toJava(JSValueConst v) const {
   if (m_isNullable && (JS_IsNull(v) || JS_IsUndefined(v))) {
     return JValue();
   }
@@ -125,7 +127,7 @@ JValue JsonObjectWrapper::toJava(JSValueConst v) const {
   return JValue(localRef);
 }
 
-JSValue JsonObjectWrapper::fromJava(const JValue &value) const {
+JSValue AidlParcelable::fromJava(const JValue &value) const {
 
   const JniLocalRef<jobject> &jWrapper = value.getLocalRef();
   if (jWrapper.isNull()) {

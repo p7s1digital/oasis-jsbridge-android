@@ -18,6 +18,7 @@
 #include "JniCache.h"
 #include "JsBridgeContext.h"
 #include "java-types/AidlInterface.h"
+#include "java-types/AidlParcelable.h"
 #include "java-types/Array.h"
 #include "java-types/BoxedPrimitive.h"
 #include "java-types/Boolean.h"
@@ -126,6 +127,8 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
 
     case JavaTypeId::AidlInterface:
       return new AidlInterface(m_jsBridgeContext, parameter);
+    case JavaTypeId::AidlParcelable:
+      return new AidlParcelable(m_jsBridgeContext, parameter, true /*TODO: isNullable*/);
   }
 }
 
@@ -165,6 +168,9 @@ JavaTypeId JavaTypeProvider::getJavaTypeId(const JniRef<jsBridgeParameter> &para
     ParameterInterface parameterInterface = m_jsBridgeContext->getJniCache()->getParameterInterface(parameter);
     if (parameterInterface.isAidlInterface()) {
       return JavaTypeId::AidlInterface;
+    }
+    if (parameterInterface.isAidlParcelable()) {
+      return JavaTypeId::AidlParcelable;
     }
 
     // TODO: check if implements NativeToJsInterface or JsToNativeInterface

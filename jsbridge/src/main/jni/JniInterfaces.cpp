@@ -209,3 +209,18 @@ jboolean ParameterInterface::isAidlInterface() const {
   static thread_local jmethodID methodId = m_jniCache->getJniContext()->getMethodID(m_class, "isAidlInterface", "()Z");
   return m_jniCache->getJniContext()->callBooleanMethod(m_object, methodId);
 }
+
+jboolean ParameterInterface::isAidlParcelable() const {
+  static thread_local jmethodID methodId = m_jniCache->getJniContext()->getMethodID(m_class, "isAidlParcelable", "()Z");
+  return m_jniCache->getJniContext()->callBooleanMethod(m_object, methodId);
+}
+
+JniLocalRef<jobject> ParameterInterface::newAidlParcelable(const JStringLocalRef &jsonString) const {
+  static thread_local jmethodID methodId = m_jniCache->getJniContext()->getMethodID(m_class, "newAidlParcelable", "(Ljava/lang/String;)Ljava/lang/Object;");
+  return m_jniCache->getJniContext()->callObjectMethod(m_object, methodId, jsonString);
+}
+
+JStringLocalRef ParameterInterface::getAidlParcelableJsonString(const JniLocalRef<jobject> &aidlParcelable) const {
+  static thread_local jmethodID methodId = m_jniCache->getJniContext()->getMethodID(m_class, "getAidlParcelableJsonString", "(Ljava/lang/Object;)Ljava/lang/String;");
+  return m_jniCache->getJniContext()->callStringMethod(m_object, methodId, aidlParcelable);
+}

@@ -5,11 +5,12 @@
 buildscript {
     ext.versions = [
         min_sdk: 21,
-        compile_sdk: 31,
-        target_sdk: 31,
+        compile_sdk: 32,
+        target_sdk: 32,
 
         timber: '5.0.1',
         okhttp: '4.9.2',
+        gson: '2.8.9',
 
         kotlin: [
             coroutines: '1.5.2',

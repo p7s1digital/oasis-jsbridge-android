@@ -33,6 +33,7 @@ add_library(
     src/main/jni/exceptions/JniException.cpp
     src/main/jni/exceptions/JsException.cpp
     src/main/jni/java-types/AidlInterface.cpp
+    src/main/jni/java-types/AidlParcelable.cpp
     src/main/jni/java-types/Array.cpp
     src/main/jni/java-types/Boolean.cpp
     src/main/jni/java-types/BoxedPrimitive.cpp

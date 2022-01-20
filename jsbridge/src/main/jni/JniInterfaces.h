@@ -84,6 +84,9 @@ public:
   JStringLocalRef getName() const;
   JStringLocalRef getParentMethodName() const;
   jboolean isAidlInterface() const;
+  jboolean isAidlParcelable() const;
+  JniLocalRef<jobject> newAidlParcelable(const JStringLocalRef &jsonString) const;
+  JStringLocalRef getAidlParcelableJsonString(const JniLocalRef<jobject> &aidlParcelable) const;
 };
 
 #endif

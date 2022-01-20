@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef _JSBRIDGE_JAVATYPES_AIDLINTERFACE_H
-#define _JSBRIDGE_JAVATYPES_AIDLINTERFACE_H
+#ifndef _JSBRIDGE_JAVATYPES_AIDLPARCELABLE_H
+#define _JSBRIDGE_JAVATYPES_AIDLPARCELABLE_H
 
 #include "JavaType.h"
 #include "jni-helpers/JObjectArrayLocalRef.h"
@@ -22,16 +22,14 @@
 
 namespace JavaTypes {
 
-class AidlInterface : public JavaType {
+class AidlParcelable : public JavaType {
 
 public:
-  AidlInterface(const JsBridgeContext *, const JniRef<jsBridgeParameter> &);
+    AidlParcelable(const JsBridgeContext *, const JniRef<jsBridgeParameter> &, bool isNullable);
 
 #if defined(DUKTAPE)
   JValue pop() const override;
-  JValue popArray(uint32_t count, bool expanded) const override;
   duk_ret_t push(const JValue &) const override;
-  duk_ret_t pushArray(const JniLocalRef<jarray> &values, bool expand) const override;
 #elif defined(QUICKJS)
   JValue toJava(JSValueConst) const override;
   JValue toJavaArray(JSValueConst) const override;
@@ -40,11 +38,8 @@ public:
 #endif
 
 private:
-  JObjectArrayLocalRef getJniJavaMethods() const;
-
   JniGlobalRef<jsBridgeParameter> m_parameter;
-  mutable JniGlobalRef<jsBridgeParameter> m_lazyJniAidlStub;
-  mutable JniGlobalRef<jobjectArray> m_lazyJniJavaMethods;
+  bool m_isNullable;
 };
 
 }  // namespace JavaTypes

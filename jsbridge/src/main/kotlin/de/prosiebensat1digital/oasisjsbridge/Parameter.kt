@@ -15,6 +15,7 @@
  */
 package de.prosiebensat1digital.oasisjsbridge
 
+import com.google.gson.Gson
 import kotlin.reflect.*
 import kotlin.reflect.full.declaredFunctions
 import kotlin.reflect.full.memberFunctions
@@ -188,6 +189,16 @@ internal open class Parameter private constructor(
     @Suppress("UNUSED")  // Called from JNI
     val methods: Array<Method>? by lazy {
         javaClass?.methods?.filter { it.declaringClass == javaClass }?.map { Method(it) }?.toTypedArray()
+    }
+
+    @Suppress("UNUSED")  // Called from JNI
+    fun newAidlParcelable(jsonString: String): Any? {
+        return Gson().fromJson(jsonString, javaClass)
+    }
+
+    @Suppress("UNUSED")  // Called from JNI
+    fun getAidlParcelableJsonString(parcelable: Any): String {
+        return Gson().toJson(parcelable, javaClass)
     }
 }
 

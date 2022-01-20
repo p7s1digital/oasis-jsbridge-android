@@ -205,7 +205,14 @@ public:
     return JniLocalRef<RetT>(this, o);
   }
 
-  template <class RetT = jobject>
+  template <typename ...InputArgs>
+  JStringLocalRef callStaticStringMethod(const JniRef<jclass> &t, jmethodID methodId, InputArgs &&...args) const {
+    JNIEnv *env = getJNIEnv();
+    jstring js = (jstring) env->CallStaticObjectMethod(t.get(), methodId, JniValueConverter::toJniValues(std::forward<InputArgs>(args))...);
+    return JStringLocalRef(this, js);
+  }
+
+    template <class RetT = jobject>
   JniLocalRef<RetT> callStaticObjectMethodA(const JniRef<jclass> &t, jmethodID methodId, const std::vector<JValue> &args) const {
     JNIEnv *env = getJNIEnv();
     jvalue *rawArgs = JValue::createArray(args);

@@ -2434,24 +2434,39 @@ class JsBridgeTest {
     fun testAidl() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
+        val kotlinParcelable = TestAidlParcelable().also { p ->
+            p.intField = 12
+            p.stringField = "twelve"
+        }
+        var jsParcelable: TestAidlParcelable? = null
 
         // WHEN
-        val aidlInstanceJsValue = JsValue.fromAidl(subject, object: TestAidlInterface.Default() {
-            override fun hello(o: TestAidlCallback) {
-                o.onDone()
+        val aidlInstance = object: TestAidlInterface.Default() {
+            override fun triggerCallback(o: TestAidlCallback) = o.onDone()
+            override fun setParcelable(payload: TestAidlParcelable) {
+                jsParcelable = payload
             }
-
-            override fun servus(payload: TestAidlParcelable) {
-
+            override fun getParcelable(): TestAidlParcelable? {
+                return kotlinParcelable
             }
-        })
+        }
+        val aidlInstanceJsValue = JsValue.fromAidl(subject, aidlInstance)
 
         val js = """
-            $aidlInstanceJsValue.hello({
+            // Call AIDL interface method and receive callback
+            $aidlInstanceJsValue.triggerCallback({
               onDone: function() {
                 nativeFunctionMock("servus");
-              }
+              },
             });
+            
+            // Pass parcelable to AIDL interface method
+            $aidlInstanceJsValue.setParcelable({intField: 1, stringField: "one"});
+            
+            // Get parcelable as return value of AIDL interface method
+            var kotlinParcelable = $aidlInstanceJsValue.getParcelable();
+            nativeFunctionMock(kotlinParcelable.intField);
+            nativeFunctionMock(kotlinParcelable.stringField);
             """
         subject.evaluateNoRetVal(js)
 
@@ -2459,7 +2474,13 @@ class JsBridgeTest {
 
         // THEN
         assertTrue(errors.isEmpty())
-        verify { jsToNativeFunctionMock(eq("servus")) }
+        assertEquals(jsParcelable?.intField, 1)
+        assertEquals(jsParcelable?.stringField, "one")
+        verify {
+            jsToNativeFunctionMock(eq("servus"))
+            jsToNativeFunctionMock(eq(12.0))
+            jsToNativeFunctionMock(eq("twelve"))
+        }
     }
 
 
