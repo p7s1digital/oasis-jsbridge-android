@@ -24,6 +24,7 @@ Powered by:
  * propagate exceptions between JavaScript and Kotlin/Java (including stack trace)
  * non-blocking API (via coroutines)
  * support for suspending functions and JavaScript promises
+ * support for AIDL interfaces and parcelable (experimental)
  * extensions (optional): console, setTimeout/setInterval, XmlHttpRequest, Promise, JS debugger
 
 See [Example](#example-consuming-a-js-api-from-kotlin).
@@ -56,6 +57,7 @@ implementation "de.prosiebensat1digital.oasis-jsbridge-android:oasis-jsbridge-qu
 1. [Map Kotlin/Java objects to JS](#using-kotlinjava-objects-from-js)
 1. [Map JS functions to Kotlin](#calling-js-functions-from-kotlin)
 1. [Map Kotlin functions to JS](#calling-kotlin-functions-from-js)
+1. [Map JS objects to AIDL](#using-aidl-from-js)
 1. [Extensions](#extensions)
 
 
@@ -235,6 +237,23 @@ jsBridge.evaluateNoRetVal("console.log('Sum is', $calcSumNative(1, 2))");
 
 Note: the native function is triggered from the "JS" thread
 
+
+### Using AIDL from JS
+
+Note: this feature is still experimental!
+
+It is also possible to register AIDL interfaces and call AIDL methods, send and receive
+parcelable values, pass AIDL interfaces as parameter.
+
+To map an AIDL interface to JS:
+
+```kotlin
+// Register existing AIDL interface
+val aidlJsValue = JsValue.fromAidlInterface(jsBridge, aidlInterface)
+
+// Call an AIDL method from JS
+jsBridge.evaluateNoRetVal("""$aidlJsValue.aidlMethod({parcelableField1: 1, parcelableField2: "two"});""")
+```
 
 ### Extensions
 
