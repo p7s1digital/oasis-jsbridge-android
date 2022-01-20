@@ -96,90 +96,53 @@ JValue AidlInterface::pop() const {
   return JValue(aidlInterfaceObject);
 }
 
-JValue AidlInterface::popArray(uint32_t count, bool expanded) const {
-  throw std::invalid_argument("Cannot pop an array of AidlInterface's!");
-}
-
-// Get a native function, register it and push a JS wrapper
 duk_ret_t AidlInterface::push(const JValue &value) const {
-  throw std::invalid_argument("Cannot push AidlInterface!");
-}
-
-duk_ret_t AidlInterface::pushArray(const JniLocalRef<jarray> &, bool /*expand*/) const {
-  throw std::invalid_argument("Cannot push an array of AidlInterface's!");
+  throw std::invalid_argument("Cannot push an AidlInterface!");
 }
 
 #elif defined(QUICKJS)
 
-// Get a JS function, register and create a native wrapper (JavaScriptLambda)
-// - C++ -> Java: call createJsLambdaProxy with <functionId> as argument
-// - Java -> C++: call callJsLambda (with <functionId> + args parameters)
-JValue FunctionX::toJava(JSValueConst v) const {
+// Get a JS object, register and create a native wrapper (JavaScriptObject)
+// - C++ -> Java: not supported
+// - Java -> C++: call JS methods
+JValue AidlInterface::toJava(JSValueConst v) const {
   const QuickJsUtils *utils = m_jsBridgeContext->getUtils();
   assert(utils != nullptr);
 
-  if (!JS_IsFunction(m_ctx, v) && !JS_IsNull(v)) {
-    throw std::invalid_argument("Cannot convert return value to FunctionX");
+  if (!JS_IsObject(v) && !JS_IsNull(v)) {
+    throw std::invalid_argument("Cannot convert return value to AidlInterface");
   }
 
-  static int jsFunctionCount = 0;
-  std::string jsFunctionGlobalName = JS_FUNCTION_GLOBAL_NAME_PREFIX + std::to_string(++jsFunctionCount);
+  static int jsAidlInterfaceCount = 0;
+  std::string jsAidlInterfaceGlobalName = JS_AIDL_INTERFACE_GLOBAL_NAME_PREFIX + std::to_string(++jsAidlInterfaceCount);
 
-  const JniRef<jsBridgeMethod> &jniJavaMethod = getJniJavaMethod();
+  JObjectArrayLocalRef javaMethods = getJniJavaMethods();
 
-  // 1. Duplicate it into the global object with prop name <functionId>
+  // 1. Duplicate it into the global object with prop name <aidlInterfaceId>
   JSValue globalObj = JS_GetGlobalObject(m_ctx);
-  JS_SetPropertyStr(m_ctx, globalObj, jsFunctionGlobalName.c_str(), JS_DupValue(m_ctx, v));
+  JS_SetPropertyStr(m_ctx, globalObj, jsAidlInterfaceGlobalName.c_str(), JS_DupValue(m_ctx, v));
   JS_FreeValue(m_ctx, globalObj);
 
-  // 2. Create the  C++ JavaScriptLambda instance
-  auto javaScriptLambda = new JavaScriptLambda(m_jsBridgeContext, jniJavaMethod, jsFunctionGlobalName, v);
+  // 2. Create the  C++ JavaScriptObject instance
+  auto javaScriptObject = new JavaScriptObject(m_jsBridgeContext, jsAidlInterfaceGlobalName, v, javaMethods, false);
 
-  // 3. Wrap it inside the JS function
-  utils->createMappedCppPtrValue<JavaScriptLambda>(javaScriptLambda, v, jsFunctionGlobalName.c_str());
+  // 3. Wrap it inside the JS object
+  utils->createMappedCppPtrValue<JavaScriptObject>(javaScriptObject, v, jsAidlInterfaceGlobalName.c_str());
 
-  // 4. Call native createJsLambdaProxy(id, javaMethod)
-  JniLocalRef<jobject> javaFunction = getJniCache()->getJsBridgeInterface().createJsLambdaProxy(
-      JStringLocalRef(m_jniContext, jsFunctionGlobalName.c_str()),
-      jniJavaMethod
+  // 4. Call native createAidlInterfaceProxy(id, aidlStub, javaMethods)
+  JniLocalRef<jobject> aidlInterfaceObject = getJniCache()->getJsBridgeInterface().createAidlInterfaceProxy(
+      JStringLocalRef(m_jniContext, jsAidlInterfaceGlobalName.c_str()),
+      m_parameter
   );
   if (m_jniContext->exceptionCheck()) {
     throw JniException(m_jniContext);
   }
 
-  return JValue(javaFunction);
+  return JValue(aidlInterfaceObject);
 }
 
-JValue FunctionX::toJavaArray(JSValueConst) const {
-  throw std::invalid_argument("Cannot transfer from JS to Java an array of functions!");
-}
-
-// Get a native function, register it and return JS wrapper
-JSValue FunctionX::fromJava(const JValue &value) const {
-  const QuickJsUtils *utils = m_jsBridgeContext->getUtils();
-  assert(utils != nullptr);
-
-  // 1. Get C++ JavaMethod instance
-  const std::shared_ptr<JavaMethod> &javaMethodPtr = getCppJavaMethod();
-
-  // 2. C++: create the JValue object which is a Java FunctionX instance
-  const JniLocalRef<jobject> &javaFunctionObject = value.getLocalRef();
-  if (javaFunctionObject.isNull()) {
-    return JS_NULL;
-  }
-
-  // 3. C++: create a JS function which invokes the JavaMethod with the above Java this
-  auto payload = new CallJavaLambdaPayload { JniGlobalRef<jobject>(javaFunctionObject), javaMethodPtr };
-  JSValue payloadValue = utils->createCppPtrValue<CallJavaLambdaPayload>(payload, true);
-  JSValue invokeFunctionValue = JS_NewCFunctionData(m_ctx, callJavaLambda, 1, 0, 1, &payloadValue);
-
-  JS_FreeValue(m_ctx, payloadValue);
-
-  return invokeFunctionValue;
-}
-
-JSValue FunctionX::fromJavaArray(const JniLocalRef<jarray> &) const {
-  throw std::invalid_argument("Cannot transfer from Java to JS an array of functions!");
+JSValue AidlInterface::fromJava(const JValue &value) const {
+   throw std::invalid_argument("Cannot push an AidlInterface!");
 }
 
 #endif

@@ -123,18 +123,25 @@ JValue AidlParcelable::toJava(JSValueConst v) const {
   JS_FreeCString(m_ctx, jsonCStr);
   JS_FreeValue(m_ctx, jsonValue);
 
-  JniLocalRef<jobject> localRef = getJniCache()->newJsonObjectWrapper(str);
+  ParameterInterface parameterInterface = m_jsBridgeContext->getJniCache()->getParameterInterface(m_parameter);
+  JniLocalRef<jobject> localRef = parameterInterface.newAidlParcelable(str);
+
+  if (m_jniContext->exceptionCheck()) {
+    throw JniException(m_jniContext);
+  }
+
   return JValue(localRef);
 }
 
 JSValue AidlParcelable::fromJava(const JValue &value) const {
 
-  const JniLocalRef<jobject> &jWrapper = value.getLocalRef();
-  if (jWrapper.isNull()) {
+  const JniLocalRef<jobject> &jParcelable = value.getLocalRef();
+  if (jParcelable.isNull()) {
     return JS_NULL;
   }
 
-  JStringLocalRef strRef = getJniCache()->getJsonObjectWrapperString(jWrapper);
+  ParameterInterface parameterInterface = m_jsBridgeContext->getJniCache()->getParameterInterface(m_parameter);
+  JStringLocalRef strRef = parameterInterface.getAidlParcelableJsonString(jParcelable);
 
   if (m_jniContext->exceptionCheck()) {
     throw JniException(m_jniContext);
@@ -142,8 +149,7 @@ JSValue AidlParcelable::fromJava(const JValue &value) const {
 
   const char *str = strRef.toUtf8Chars();
 
-  // Undefined values are returned as an empty string
-  if (!str || strlen(str) == 0) {
+  if (!str) {
     return JS_UNDEFINED;
   }
 

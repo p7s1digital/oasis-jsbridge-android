@@ -34,9 +34,7 @@ public:
   duk_ret_t pushArray(const JniLocalRef<jarray> &values, bool expand) const override;
 #elif defined(QUICKJS)
   JValue toJava(JSValueConst) const override;
-  JValue toJavaArray(JSValueConst) const override;
   JSValue fromJava(const JValue &) const override;
-  JSValue fromJavaArray(const JniLocalRef<jarray> &values) const override;
 #endif
 
 private:

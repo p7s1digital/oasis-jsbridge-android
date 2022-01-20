@@ -125,17 +125,17 @@ duk_ret_t Byte::pushArray(const JniLocalRef<jarray> &values, bool expand) const 
 #elif defined(QUICKJS)
 
 namespace {
-  inline jint getInt(JSValue v) {
+  inline jbyte getByte(JSValue v) {
     int tag = JS_VALUE_GET_TAG(v);
     if (tag == JS_TAG_INT) {
       return JS_VALUE_GET_INT(v);
     }
 
     if (JS_TAG_IS_FLOAT64(tag)) {
-      return jint(JS_VALUE_GET_FLOAT64(v));
+      return jbyte(JS_VALUE_GET_FLOAT64(v));
     }
 
-    throw std::invalid_argument("Cannot convert JS value to Java int");
+    throw std::invalid_argument("Cannot convert JS value to Java byte");
   }
 }
 
@@ -144,7 +144,7 @@ JValue Byte::toJava(JSValueConst v) const {
     return JValue();
   }
 
-  return JValue(getInt(v));
+  return JValue(getByte(v));
 }
 
 JValue Byte::toJavaArray(JSValueConst v) const {
@@ -161,36 +161,36 @@ JValue Byte::toJavaArray(JSValueConst v) const {
   uint32_t count = JS_VALUE_GET_INT(lengthValue);
   JS_FreeValue(m_ctx, lengthValue);
 
-  JArrayLocalRef<jint> intArray(m_jniContext, count);
-  if (intArray.isNull()) {
+  JArrayLocalRef<jbyte> byteArray(m_jniContext, count);
+  if (byteArray.isNull()) {
     throw JniException(m_jniContext);
   }
 
-  jint *elements = intArray.getMutableElements();
+  jbyte *elements = byteArray.getMutableElements();
   if (elements == nullptr) {
     throw JniException(m_jniContext);
   }
 
   for (uint32_t i = 0; i < count; ++i) {
     JSValue ev = JS_GetPropertyUint32(m_ctx, v, i);
-    elements[i] = getInt(ev);
+    elements[i] = getByte(ev);
   }
 
-  intArray.releaseArrayElements();  // copy back elements to Java
-  return JValue(intArray);
+  byteArray.releaseArrayElements();  // copy back elements to Java
+  return JValue(byteArray);
 }
 
 JSValue Byte::fromJava(const JValue &value) const {
-  return JS_NewInt32(m_ctx, value.getInt());
+  return JS_NewInt32(m_ctx, value.getByte());
 }
 
 JSValue Byte::fromJavaArray(const JniLocalRef<jarray> &values) const {
-  JArrayLocalRef<jint> intArray(values);
-  const auto count = intArray.getLength();
+  JArrayLocalRef<jbyte> byteArray(values);
+  const auto count = byteArray.getLength();
 
   JSValue jsArray = JS_NewArray(m_ctx);
 
-  const jint *elements = intArray.getElements();
+  const jbyte *elements = byteArray.getElements();
   if (elements == nullptr) {
     JS_FreeValue(m_ctx, jsArray);
     throw JniException(m_jniContext);
