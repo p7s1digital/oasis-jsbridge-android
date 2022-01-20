@@ -101,7 +101,7 @@ internal constructor(
         // - aidl must be an AIDL interface directly implementing android.os.IInterface
         //   (e.g. your.AidlInterface.Stub.asInterface(...))
         // - the native methods will be called in the JS thread!
-        inline fun <reified T> fromAidl(jsBridge: JsBridge, aidl: T): JsValue
+        inline fun <reified T> fromAidlInterface(jsBridge: JsBridge, aidl: T): JsValue
                 where T: android.os.IInterface {
             return jsBridge.registerNativeAidlInterface(T::class, aidl)
         }
@@ -114,7 +114,7 @@ internal constructor(
         // - from Kotlin, it is recommended to use the method overload with generic parameter,
         // instead!@JvmStatic
         @JvmStatic
-        fun fromAidl(jsBridge: JsBridge, aidl: Any, aidlInterface: Class<*>): JsValue {
+        fun fromAidlInterface(jsBridge: JsBridge, aidl: Any, aidlInterface: Class<*>): JsValue {
             return jsBridge.registerNativeAidlInterface(aidlInterface.kotlin, aidl)
         }
 

@@ -2480,7 +2480,7 @@ class JsBridgeTest {
                 return kotlinEnum
             }
         }
-        val aidlInstanceJsValue = JsValue.fromAidl(subject, aidlInstance)
+        val aidlInstanceJsValue = JsValue.fromAidlInterface(subject, aidlInstance)
 
         val js = """
             // Call AIDL interface method and receive callback
