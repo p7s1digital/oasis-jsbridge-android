@@ -61,7 +61,7 @@ JavaScriptMethod::JavaScriptMethod(const JsBridgeContext *jsBridgeContext, const
 
     if (m_isVarArgs && i == numParameters - 1) {
         ParameterInterface parameterInterface = jsBridgeContext->getJniCache()->getParameterInterface(parameter);
-        JniLocalRef<jsBridgeParameter> varArgParameter = parameterInterface.getComponentType();
+        JniLocalRef<jsBridgeParameter> varArgParameter = parameterInterface.getGenericParameter();
         auto javaType = jsBridgeContext->getJavaTypeProvider().makeUniqueType(varArgParameter, false /*boxed*/);
         m_argumentTypes[i] = std::move(javaType);
         break;

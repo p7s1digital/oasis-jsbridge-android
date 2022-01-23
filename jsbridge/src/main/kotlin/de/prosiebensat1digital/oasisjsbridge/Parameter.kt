@@ -111,13 +111,16 @@ internal open class Parameter private constructor(
         Method(javaMethod, kotlinType.arguments, true)
     }
 
-    // Return the component type of an array (e.g. for varargs parameters)
+    // Return the JavaClass of the first generic parameters
     //
-    // e.g.: if the parameter is vararg Int, return Int
+    // e.g.:
+    // - if the parameter is a Deferred<String>, return String::class.java
+    // - if the parameter is an Array, return the array componet
     @Suppress("UNUSED")  // Called from JNI
-    fun getComponentType(): Parameter? {
+    fun getGenericParameter(): Parameter? {
         val javaComponentType = javaClass?.componentType
         if (javaComponentType?.isPrimitive == true) {
+            // Primitives (for arrays) are always given by the Java component type
             return Parameter(javaComponentType)
         }
 
@@ -135,31 +138,7 @@ internal open class Parameter private constructor(
             }
         }
     }
-
-    // For Deferred
-    // TODO: replace it into more "generic" method like "getGenericParameters()"
-    // ---
-
-    // Return the JavaClass of the first generic parameters
-    //
-    // e.g.: if the parameter is a Deferred<String>, return String::class.java
-    @Suppress("UNUSED")  // Called from JNI
-    fun getGenericParameter(): Parameter? {
-        return if (kotlinType == null) {
-            if (javaClass?.componentType?.isPrimitive == false) {
-                return Parameter(javaClass.componentType!!)
-            }
-
-            // No type information => using generic Object type
-            Parameter(Any::class.java)
-        } else {
-            // Use KType instance to create the (only) generic type
-            kotlinType.arguments.firstOrNull()?.type?.let { genericParameterType ->
-                Parameter(genericParameterType)
-            }
-        }
-    }
-
+    
 
     // For AIDL
     // ---
