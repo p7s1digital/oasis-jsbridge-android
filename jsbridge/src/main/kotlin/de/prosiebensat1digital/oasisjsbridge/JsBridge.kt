@@ -22,12 +22,12 @@ import android.app.Activity
 import android.content.Context
 import android.os.Looper
 import androidx.annotation.VisibleForTesting
+import com.android.dx.stock.ProxyBuilder
 import de.prosiebensat1digital.oasisjsbridge.JsBridgeError.*
 import de.prosiebensat1digital.oasisjsbridge.extensions.*
 import java.io.FileNotFoundException
 import java.io.InputStream
 import java.lang.reflect.Method as JavaMethod
-import java.lang.reflect.Proxy
 import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
@@ -39,6 +39,7 @@ import kotlin.reflect.full.createType
 import kotlin.reflect.full.declaredMemberFunctions
 import kotlinx.coroutines.*
 import timber.log.Timber
+import java.lang.reflect.Proxy
 
 
 // Execute JS code via Duktape or QuickJS and handle the bi-directional communication between native
@@ -773,12 +774,22 @@ constructor(config: JsBridgeConfig): CoroutineScope {
 
     private fun findApiInterface(clazz: Class<*>, isAidl: Boolean): Class<*>? {
         if (isAidl) {
-            val superclazz = clazz.superclass ?: return null
-            val maybeAidlInterface = superclazz.interfaces.singleOrNull() ?: return null
-            maybeAidlInterface.interfaces.singleOrNull { it == android.os.IInterface::class.java } ?: return null
-            return maybeAidlInterface
+            // If it implements android.os.IInterface, return it
+            clazz.interfaces.singleOrNull { it == android.os.IInterface::class.java }?.let { return clazz }
+
+            // Otherwise, try with the superclass
+            clazz.superclass?.let { findApiInterface(it, true) }?.let { return it }
+
+            // Or with the implemented interfaces
+            clazz.interfaces.firstNotNullOfOrNull { findApiInterface(it, true) }?.let { return it }
+
+            // Not found
+            return null
         } else {
+            // If one of the interfaces implements android.os.IInterface (e.g. Stub), return it
             clazz.interfaces.firstOrNull { it == JsToNativeInterface::class.java }?.let { return clazz }
+
+            // Otherwise, try with the interfaces
             clazz.interfaces.firstOrNull { findApiInterface(it, false) != null }?.let { return it }
         }
 
@@ -957,7 +968,12 @@ constructor(config: JsBridgeConfig): CoroutineScope {
         val jsValue = JsValue(this, globalObjectName, globalObjectName)
         val proxyListener = ProxyListener(jsValue, parameter.javaClass as Class<*>)
 
-        val proxy = Proxy.newProxyInstance(parameter.aidlInterfaceStub!!.javaClass!!.classLoader, arrayOf(parameter.javaClass), proxyListener)
+        // We use the ProxyBuilder from dexmaker instead of the standard Java Proxy because
+        // it makes it possible to make the proxy extend another class (AIDL Stub)
+        //val proxy = Proxy.newProxyInstance(parameter.aidlInterfaceStub!!.javaClass!!.classLoader, arrayOf(parameter.javaClass), proxyListener)
+        val proxy = ProxyBuilder.forClass(parameter.aidlInterfaceStub!!.javaClass)
+             .handler(proxyListener)
+             .build()
         Timber.v("Created proxy instance for ${parameter.javaClass.name}, js value name: $jsValue")
 
         return proxy
@@ -1064,14 +1080,15 @@ constructor(config: JsBridgeConfig): CoroutineScope {
 
     private inner class ProxyListener(
         private val jsValue: JsValue,
-        private val type: Class<*>
+        private val type: Class<*>,
     ) : java.lang.reflect.InvocationHandler {
-
-        override fun invoke(proxy: Any, method: JavaMethod, args: Array<Any?>?): Any? {
+        override fun invoke(proxy: Any, method: JavaMethod, args: Array<Any?>): Any? {
             return when {
                 method.name == "hashCode" -> jsValue.hashCode()
-                method.name == "equals" -> jsValue.toString() == args?.firstOrNull()?.toString()
+                method.name == "equals" -> jsValue.toString() == args.firstOrNull()?.toString()
                 method.name == "toString" -> jsValue.toString()
+                method.name == "asBinder" -> ProxyBuilder.callSuper(proxy, method, *args)
+                method.name == "onTransact" -> ProxyBuilder.callSuper(proxy, method, *args)
 
                 method.returnType == Unit::class.java ||
                 method.returnType == Void::class.java ||
@@ -1080,7 +1097,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
                     CompletableDeferred(Unit)
                 }
 
-                args?.lastOrNull() is Continuation<*> -> {
+                args.lastOrNull() is Continuation<*> -> {
                     @Suppress("UNCHECKED_CAST")
                     val continuation = args.last() as Continuation<Any?>
                     val jsArgs = args.copyOfRange(0, args.size - 1)

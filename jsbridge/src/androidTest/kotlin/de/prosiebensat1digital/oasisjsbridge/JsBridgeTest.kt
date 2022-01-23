@@ -2473,7 +2473,7 @@ class JsBridgeTest {
             override fun setEnum(payload: Byte) {
                 jsEnum = payload
             }
-            override fun getParcelable(): TestAidlParcelable? {
+            override fun getParcelable(): TestAidlParcelable {
                 return kotlinParcelable
             }
             override fun getEnum(): Byte {
