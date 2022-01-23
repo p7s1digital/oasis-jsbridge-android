@@ -68,7 +68,7 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
     case JavaTypeId::Unknown:
       return nullptr;
     case JavaTypeId::Void:
-      return new Void(m_jsBridgeContext, id, false /*boxed*/);  // TODO: check it
+      return new Void(m_jsBridgeContext, id, false /*boxed*/);
     case JavaTypeId::Unit:
       return new Void(m_jsBridgeContext, id, boxed);
     case JavaTypeId::Boolean:
@@ -135,7 +135,7 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
     case JavaTypeId::AidlInterface:
       return new AidlInterface(m_jsBridgeContext, parameter);
     case JavaTypeId::AidlParcelable:
-      return new AidlParcelable(m_jsBridgeContext, parameter, true /*TODO: isNullable*/);
+      return new AidlParcelable(m_jsBridgeContext, parameter, isParameterNullable(parameter));
   }
 }
 
