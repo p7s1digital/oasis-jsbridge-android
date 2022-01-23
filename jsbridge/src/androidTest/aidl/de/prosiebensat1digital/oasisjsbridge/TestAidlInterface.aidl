@@ -7,6 +7,7 @@ import de.prosiebensat1digital.oasisjsbridge.TestAidlParcelable;
 interface TestAidlInterface {
     void triggerCallback(in TestAidlCallback cb);
     void setParcelable(in TestAidlParcelable p);
+    void setParcelableArray(in TestAidlParcelable[] pa);
     void setEnum(in TestAidlEnum e);
     TestAidlParcelable getParcelable();
     TestAidlEnum getEnum();

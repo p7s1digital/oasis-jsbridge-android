@@ -27,7 +27,7 @@
 namespace JavaTypes {
 
 AidlParcelable::AidlParcelable(const JsBridgeContext *jsBridgeContext, const JniRef<jsBridgeParameter> &parameter, bool isNullable)
- : JavaType(jsBridgeContext, JavaTypeId::JsonObjectWrapper)
+ : JavaType(jsBridgeContext, JavaTypeId::AidlParcelable)
  , m_parameter(parameter)
  , m_isNullable(isNullable) {
 }
@@ -153,11 +153,11 @@ JSValue AidlParcelable::fromJava(const JValue &value) const {
     return JS_UNDEFINED;
   }
 
-  JSValue decodedValue = JS_ParseJSON(m_ctx, str, strlen(str), "JsonObjectWrapper.cpp");
+  JSValue decodedValue = JS_ParseJSON(m_ctx, str, strlen(str), "AidlParcelable.cpp");
 
   if (JS_IsException(decodedValue)) {
     JS_GetException(m_ctx);
-    throw std::invalid_argument(std::string("Error while reading JsonObjectWrapper value (\"") + str + "\")");
+    throw std::invalid_argument(std::string("Error while reading AidlParcelable value (\"") + str + "\")");
   }
 
   strRef.release();
@@ -165,6 +165,11 @@ JSValue AidlParcelable::fromJava(const JValue &value) const {
 }
 
 #endif
+
+JniLocalRef<jclass> AidlParcelable::getJavaClass() const {
+  ParameterInterface parameterInterface = m_jsBridgeContext->getJniCache()->getParameterInterface(m_parameter);
+  return parameterInterface.getJava();
+}
 
 }  // namespace JavaTypes
 

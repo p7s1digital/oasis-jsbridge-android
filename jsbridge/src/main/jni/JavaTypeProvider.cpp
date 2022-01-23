@@ -108,7 +108,7 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
 
     case JavaTypeId::ObjectArray: {
       auto genericParameterType = getGenericParameterType(parameter);
-      return new Array(m_jsBridgeContext, move(genericParameterType));
+      return new Array(m_jsBridgeContext, std::move(genericParameterType));
     }
     case JavaTypeId::BooleanArray:
       return createPrimitiveArray<Boolean>(m_jsBridgeContext);

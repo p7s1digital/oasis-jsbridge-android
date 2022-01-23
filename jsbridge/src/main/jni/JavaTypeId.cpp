@@ -17,6 +17,7 @@
 #include "log.h"
 #include <unordered_map>
 #include <algorithm>
+#include <stdexcept>
 #include <string>
 
 // map<javaName, JavaTypeId>
@@ -126,5 +127,10 @@ JavaTypeId getJavaTypeIdByJavaName(std::u16string_view javaName) {
 
 // Returns the JNI class name (UTF8) needed by JNIenv::findClass(...), e.g.: "java/lang/Integer"
 const std::string &getJniClassNameByJavaTypeId(JavaTypeId id) {
-  return sIdToJavaName[id];
+  auto it = sIdToJavaName.find(id);
+  if (it == sIdToJavaName.end()) {
+    throw std::invalid_argument(std::string() + "Could not get Java name for JavaTypeId " + std::to_string(static_cast<int>(id)) + "!");
+  }
+
+  return it->second;
 }

@@ -16,6 +16,7 @@
 package de.prosiebensat1digital.oasisjsbridge
 
 import com.google.gson.Gson
+import timber.log.Timber
 import kotlin.reflect.*
 import kotlin.reflect.full.declaredFunctions
 import kotlin.reflect.full.memberFunctions
@@ -145,6 +146,10 @@ internal open class Parameter private constructor(
     @Suppress("UNUSED")  // Called from JNI
     fun getGenericParameter(): Parameter? {
         return if (kotlinType == null) {
+            if (javaClass?.componentType?.isPrimitive == false) {
+                return Parameter(javaClass.componentType!!)
+            }
+
             // No type information => using generic Object type
             Parameter(Any::class.java)
         } else {

@@ -2458,17 +2458,36 @@ class JsBridgeTest {
         val subject = createAndSetUpJsBridge()
         val kotlinParcelable = TestAidlParcelable().also { p ->
             p.intField = 12
-            p.stringField = "twelve"
+            p.stringField = "kotlinParcelable"
         }
+        val kotlinParcelableArray = arrayOf(
+            TestAidlParcelable().also { p ->
+                p.intField = 100
+                p.stringField = "kotlinParcelableArrayItem1"
+            },
+            TestAidlParcelable().also { p ->
+                p.intField = 101
+                p.stringField = "kotlinParcelableArrayItem2"
+            },
+        )
         val kotlinEnum = TestAidlEnum.SECOND
         var jsParcelable: TestAidlParcelable? = null
+        var jsParcelableArray: Array<TestAidlParcelable>? = null
         var jsEnum: Byte? = null
+        val expectedJsValues = JsValue(subject, "({})")
 
         // WHEN
         val aidlInstance = object: TestAidlInterface.Default() {
-            override fun triggerCallback(o: TestAidlCallback) = o.onDone()
+            override fun triggerCallback(o: TestAidlCallback) {
+                o.onDone()
+                o.onDoneWithParcelable(kotlinParcelable)
+                o.onDoneWithParcelableArray(kotlinParcelableArray)
+            }
             override fun setParcelable(payload: TestAidlParcelable) {
                 jsParcelable = payload
+            }
+            override fun setParcelableArray(payload: Array<TestAidlParcelable>) {
+                jsParcelableArray = payload
             }
             override fun setEnum(payload: Byte) {
                 jsEnum = payload
@@ -2486,39 +2505,60 @@ class JsBridgeTest {
             // Call AIDL interface method and receive callback
             $aidlInstanceJsValue.triggerCallback({
               onDone: function() {
-                nativeFunctionMock("callback");
+                $expectedJsValues.onDone = true
+              },
+              onDoneWithParcelable: function(p) {
+                $expectedJsValues.onDoneWithParcelable = p
+              },
+              onDoneWithParcelableArray: function(pa) {
+                $expectedJsValues.onDoneWithParcelableArray = pa;
               },
             });
             
             // Pass parcelable to AIDL interface method
             $aidlInstanceJsValue.setParcelable({intField: 1, stringField: "one"});
             
+            // Pass parcelable to AIDL interface method
+            $aidlInstanceJsValue.setParcelableArray([
+                {intField: 1, stringField: "one"},
+                {intField: 2, stringField: "two"},
+                {intField: 3, stringField: "three"},
+            ]);
+            
             // Pass enum to AIDL interface method
             $aidlInstanceJsValue.setEnum(${TestAidlEnum.FIRST});
             
             // Get parcelable as return value of AIDL interface method
-            var kotlinParcelable = $aidlInstanceJsValue.getParcelable();
-            nativeFunctionMock(kotlinParcelable.intField);
-            nativeFunctionMock(kotlinParcelable.stringField);
+            $expectedJsValues.parcelableFromKotlin = $aidlInstanceJsValue.getParcelable();
             
             // Get enum as return value of AIDL interface method
-            var kotlinEnum = $aidlInstanceJsValue.getEnum();
-            nativeFunctionMock(kotlinEnum);
+            $expectedJsValues.enumFromKotlin = $aidlInstanceJsValue.getEnum();
             """
-        subject.evaluateNoRetVal(js)
 
-        runBlocking { waitForDone(subject) }
+        runBlocking {
+            subject.evaluate<Unit>(js)
+            val expectedJsValuesMap = expectedJsValues.evaluate<JsonObjectWrapper>()
+            waitForDone(subject)
 
-        // THEN
-        assertTrue(errors.isEmpty())
-        assertEquals(jsParcelable?.intField, 1)
-        assertEquals(jsParcelable?.stringField, "one")
-        assertEquals(jsEnum, TestAidlEnum.FIRST)
-        verify {
-            jsToNativeFunctionMock(eq("callback"))
-            jsToNativeFunctionMock(eq(12.0))
-            jsToNativeFunctionMock(eq("twelve"))
-            jsToNativeFunctionMock(eq(kotlinEnum.toDouble()))
+            // THEN
+            assertTrue(errors.isEmpty())
+            assertEquals(1, jsParcelable?.intField)
+            assertEquals("one", jsParcelable?.stringField)
+            assertEquals(3, jsParcelableArray?.size)
+            assertEquals(1, jsParcelableArray!![0].intField)
+            assertEquals(2, jsParcelableArray!![1].intField)
+            assertEquals(3, jsParcelableArray!![2].intField)
+            assertEquals(TestAidlEnum.FIRST, jsEnum)
+            assertEquals(payloadObjectOf(
+                "onDone" to true,
+                "onDoneWithParcelable" to payloadObjectOf("intField" to kotlinParcelable.intField, "stringField" to kotlinParcelable.stringField),
+                "onDoneWithParcelableArray" to payloadArrayOf(
+                    payloadObjectOf("intField" to kotlinParcelableArray[0].intField, "stringField" to kotlinParcelableArray[0].stringField),
+                    payloadObjectOf("intField" to kotlinParcelableArray[1].intField, "stringField" to kotlinParcelableArray[1].stringField),
+                ),
+                "parcelableFromKotlin" to payloadObjectOf("intField" to kotlinParcelable.intField, "stringField" to kotlinParcelable.stringField),
+                "enumFromKotlin" to kotlinEnum.toInt(),
+            ), expectedJsValuesMap.toPayloadObject())
         }
     }
 

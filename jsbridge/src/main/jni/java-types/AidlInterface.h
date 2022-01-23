@@ -36,6 +36,7 @@ public:
 #endif
 
 private:
+  JniLocalRef<jclass> getJavaClass() const override;
   JObjectArrayLocalRef getJniJavaMethods() const;
 
   JniGlobalRef<jsBridgeParameter> m_parameter;

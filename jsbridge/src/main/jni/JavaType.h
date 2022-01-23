@@ -70,7 +70,7 @@ public:
 protected:
     explicit JavaType(const JsBridgeContext *, JavaTypeId);
 
-    const JniRef<jclass> &getJavaClass() const;
+    virtual JniLocalRef<jclass> getJavaClass() const;
     const JniCache *getJniCache() const { return m_jsBridgeContext->getJniCache(); }
     const ExceptionHandler *getExceptionHandler() const { return m_jsBridgeContext->getExceptionHandler(); }
 

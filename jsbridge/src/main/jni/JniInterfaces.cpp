@@ -170,9 +170,9 @@ JObjectArrayLocalRef ParameterInterface::getMethods() const {
   return JObjectArrayLocalRef(localRef);
 }
 
-JniLocalRef<jobject> ParameterInterface::getJava() const {
+JniLocalRef<jclass> ParameterInterface::getJava() const {
   static thread_local jmethodID methodId = m_jniCache->getJniContext()->getMethodID(m_class, "getJava", "()Ljava/lang/Class;");
-  return m_jniCache->getJniContext()->callObjectMethod(m_object, methodId);
+  return m_jniCache->getJniContext()->callObjectMethod<jclass>(m_object, methodId);
 }
 
 JStringLocalRef ParameterInterface::getJavaName() const {

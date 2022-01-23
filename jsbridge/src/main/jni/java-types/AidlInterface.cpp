@@ -44,7 +44,7 @@ namespace {
 namespace JavaTypes {
 
 AidlInterface::AidlInterface(const JsBridgeContext *jsBridgeContext, const JniRef<jsBridgeParameter> &parameter)
- : JavaType(jsBridgeContext, JavaTypeId::FunctionX)
+ : JavaType(jsBridgeContext, JavaTypeId::AidlInterface)
  , m_parameter(parameter) {
 }
 
@@ -150,6 +150,11 @@ JSValue AidlInterface::fromJava(const JValue &value) const {
 
 // Private methods
 // ---
+
+JniLocalRef<jclass> AidlInterface::getJavaClass() const {
+  ParameterInterface parameterInterface = m_jsBridgeContext->getJniCache()->getParameterInterface(m_parameter);
+  return parameterInterface.getJava();
+}
 
 JObjectArrayLocalRef AidlInterface::getJniJavaMethods() const {
   if (!m_lazyJniJavaMethods.isNull()) {

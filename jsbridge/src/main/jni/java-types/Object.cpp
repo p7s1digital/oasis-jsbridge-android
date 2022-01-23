@@ -16,6 +16,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#include <log.h>
+#include <exceptions/JniException.h>
 #include "Object.h"
 
 #include "BoxedPrimitive.h"
@@ -157,6 +159,9 @@ JSValue Object::fromJava(const JValue &value) const {
 JavaType *Object::newJavaType(const JniLocalRef<jobject> &jobject) const {
   JniLocalRef<jclass> objectJavaClass = m_jniContext->getObjectClass(jobject);
   jmethodID getName = m_jniContext->getMethodID(objectJavaClass, "getName", "()Ljava/lang/String;");
+  if (m_jniContext->exceptionCheck()) {
+    throw JniException(m_jniContext);
+  }
   JStringLocalRef javaNameRef = m_jniContext->callStringMethod(objectJavaClass, getName);
 
   JavaTypeId id = getJavaTypeIdByJavaName(javaNameRef.getUtf16View());

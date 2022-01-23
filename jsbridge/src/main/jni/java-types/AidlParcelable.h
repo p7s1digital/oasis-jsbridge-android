@@ -36,6 +36,8 @@ public:
 #endif
 
 private:
+  JniLocalRef<jclass> getJavaClass() const override;
+
   JniGlobalRef<jsBridgeParameter> m_parameter;
   bool m_isNullable;
 };

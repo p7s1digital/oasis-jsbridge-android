@@ -76,7 +76,7 @@ public:
 
   JniLocalRef<jsBridgeMethod> getInvokeMethod() const;
   JObjectArrayLocalRef getMethods() const;
-  JniLocalRef<jobject> getJava() const;
+  JniLocalRef<jclass> getJava() const;
   JStringLocalRef getJavaName() const;
   jboolean isNullable() const;
   JniLocalRef<jsBridgeParameter> getComponentType() const;
