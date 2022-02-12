@@ -17,6 +17,7 @@
 
 #include "JsBridgeContext.h"
 #include "jni-helpers/JniContext.h"
+#include "log.h"
 
 JniCache::JniCache(const JsBridgeContext *jsBridgeContext, const JniLocalRef<jobject> &jsBridgeJavaObject)
  : m_jsBridgeContext(jsBridgeContext)
@@ -43,15 +44,17 @@ const JniGlobalRef<jclass> &JniCache::getJavaClass(JavaTypeId id) const {
   const JniContext *jniContext = m_jsBridgeContext->getJniContext();
   assert(jniContext != nullptr);
 
-  const char *javaName = getJniClassNameByJavaTypeId(id).c_str();
-  JniLocalRef<jclass> javaClass = jniContext->findClass(javaName);
+  const std::string &javaName = getJniClassNameByJavaTypeId(id);
+
+  JniLocalRef<jclass> javaClass = jniContext->findClass(javaName.c_str());
 
   // If the above findClass() call throws an exception, try to get the class from the primitive type
   if (jniContext->exceptionCheck()) {
     jniContext->exceptionClear();
     JniLocalRef<jclass> classClass = jniContext->findClass("java/lang/Class");
     jmethodID getPrimitiveClass = jniContext->getStaticMethodID(classClass, "getPrimitiveClass", "(Ljava/lang/String;)Ljava/lang/Class;");
-    javaClass = jniContext->callStaticObjectMethod<jclass>(classClass, getPrimitiveClass, JStringLocalRef(jniContext, javaName));
+
+    javaClass = jniContext->callStaticObjectMethod<jclass>(classClass, getPrimitiveClass, JStringLocalRef(jniContext, javaName.c_str()));
   }
   return m_javaClasses.emplace(id, JniGlobalRef<jclass>(javaClass)).first->second;
 }

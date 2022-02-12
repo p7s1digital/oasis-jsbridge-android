@@ -22,12 +22,12 @@ import android.app.Activity
 import android.content.Context
 import android.os.Looper
 import androidx.annotation.VisibleForTesting
+import com.android.dx.stock.ProxyBuilder
 import de.prosiebensat1digital.oasisjsbridge.JsBridgeError.*
 import de.prosiebensat1digital.oasisjsbridge.extensions.*
 import java.io.FileNotFoundException
 import java.io.InputStream
 import java.lang.reflect.Method as JavaMethod
-import java.lang.reflect.Proxy
 import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
@@ -39,6 +39,7 @@ import kotlin.reflect.full.createType
 import kotlin.reflect.full.declaredMemberFunctions
 import kotlinx.coroutines.*
 import timber.log.Timber
+import java.lang.reflect.Proxy
 
 
 // Execute JS code via Duktape or QuickJS and handle the bi-directional communication between native
@@ -450,7 +451,21 @@ constructor(config: JsBridgeConfig): CoroutineScope {
 
         launch {
             val jniJsContext = jniJsContextOrThrow()
-            registerJsToNativeInterfaceHelper(jniJsContext, jsValue, kClass, obj)
+            registerJsToNativeInterfaceHelper(jniJsContext, jsValue, kClass, obj, false)
+        }
+
+        return jsValue
+    }
+
+    @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
+    fun registerNativeAidlInterface(kClass: KClass<*>, obj: Any): JsValue {
+        val suffix = internalCounter.incrementAndGet()
+        val jsObjectName = "__jsBridge_aidl_${kClass.simpleName ?: "unnamed_class"}$suffix"
+        val jsValue = JsValue(this, null, associatedJsName = jsObjectName)
+
+        launch {
+            val jniJsContext = jniJsContextOrThrow()
+            registerJsToNativeInterfaceHelper(jniJsContext, jsValue, kClass, obj, true)
         }
 
         return jsValue
@@ -712,12 +727,12 @@ constructor(config: JsBridgeConfig): CoroutineScope {
     }
 
     @Throws(JsToNativeRegistrationError::class)
-    private fun registerJsToNativeInterfaceHelper(jniJsContext: Long, jsValue: JsValue, type: KClass<*>, obj: Any) {
+    private fun registerJsToNativeInterfaceHelper(jniJsContext: Long, jsValue: JsValue, type: KClass<*>, obj: Any, isAidl: Boolean) {
         checkJsThread()
 
-        // Pick up the most "bottom" interface which implements JsToNativeInterface
-        val apiInterface = findApiInterface(obj::class.java)
-                ?: throw JsToNativeRegistrationError(this::class, customMessage = "Cannot map native object to JS because it does not implement any JsToNativeInterface-based interface")
+        // Pick up the most "bottom" interface which implements JsToNativeInterface (or android.os.IInterface)
+        val apiInterface = findApiInterface(obj::class.java, isAidl)
+                ?: throw JsToNativeRegistrationError(this::class, customMessage = "Cannot map native object to JS because it does not implement JsToNativeInterface or android.os.IInterface")
 
         if (!type.isInstance(obj)) {
             throw JsToNativeRegistrationError(type, Throwable("${obj.javaClass.name} is not an instance of $type"))
@@ -757,14 +772,32 @@ constructor(config: JsBridgeConfig): CoroutineScope {
         }
     }
 
-    private fun findApiInterface(clazz: Class<*>): Class<*>? {
-        clazz.interfaces.firstOrNull { it == JsToNativeInterface::class.java }?.let { return clazz }
-        clazz.interfaces.firstOrNull { findApiInterface(it) != null }?.let { return it }
+    private fun findApiInterface(clazz: Class<*>, isAidl: Boolean): Class<*>? {
+        if (isAidl) {
+            // If it implements android.os.IInterface, return it
+            clazz.interfaces.singleOrNull { it == android.os.IInterface::class.java }?.let { return clazz }
+
+            // Otherwise, try with the superclass
+            clazz.superclass?.let { findApiInterface(it, true) }?.let { return it }
+
+            // Or with the implemented interfaces
+            clazz.interfaces.firstNotNullOfOrNull { findApiInterface(it, true) }?.let { return it }
+
+            // Not found
+            return null
+        } else {
+            // If one of the interfaces implements android.os.IInterface (e.g. Stub), return it
+            clazz.interfaces.firstOrNull { it == JsToNativeInterface::class.java }?.let { return clazz }
+
+            // Otherwise, try with the interfaces
+            clazz.interfaces.firstOrNull { findApiInterface(it, false) != null }?.let { return it }
+        }
+
         return null
     }
 
-    // - If async = true, the proxy object is returned directly the registration itself is
-    // launched asynchronously a
+    // - If async = true, the proxy object is returned directly (the registration will be
+    // done asynchronously)
     // - If async = false, the proxy object is only returned after a successful registration
     @Throws
     private suspend fun <T: Any> registerNativeToJsInterfaceHelper(jsValue: JsValue, type: KClass<T>, check: Boolean, waitForRegistration: Boolean): T {
@@ -789,7 +822,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
 
                 // Except only 1 super interface and return it
                 // -> KClass<*>
-                .single()
+                .singleOrNull()
                 .also {
                     it?.java?.isInterface
                             ?: throw NativeToJsRegistrationError(type, customMessage = "$type and its super interfaces must extend exactly 1 interface")
@@ -800,7 +833,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
         }
 
         val methods = interfaces
-            // Collect all member functions of all interface
+            // Collect all member functions of all interfaces
             // -> Sequence<KFunction<*>>
             .flatMap { it.declaredMemberFunctions.asSequence() }
 
@@ -913,6 +946,39 @@ constructor(config: JsBridgeConfig): CoroutineScope {
         }
     }
 
+    // Create a native proxy to a JS function defined by a reflected (lambda) Method. The function
+    // will be called from Java/Kotlin and will trigger execution of the JS lambda.
+    //
+    // This is used for example when a JsToNative interface with a lambda parameter is registered,
+    // e.g.:
+    // interface MyNativeApi {
+    //   fun myNativeMethod(cb: (p: Int) -> Unit)
+    // }
+    //
+    // When JS code calls "myNativeMethod()", the cb parameter will be passed to the native after being
+    // created via createJsLambdaProxy().
+    //
+    // Note: as it triggers a JS function running in the JS thread, the lambda needs to be started
+    // asynchronously and shall not block the current thread. As a result, only JS lambdas without
+    // return value are supported (which is usually fine for callbacks).
+    @Suppress("UNUSED")  // Called from JNI
+    private fun createAidlInterfaceProxy(globalObjectName: String, parameter: Parameter): Any? {
+        checkJsThread()
+
+        val jsValue = JsValue(this, globalObjectName, globalObjectName)
+        val proxyListener = ProxyListener(jsValue, parameter.javaClass as Class<*>)
+
+        // We use the ProxyBuilder from dexmaker instead of the standard Java Proxy because
+        // it makes it possible to make the proxy extend another class (AIDL Stub)
+        //val proxy = Proxy.newProxyInstance(parameter.aidlInterfaceStub!!.javaClass!!.classLoader, arrayOf(parameter.javaClass), proxyListener)
+        val proxy = ProxyBuilder.forClass(parameter.aidlInterfaceStub!!.javaClass)
+             .handler(proxyListener)
+             .build()
+        Timber.v("Created proxy instance for ${parameter.javaClass.name}, js value name: $jsValue")
+
+        return proxy
+    }
+
     @Suppress("UNUSED")  // Called from JNI
     private fun createCompletableDeferred(): CompletableDeferred<Any?> {
         checkJsThread()
@@ -990,7 +1056,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
     private external fun jniEvaluateFileContent(context: Long, js: String, filename: String)
     private external fun jniRegisterJavaLambda(context: Long, name: String, obj: Any, method: Any)
     private external fun jniRegisterJavaObject(context: Long, name: String, obj: Any, methods: Array<Any>)
-    private external fun jniRegisterJsObject(context: Long, name: String, methods: Array<Any>, check: Boolean)
+    private external fun jniRegisterJsObject(context: Long, name: String, methods: Array<out Any>, check: Boolean)
     private external fun jniRegisterJsLambda(context: Long, name: String, method: Any)
     private external fun jniCallJsMethod(context: Long, objectName: String, javaMethod: JavaMethod, args: Array<Any?>): Any?
     private external fun jniCallJsMethod(context: Long, objectName: String, javaMethod: JavaMethod, args: Array<Any?>, awaitJsPromise: Boolean): Any?
@@ -1014,14 +1080,15 @@ constructor(config: JsBridgeConfig): CoroutineScope {
 
     private inner class ProxyListener(
         private val jsValue: JsValue,
-        private val type: Class<*>
+        private val type: Class<*>,
     ) : java.lang.reflect.InvocationHandler {
-
-        override fun invoke(proxy: Any, method: JavaMethod, args: Array<Any?>?): Any? {
+        override fun invoke(proxy: Any, method: JavaMethod, args: Array<Any?>): Any? {
             return when {
                 method.name == "hashCode" -> jsValue.hashCode()
-                method.name == "equals" -> jsValue.toString() == args?.firstOrNull()?.toString()
+                method.name == "equals" -> jsValue.toString() == args.firstOrNull()?.toString()
                 method.name == "toString" -> jsValue.toString()
+                method.name == "asBinder" -> ProxyBuilder.callSuper(proxy, method, *args)
+                method.name == "onTransact" -> ProxyBuilder.callSuper(proxy, method, *args)
 
                 method.returnType == Unit::class.java ||
                 method.returnType == Void::class.java ||
@@ -1030,7 +1097,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
                     CompletableDeferred(Unit)
                 }
 
-                args?.lastOrNull() is Continuation<*> -> {
+                args.lastOrNull() is Continuation<*> -> {
                     @Suppress("UNCHECKED_CAST")
                     val continuation = args.last() as Continuation<Any?>
                     val jsArgs = args.copyOfRange(0, args.size - 1)

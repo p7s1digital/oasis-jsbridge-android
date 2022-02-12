@@ -43,50 +43,50 @@ class JsBridgeContext;
 // to/from Duktape/QuickJS with appropriate conversions and boxing/unboxing.
 class JavaType {
 public:
-  virtual ~JavaType() = default;
+    virtual ~JavaType() = default;
 
 #if defined(DUKTAPE)
-  // Pop values from JS to Java
-  // Note: in case of exception, no value will be popped
-  virtual JValue pop() const = 0;
-  virtual JValue popArray(uint32_t count, bool expanded) const;
+    // Pop values from JS to Java
+    // Note: in case of exception, no value will be popped
+    virtual JValue pop() const = 0;
+    virtual JValue popArray(uint32_t count, bool expanded) const;
 
-  // Push values from Java to JS
-  // Note: in case of exception, no value will be pushed
-  virtual duk_ret_t push(const JValue &value) const = 0;
-  virtual duk_ret_t pushArray(const JniLocalRef<jarray> &values, bool expand) const;
+    // Push values from Java to JS
+    // Note: in case of exception, no value will be pushed
+    virtual duk_ret_t push(const JValue &value) const = 0;
+    virtual duk_ret_t pushArray(const JniLocalRef<jarray> &values, bool expand) const;
 #elif defined(QUICKJS)
-  virtual JValue toJava(JSValueConst) const = 0;
+    virtual JValue toJava(JSValueConst) const = 0;
   virtual JValue toJavaArray(JSValueConst) const;
 
   virtual JSValue fromJava(const JValue &value) const = 0;
   virtual JSValue fromJavaArray(const JniLocalRef<jarray> &values) const;
 #endif
 
-  virtual JValue callMethod(jmethodID, const JniRef<jobject> &javaThis, const std::vector<JValue> &args) const;
+    virtual JValue callMethod(jmethodID, const JniRef<jobject> &javaThis, const std::vector<JValue> &args) const;
 
-  virtual bool isDeferred() const { return false; }
+    virtual bool isDeferred() const { return false; }
 
 protected:
-  explicit JavaType(const JsBridgeContext *, JavaTypeId);
+    explicit JavaType(const JsBridgeContext *, JavaTypeId);
 
-  const JniRef<jclass> &getJavaClass() const;
-  const JniCache *getJniCache() const { return m_jsBridgeContext->getJniCache(); }
-  const ExceptionHandler *getExceptionHandler() const { return m_jsBridgeContext->getExceptionHandler(); }
+    virtual JniLocalRef<jclass> getJavaClass() const;
+    const JniCache *getJniCache() const { return m_jsBridgeContext->getJniCache(); }
+    const ExceptionHandler *getExceptionHandler() const { return m_jsBridgeContext->getExceptionHandler(); }
 
-  const JsBridgeContext * const m_jsBridgeContext;
-  const JniContext * const m_jniContext;
+    const JsBridgeContext * const m_jsBridgeContext;
+    const JniContext * const m_jniContext;
 
 #if defined(DUKTAPE)
-  const DuktapeUtils *getUtils() const { return m_jsBridgeContext->getUtils(); }
-  duk_context * const m_ctx;
+    const DuktapeUtils *getUtils() const { return m_jsBridgeContext->getUtils(); }
+    duk_context * const m_ctx;
 #elif defined(QUICKJS)
-  const QuickJsUtils *getUtils() const { return m_jsBridgeContext->getUtils(); }
+    const QuickJsUtils *getUtils() const { return m_jsBridgeContext->getUtils(); }
   JSContext * const m_ctx;
 #endif
 
 private:
-  const JavaTypeId m_id;
+    const JavaTypeId m_id;
 };
 
 #endif

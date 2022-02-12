@@ -32,9 +32,12 @@ add_library(
     src/main/jni/JniInterfaces.cpp
     src/main/jni/exceptions/JniException.cpp
     src/main/jni/exceptions/JsException.cpp
+    src/main/jni/java-types/AidlInterface.cpp
+    src/main/jni/java-types/AidlParcelable.cpp
     src/main/jni/java-types/Array.cpp
     src/main/jni/java-types/Boolean.cpp
     src/main/jni/java-types/BoxedPrimitive.cpp
+    src/main/jni/java-types/Byte.cpp
     src/main/jni/java-types/Double.cpp
     src/main/jni/java-types/Float.cpp
     src/main/jni/java-types/FunctionX.cpp

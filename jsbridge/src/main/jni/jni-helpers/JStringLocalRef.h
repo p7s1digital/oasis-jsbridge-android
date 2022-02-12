@@ -104,6 +104,11 @@ public:
     return m_utf8Chars;
   }
 
+  std::string toStdString() const {
+    const char *s = toUtf8Chars();
+    return s ? s : std::string();
+  }
+
   // Return a string_view to the Java UTF-16 string. This is indeed a direct pointer to the Java String
   // (which is *not* null-terminated)
   // WARNING: the returned string_view is invalid after the JStringLocalRef instance has been released!

@@ -51,6 +51,12 @@ public:
   }
 
   template<typename U = T>
+  JArrayLocalRef(const JniContext *jniContext, jsize count, Mode mode = Mode::AutoReleased, typename std::enable_if_t<std::is_same<U, jbyte>::value>* = nullptr)
+       : JniLocalRef<jarray>(jniContext, JniRefHelper::getJNIEnv(jniContext)->NewByteArray(count), mode)
+      , m_jniReleaseArrayMode(JNI_ABORT) {
+  }
+
+    template<typename U = T>
   JArrayLocalRef(const JniContext *jniContext, jsize count, Mode mode = Mode::AutoReleased, typename std::enable_if_t<std::is_same<U, jint>::value>* = nullptr)
       : JniLocalRef<jarray>(jniContext, JniRefHelper::getJNIEnv(jniContext)->NewIntArray(count), mode)
       , m_jniReleaseArrayMode(JNI_ABORT) {
@@ -114,14 +120,33 @@ public:
     return static_cast<T *>(m_elements);
   }
 
+  template<typename U = T, typename = std::enable_if_t<std::is_same<U, jbyte>::value>>
+  const jbyte *getElements() const {
+    if (!m_elements) {
+      m_elements = getJniEnv()->GetByteArrayElements(static_cast<jbyteArray>(get()), nullptr);
+      m_jniReleaseArrayMode = JNI_ABORT;  // no copy back
+    }
+
+    return static_cast<const T *>(m_elements);
+  }
+
+  template<typename U = T, typename = std::enable_if_t<std::is_same<U, jbyte>::value>>
+  jbyte *getMutableElements() {
+    if (!m_elements) {
+      m_elements = getJniEnv()->GetByteArrayElements(static_cast<jbyteArray>(get()), nullptr);
+    }
+
+    m_jniReleaseArrayMode = 0;  // copy back + free
+    return static_cast<T *>(m_elements);
+  }
+
   template<typename U = T, typename = std::enable_if_t<std::is_same<U, jint>::value>>
   const jint *getElements() const {
     if (!m_elements) {
       m_elements = getJniEnv()->GetIntArrayElements(static_cast<jintArray>(get()), nullptr);
-      m_jniReleaseArrayMode = JNI_ABORT;  // no copy  back
+      m_jniReleaseArrayMode = JNI_ABORT;  // no copy back
     }
-
-    return static_cast<const T *>(m_elements);
+   return static_cast<const T *>(m_elements);
   }
 
   template<typename U = T, typename = std::enable_if_t<std::is_same<U, jint>::value>>
@@ -203,6 +228,18 @@ public:
       getJniEnv()->ReleaseBooleanArrayElements(
           static_cast<jbooleanArray>(get()),
           static_cast<jboolean *>(m_elements), m_jniReleaseArrayMode);
+      m_elements = nullptr;
+    }
+  }
+
+  // Release / copy back array elements returned by get(Mutable)Elements()
+  template <typename V = void, class Q = T>
+  typename std::enable_if<std::is_same<Q, jbyte>::value, V>::type
+  releaseArrayElements() {
+    if (m_elements != nullptr) {
+      getJniEnv()->ReleaseByteArrayElements(
+              static_cast<jbyteArray >(get()),
+              static_cast<T *>(m_elements), m_jniReleaseArrayMode);
       m_elements = nullptr;
     }
   }

@@ -15,8 +15,12 @@
  */
 package de.prosiebensat1digital.oasisjsbridge
 
+import com.google.gson.Gson
+import timber.log.Timber
 import kotlin.reflect.*
+import kotlin.reflect.full.declaredFunctions
 import kotlin.reflect.full.memberFunctions
+import kotlin.reflect.jvm.javaMethod
 
 // Represents a (reflected) function parameter (or return value) with its (optional) name based on:
 // - (ideally) Kotlin KParameter or KType which has the (full) reflection info
@@ -24,8 +28,8 @@ import kotlin.reflect.full.memberFunctions
 @PublishedApi
 internal open class Parameter private constructor(
     private val parentMethod: Method?,
-    private val kotlinType: KType?,
-    private val javaClass: Class<*>?,
+    internal val kotlinType: KType?,
+    internal val javaClass: Class<*>?,
     val name: String?,
     val isOptional: Boolean
 ) {
@@ -107,13 +111,16 @@ internal open class Parameter private constructor(
         Method(javaMethod, kotlinType.arguments, true)
     }
 
-    // Return the component type of an array (e.g. for varargs parameters)
+    // Return the JavaClass of the first generic parameters
     //
-    // e.g.: if the parameter is vararg Int, return Int
+    // e.g.:
+    // - if the parameter is a Deferred<String>, return String::class.java
+    // - if the parameter is an Array, return the array componet
     @Suppress("UNUSED")  // Called from JNI
-    fun getComponentType(): Parameter? {
+    fun getGenericParameter(): Parameter? {
         val javaComponentType = javaClass?.componentType
         if (javaComponentType?.isPrimitive == true) {
+            // Primitives (for arrays) are always given by the Java component type
             return Parameter(javaComponentType)
         }
 
@@ -131,25 +138,51 @@ internal open class Parameter private constructor(
             }
         }
     }
+    
 
-    // For Deferred
-    // TODO: replace it into more "generic" method like "getGenericParameters()"
+    // For AIDL
     // ---
 
-    // Return the JavaClass of the first generic parameters
-    //
-    // e.g.: if the parameter is a Deferred<String>, return String::class.java
     @Suppress("UNUSED")  // Called from JNI
-    fun getGenericParameter(): Parameter? {
-        return if (kotlinType == null) {
-            // No type information => using generic Object type
-            Parameter(Any::class.java)
-        } else {
-            // Use KType instance to create the (only) generic type
-            kotlinType.arguments.firstOrNull()?.type?.let { genericParameterType ->
-                Parameter(genericParameterType)
+    fun isAidlInterface(): Boolean {
+        return javaClass?.interfaces?.singleOrNull { it == android.os.IInterface::class.java } != null
+    }
+
+    @Suppress("UNUSED")  // Called from JNI
+    fun isAidlParcelable(): Boolean {
+        return javaClass?.interfaces?.singleOrNull { it == android.os.Parcelable::class.java } != null
+    }
+
+    // Return the an AIDL interface stub as a Parameter
+    internal val aidlInterfaceStub: Parameter? by lazy {
+        try {
+            if (kotlinType != null) {
+                val kotlinClass = kotlinType.classifier as? KClass<*>
+                val stubKotlinClass = kotlinClass?.nestedClasses?.singleOrNull { it.simpleName == "Stub" }
+                return@lazy stubKotlinClass?.let { Parameter(it.java) }
             }
-        }
+        } catch (t: Throwable) {}
+
+        // TODO
+        null
+    }
+
+    // Return the methods of an AIDL interface parameter or null if it is not a lambda
+    // (because the lambda parameter is a FunctionX object with an invoke() method)
+    //
+    @Suppress("UNUSED")  // Called from JNI
+    val methods: Array<Method>? by lazy {
+        javaClass?.methods?.filter { it.declaringClass == javaClass }?.map { Method(it) }?.toTypedArray()
+    }
+
+    @Suppress("UNUSED")  // Called from JNI
+    fun newAidlParcelable(jsonString: String): Any? {
+        return Gson().fromJson(jsonString, javaClass)
+    }
+
+    @Suppress("UNUSED")  // Called from JNI
+    fun getAidlParcelableJsonString(parcelable: Any): String {
+        return Gson().toJson(parcelable, javaClass)
     }
 }
 

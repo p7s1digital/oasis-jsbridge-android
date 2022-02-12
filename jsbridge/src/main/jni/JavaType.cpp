@@ -48,7 +48,7 @@ JavaType::JavaType(const JsBridgeContext *jsBridgeContext, JavaTypeId id)
  , m_id(id) {
 }
 
-const JniRef<jclass> &JavaType::getJavaClass() const {
+JniLocalRef<jclass> JavaType::getJavaClass() const {
  return m_jsBridgeContext->getJniCache()->getJavaClass(m_id) ;
 }
 

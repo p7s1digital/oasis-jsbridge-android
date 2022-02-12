@@ -26,7 +26,9 @@
 class JObjectArrayLocalRef : public JniLocalRef<jobjectArray> {
 
 public:
-  JObjectArrayLocalRef() = delete;
+  JObjectArrayLocalRef() {
+
+  }
 
   JObjectArrayLocalRef(const JniContext *jniContext, jobjectArray o, Mode mode = Mode::AutoReleased)
       : JniLocalRef<jobjectArray>(jniContext, o, mode) {
@@ -53,6 +55,8 @@ public:
   operator bool() const = delete;
 
   jsize getLength() const {
+    assert(!isNull());
+
     JNIEnv *env = JniRefHelper::getJNIEnv(getJniContext());
     assert(env != nullptr);
 
@@ -61,6 +65,8 @@ public:
 
   template <typename T = jobject>
   JniLocalRef<T> getElement(jsize index) const {
+    assert(!isNull());
+
     JNIEnv *env = JniRefHelper::getJNIEnv(getJniContext());
     assert(env != nullptr);
 
@@ -70,6 +76,8 @@ public:
 
   template <typename T = jobject>
   void setElement(jsize index, const JniRef<T> &element) {
+    assert(!isNull());
+
     JNIEnv *env = JniRefHelper::getJNIEnv(getJniContext());
     assert(env != nullptr);
 

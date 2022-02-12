@@ -48,6 +48,7 @@ public:
   void onDebuggerPending() const;
   void onDebuggerReady() const;
   JniLocalRef<jobject> createJsLambdaProxy(const JStringLocalRef &, const JniRef<jsBridgeMethod> &) const;
+  JniLocalRef<jobject> createAidlInterfaceProxy(const JStringLocalRef &, const JniRef<jsBridgeParameter> &) const;
   void consoleLogHelper(const JStringLocalRef &logType, const JStringLocalRef &msg) const;
   void resolveDeferred(const JniRef<jobject> &javaDeferred, const JValue &) const;
   void rejectDeferred(const JniRef<jobject> &javaDeferred, const JValue &exception) const;
@@ -74,13 +75,17 @@ public:
   ParameterInterface(const JniCache *, const JniRef<jsBridgeParameter> &);
 
   JniLocalRef<jsBridgeMethod> getInvokeMethod() const;
-  JniLocalRef<jobject> getJava() const;
+  JObjectArrayLocalRef getMethods() const;
+  JniLocalRef<jclass> getJava() const;
   JStringLocalRef getJavaName() const;
   jboolean isNullable() const;
-  JniLocalRef<jsBridgeParameter> getComponentType() const;
   JniLocalRef<jsBridgeParameter> getGenericParameter() const;
   JStringLocalRef getName() const;
   JStringLocalRef getParentMethodName() const;
+  jboolean isAidlInterface() const;
+  jboolean isAidlParcelable() const;
+  JniLocalRef<jobject> newAidlParcelable(const JStringLocalRef &jsonString) const;
+  JStringLocalRef getAidlParcelableJsonString(const JniLocalRef<jobject> &aidlParcelable) const;
 };
 
 #endif

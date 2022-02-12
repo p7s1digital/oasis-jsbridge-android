@@ -19,8 +19,8 @@ import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import timber.log.Timber;
-
 import static org.junit.Assert.assertEquals;
+import android.os.RemoteException;
 
 // Minimal test for using JsBridge from Java
 public final class JsBridgeJavaTest {
@@ -113,6 +113,35 @@ public final class JsBridgeJavaTest {
 
         // THEN
         assertEquals(sum, 10);
+    }
+
+    @Test
+    public void testAidl() {
+        // GIVEN
+        JsBridge subject = createAndSetUpJsBridge();
+
+        class TAI extends TestAidlInterface.Default {
+            @Override
+            public void triggerCallback(TestAidlCallback cb) throws RemoteException {
+                cb.onDone();
+            }
+        }
+        final TAI aidlInstance = new TAI();
+        final JsValue aidlInstanceJsValue = JsValue.fromAidlInterface(subject, aidlInstance, TestAidlInterface.class);
+
+        // WHEN
+        final String js =
+            "var answer;" +
+            aidlInstanceJsValue.toString() + ".triggerCallback({" +
+              "onDone: function() {" +
+                "answer = 12;" +
+              "}," +
+            "});" +
+            "answer";
+        Integer sumInt = (Integer) subject.evaluateBlocking(js, Integer.class);
+
+        // THEN
+        assertEquals(sumInt, new Integer(12));
     }
 
 

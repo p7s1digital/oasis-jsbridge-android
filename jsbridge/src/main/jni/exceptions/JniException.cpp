@@ -41,10 +41,15 @@ std::string JniException::createMessage(const JniContext *jniContext, const JniL
   JniLocalRef<jclass> classObjectClass = jniContext->getObjectClass(classObject);
 
   jmethodID getName = jniContext->getMethodID(classObjectClass, "getName", "()Ljava/lang/String;");
-  std::string exceptionName = jniContext->callStringMethod(exceptionClass, getName).toUtf8Chars();
+  std::string exceptionName;
+  if (jniContext->exceptionCheck()) {
+    exceptionName = jniContext->callStringMethod(exceptionClass, getName).toStdString();
+  } else {
+    exceptionName = "<unknown exception>";
+  }
 
   jmethodID getMessage = jniContext->getMethodID(exceptionClass, "getMessage", "()Ljava/lang/String;");
-  std::string message = jniContext->callStringMethod(throwable, getMessage).toUtf8Chars();
+  std::string message = jniContext->callStringMethod(throwable, getMessage).toStdString();
 
   return exceptionName + ": " + message;
 }

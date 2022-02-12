@@ -123,7 +123,7 @@ JSValue JsValue::fromJava(const JValue &value) const {
   }
 
   // Get JsValue JS name from Java
-  std::string jsValueName = getJniCache()->getJsValueName(jValue).toUtf8Chars();
+  std::string jsValueName = getJniCache()->getJsValueName(jValue).toStdString();
   if (m_jniContext->exceptionCheck()) {
     throw JniException(m_jniContext);
   }

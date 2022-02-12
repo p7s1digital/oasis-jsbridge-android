@@ -65,7 +65,7 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
     const JniLocalRef<jsBridgeMethod> method = methods.getElement<jsBridgeMethod>(i);
     MethodInterface methodInterface = jniCache->getMethodInterface(method);
 
-    std::string strMethodName = methodInterface.getName().toUtf8Chars();
+    std::string strMethodName = methodInterface.getName().toStdString();
 
     if (check) {
       // Sanity check that as of right now, the object we're proxying has a function with this name
@@ -159,7 +159,7 @@ JavaScriptObject::JavaScriptObject(const JsBridgeContext *jsBridgeContext, std::
     JniLocalRef<jsBridgeMethod > method = methods.getElement<jsBridgeMethod>(i);
     MethodInterface methodInterface = jniCache->getMethodInterface(method);
 
-    std::string strMethodName = methodInterface.getName().toUtf8Chars();
+    std::string strMethodName = methodInterface.getName().toStdString();
 
     if (check) {
       // Sanity check that as of right now, the object we're proxying has a function with this name

@@ -17,9 +17,12 @@
 
 #include "JniCache.h"
 #include "JsBridgeContext.h"
+#include "java-types/AidlInterface.h"
+#include "java-types/AidlParcelable.h"
 #include "java-types/Array.h"
 #include "java-types/BoxedPrimitive.h"
 #include "java-types/Boolean.h"
+#include "java-types/Byte.h"
 #include "java-types/Deferred.h"
 #include "java-types/Double.h"
 #include "java-types/Float.h"
@@ -65,10 +68,13 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
     case JavaTypeId::Unknown:
       return nullptr;
     case JavaTypeId::Void:
+      return new Void(m_jsBridgeContext, id, false /*boxed*/);
     case JavaTypeId::Unit:
       return new Void(m_jsBridgeContext, id, boxed);
     case JavaTypeId::Boolean:
       return createPrimitive<Boolean>(m_jsBridgeContext, boxed);
+    case JavaTypeId::Byte:
+      return createPrimitive<Byte>(m_jsBridgeContext, boxed);
     case JavaTypeId::Int:
       return createPrimitive<Integer>(m_jsBridgeContext, boxed);
     case JavaTypeId::Long:
@@ -82,6 +88,8 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
       return new Void(m_jsBridgeContext, id, false /*boxed*/);  // Java "Void" object behaves like the unboxed version
     case JavaTypeId::BoxedBoolean:
       return createPrimitive<Boolean>(m_jsBridgeContext, true);
+    case JavaTypeId::BoxedByte:
+      return createPrimitive<Byte>(m_jsBridgeContext, true);
     case JavaTypeId::BoxedInt:
       return createPrimitive<Integer>(m_jsBridgeContext, true);
     case JavaTypeId::BoxedLong:
@@ -100,10 +108,12 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
 
     case JavaTypeId::ObjectArray: {
       auto genericParameterType = getGenericParameterType(parameter);
-      return new Array(m_jsBridgeContext, move(genericParameterType));
+      return new Array(m_jsBridgeContext, std::move(genericParameterType));
     }
     case JavaTypeId::BooleanArray:
       return createPrimitiveArray<Boolean>(m_jsBridgeContext);
+    case JavaTypeId::ByteArray:
+      return createPrimitiveArray<Byte>(m_jsBridgeContext);
     case JavaTypeId::IntArray:
       return createPrimitiveArray<Integer>(m_jsBridgeContext);
     case JavaTypeId::LongArray:
@@ -121,11 +131,17 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
       return new JsonObjectWrapper(m_jsBridgeContext, isParameterNullable(parameter));
     case JavaTypeId::Deferred:
       return new Deferred(m_jsBridgeContext, getGenericParameterType(parameter));
+
+    case JavaTypeId::AidlInterface:
+      return new AidlInterface(m_jsBridgeContext, parameter);
+    case JavaTypeId::AidlParcelable:
+      return new AidlParcelable(m_jsBridgeContext, parameter, isParameterNullable(parameter));
   }
 }
 
 std::unique_ptr<const JavaType> JavaTypeProvider::makeUniqueType(const JniRef<jsBridgeParameter> &parameter, bool boxed) const {
-  return std::unique_ptr<const JavaType>(newType(parameter, boxed));
+  const JavaType *t = newType(parameter, boxed);
+  return t ? std::unique_ptr<const JavaType>(t) : std::unique_ptr<const JavaType>();
 }
 
 const std::unique_ptr<const JavaType> &JavaTypeProvider::getObjectType() const {
@@ -155,8 +171,17 @@ JavaTypeId JavaTypeProvider::getJavaTypeId(const JniRef<jsBridgeParameter> &para
 
   JavaTypeId id = getJavaTypeIdByJavaName(javaName.getUtf16View());
   if (id == JavaTypeId::Unknown) {
+    // AIDL types
+    ParameterInterface parameterInterface = m_jsBridgeContext->getJniCache()->getParameterInterface(parameter);
+    if (parameterInterface.isAidlInterface()) {
+      return JavaTypeId::AidlInterface;
+    }
+    if (parameterInterface.isAidlParcelable()) {
+      return JavaTypeId::AidlParcelable;
+    }
+
     // TODO: check if implements NativeToJsInterface or JsToNativeInterface
-    throw std::invalid_argument(std::string("Unsupported Java type: ") + javaName.toUtf8Chars());
+    throw std::invalid_argument(std::string("Unsupported Java type: ") + javaName.toStdString());
   }
 
   return id;
