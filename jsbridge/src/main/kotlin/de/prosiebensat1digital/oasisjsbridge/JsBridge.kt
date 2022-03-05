@@ -264,7 +264,6 @@ constructor(config: JsBridgeConfig): CoroutineScope {
                 Timber.d("-> $filename ($jsFileName) has been successfully evaluated!")
             } catch (t: Throwable) {
                 throw JsFileEvaluationError(filename, t)
-                    .also(::notifyErrorListeners)
             }
 
             processPromiseQueue()
@@ -281,7 +280,6 @@ constructor(config: JsBridgeConfig): CoroutineScope {
                 Timber.d("-> file content ($filename) has been successfully evaluated!")
             } catch (t: Throwable) {
                 throw JsFileEvaluationError(filename, t)
-                    .also(::notifyErrorListeners)
             }
 
             processPromiseQueue()
@@ -939,8 +937,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
                     val jniJsContext = jniJsContextOrThrow()
                     jniCallJsLambda(jniJsContext, jsFunctionObject.associatedJsName, args, false)
                 } catch (t: Throwable) {
-                    JsToNativeFunctionCallError("JS lambda($globalObjectName)", t )
-                        .also(::notifyErrorListeners)
+                    throw JsToNativeFunctionCallError("JS lambda($globalObjectName)", t )
                 }
             }
         }
@@ -1036,7 +1033,6 @@ constructor(config: JsBridgeConfig): CoroutineScope {
         if (!isJsThread()) {
             Timber.e("checkJsThread() - FAILED!")
             throw InternalError(Throwable("Unexpected call: should be in the JsThread but is in ${Thread.currentThread().name}"))
-                .also(::notifyErrorListeners)
         }
     }
 
@@ -1117,7 +1113,6 @@ constructor(config: JsBridgeConfig): CoroutineScope {
                     callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf(), false)
                 } catch (t: Throwable) {
                     throw NativeToJsCallError("${type.canonicalName}/$jsValue.${method.name}", t)
-                        .also(::notifyErrorListeners)
                 }
             }
         }
