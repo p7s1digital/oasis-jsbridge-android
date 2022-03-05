@@ -107,7 +107,6 @@ tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
 }
 
 dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:$versions.kotlin.kotlin"
     implementation "org.jetbrains.kotlin:kotlin-reflect:$versions.kotlin.kotlin"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$versions.kotlin.coroutines"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:$versions.kotlin.coroutines"
@@ -131,5 +130,4 @@ dependencies {
     androidTestImplementation "androidx.test:runner:$versions.androidx.test"
     androidTestImplementation "org.jetbrains.kotlin:kotlin-test:$versions.kotlin.kotlin"
     androidTestImplementation "io.mockk:mockk-android:$versions.mockk"
-    //androidTestImplementation 'org.junit.jupiter:junit-jupiter'
 }
