@@ -2562,6 +2562,45 @@ class JsBridgeTest {
         }
     }
 
+    interface TestAidlInterfaceReuseNativeApi : JsToNativeInterface {
+        fun registerCallback(cb: TestAidlCallback)
+        fun unregisterCallback(cb: TestAidlCallback)
+    }
+
+    @Test
+    fun testAidlInterfaceReuse() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+        val nativeApi = object : TestAidlInterfaceReuseNativeApi {
+            var registeredCallback: TestAidlCallback? = null
+            var done = false
+
+            override fun registerCallback(cb: TestAidlCallback) {
+                assertNull(registeredCallback)
+                registeredCallback = cb
+            }
+
+            override fun unregisterCallback(cb: TestAidlCallback) {
+                assertNotNull(registeredCallback)
+                assertSame(cb, registeredCallback)
+                assertFalse(done)
+                done = true
+            }
+        }
+        val nativeApiJsValue = JsValue.fromNativeObject(subject, nativeApi)
+
+        // WHEN
+        val js = """
+            var cb = {};
+            $nativeApiJsValue.registerCallback(cb);
+            $nativeApiJsValue.unregisterCallback(cb);
+        """.trimIndent()
+        runBlocking {
+            subject.evaluate<Unit>(js)
+            assertTrue(nativeApi.done)
+        }
+    }
+
 
     // JsExpectations
     // ---

@@ -63,8 +63,19 @@ JValue AidlInterface::pop() const {
     throw std::invalid_argument(message);
   }
 
-  JObjectArrayLocalRef javaMethods = getJniJavaMethods();
   const DuktapeUtils *utils = m_jsBridgeContext->getUtils();
+  std::string aidlInterfaceJavaName = m_jsBridgeContext->getJniCache()->getParameterInterface(m_parameter).getJavaName().toStdString();
+
+  // First check if this is already a known AIDL interface instance
+  if (duk_get_prop_string(m_ctx, -1, aidlInterfaceJavaName.c_str())) {
+    JniLocalRef<jobject> javaRef = utils->getJavaRef<jobject>(-1);
+    duk_pop(m_ctx);  // prop aidlInterfaceJavaName
+    duk_pop(m_ctx);  // JS object
+    return JValue(javaRef);
+  }
+  duk_pop(m_ctx);  // prop aidlInterfaceJavaName
+
+  JObjectArrayLocalRef javaMethods = getJniJavaMethods();
 
   static int jsAidlInterfaceCount = 0;
   std::string jsAidlInterfaceGlobalName = JS_AIDL_INTERFACE_GLOBAL_NAME_PREFIX + std::to_string(++jsAidlInterfaceCount);
@@ -82,7 +93,6 @@ JValue AidlInterface::pop() const {
   // 3. Create JavaScriptObject C++ object and wrap it inside the JS object
   auto javaScriptObject = new JavaScriptObject(m_jsBridgeContext, jsAidlInterfaceGlobalName, jsObjectIdx, javaMethods, false);
   utils->createMappedCppPtrValue<JavaScriptObject>(javaScriptObject, -1, jsAidlInterfaceGlobalName.c_str());
-  duk_pop(m_ctx);  // JS object
 
   // 4. Call native createAidlInterfaceProxy(id, aidlStub, javaMethods)
   JniLocalRef<jobject> aidlInterfaceObject = getJniCache()->getJsBridgeInterface().createAidlInterfaceProxy(
@@ -90,8 +100,15 @@ JValue AidlInterface::pop() const {
       m_parameter
   );
   if (m_jniContext->exceptionCheck()) {
+    duk_pop(m_ctx);  // JS object
     throw JniException(m_jniContext);
   }
+
+  // 5. Store the Java reference
+  utils->pushJavaRefValue(aidlInterfaceObject);
+  duk_put_prop_string(m_ctx, jsObjectIdx, aidlInterfaceJavaName.c_str());
+
+  duk_pop(m_ctx);  // JS object
 
   return JValue(aidlInterfaceObject);
 }
@@ -113,6 +130,16 @@ JValue AidlInterface::toJava(JSValueConst v) const {
     throw std::invalid_argument("Cannot convert return value to AidlInterface");
   }
 
+  std::string aidlInterfaceJavaName = m_jsBridgeContext->getJniCache()->getParameterInterface(m_parameter).getJavaName().toStdString();
+
+  // First check if this is already a known AIDL interface instance
+  JSValue existingJavaAidlInterfaceValue = JS_GetPropertyStr(m_ctx, v, aidlInterfaceJavaName.c_str());
+  if (!JS_IsUndefined(existingJavaAidlInterfaceValue)) {
+    JniLocalRef<jobject> javaRef = utils->getJavaRef<jobject>(existingJavaAidlInterfaceValue);
+    JS_FreeValue(m_ctx, existingJavaAidlInterfaceValue);
+    return JValue(javaRef);
+  }
+
   static int jsAidlInterfaceCount = 0;
   std::string jsAidlInterfaceGlobalName = JS_AIDL_INTERFACE_GLOBAL_NAME_PREFIX + std::to_string(++jsAidlInterfaceCount);
 
@@ -123,7 +150,7 @@ JValue AidlInterface::toJava(JSValueConst v) const {
   JS_SetPropertyStr(m_ctx, globalObj, jsAidlInterfaceGlobalName.c_str(), JS_DupValue(m_ctx, v));
   JS_FreeValue(m_ctx, globalObj);
 
-  // 2. Create the  C++ JavaScriptObject instance
+  // 2. Create the C++ JavaScriptObject instance
   auto javaScriptObject = new JavaScriptObject(m_jsBridgeContext, jsAidlInterfaceGlobalName, v, javaMethods, false);
 
   // 3. Wrap it inside the JS object
@@ -137,6 +164,10 @@ JValue AidlInterface::toJava(JSValueConst v) const {
   if (m_jniContext->exceptionCheck()) {
     throw JniException(m_jniContext);
   }
+
+  // 5. Store the Java reference
+  JSValue javaRefJsValue = utils->createJavaRefValue(aidlInterfaceObject);
+  JS_SetPropertyStr(m_ctx, v, aidlInterfaceJavaName.c_str(), javaRefJsValue);
 
   return JValue(aidlInterfaceObject);
 }

@@ -6,6 +6,9 @@ on:
     #- tags:
   pull_request:
 
+env:
+  GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -Dorg.gradle.daemon=false"
+
 jobs:
   jvm:
     runs-on: ubuntu-latest

@@ -81,7 +81,7 @@ public:
       JS_SetPropertyStr(m_ctx, jsValue, CPP_OBJECT_MAP_PROP_NAME, JS_DupValue(m_ctx, cppObjectMapValue));
     }
 
-    // Store it in jsValue.cppObjectMap["lambda_global_name"]
+    // Store it in jsValue.cppObjectMap[key]
     JSValue cppValue = createCppPtrValue<T>(obj, true /*deleteOnFinalize*/);
     JS_SetPropertyStr(m_ctx, cppObjectMapValue, key, cppValue);
     // No JS_FreeValue(m_ctx, cppValue) after JS_SetPropertyStr
@@ -132,7 +132,12 @@ public:
   // Access a JNI ref wrapped in a JSValue via createJavaRefValue()
   template <class T>
   JniLocalRef<T> getJavaRef(JSValueConst v) const {
-    auto cppWrapper = reinterpret_cast<CppWrapper *>(JS_GetOpaque(v, js_cppwrapper_class_id));
+    void *opaque = JS_GetOpaque(v, js_cppwrapper_class_id);
+    if (opaque == nullptr) {
+      return JniLocalRef<T>();
+    }
+
+    auto cppWrapper = reinterpret_cast<CppWrapper *>(opaque);
     auto globalRefPtr = reinterpret_cast<JniGlobalRef<T> *>(cppWrapper->ptr);
 
     return JniLocalRef<T>(*globalRefPtr);
