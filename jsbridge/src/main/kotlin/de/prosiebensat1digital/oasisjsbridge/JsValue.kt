@@ -25,18 +25,20 @@ import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.reflect.KType
 import kotlin.reflect.full.createType
 
-// A simple wrapper around a JS value stored as a global JS variable and deleted
-// when the Java object is finalized.
-//
-// This is useful for JS values which need to be transfered to the Java/Kotlin world
-// but do not need to be converted to a JVM type or needs to be evaluated at a later stage.
-// The corresponding JS variable named "associatedJsName" is only valid during the lifetime of the Java
-// object and you should never explicitly refence it in your JS code.
-//
-// Note: the initial JS code must be successfully evaluated via JS eval(). It implies that an object
-// or an anonymous function must be surrounded by brackets, e.g.:
-// - `val jsObject = JsValue(jsBridge, "({ a: 1, b: 'two' })")
-// - `val jsFunction = JsValue(jsBridge, "(function(a, b) { return a + b; })")
+/**
+ * A simple wrapper around a JS value stored as a global JS variable and deleted
+ * when the Java object is finalized.
+ *
+ * This is useful for JS values which need to be transfered to the Java/Kotlin world
+ * but do not need to be converted to a JVM type or needs to be evaluated at a later stage.
+ * The corresponding JS variable named "associatedJsName" is only valid during the lifetime of the Java
+ * object and you should never explicitly refence it in your JS code.
+ *
+ * Note: the initial JS code must be successfully evaluated via JS eval(). It implies that an object
+ * or an anonymous function must be surrounded by brackets, e.g.:
+ * - `val jsObject = JsValue(jsBridge, "({ a: 1, b: 'two' })")
+ * - `val jsFunction = JsValue(jsBridge, "(function(a, b) { return a + b; })")
+ */
 class JsValue
 internal constructor(
     jsBridge: JsBridge,
@@ -47,7 +49,9 @@ internal constructor(
     internal constructor(jsBridge: JsBridge)
             : this(jsBridge, jsCode = null, associatedJsName = generateJsGlobalName())
 
-    // Create a JsValue with an initial value (from JS code)
+    /**
+     * Create a JsValue with an initial value (from JS code)
+     */
     constructor(jsBridge: JsBridge, jsCode: String)
             : this(jsBridge, jsCode = jsCode, associatedJsName = generateJsGlobalName())
 
@@ -61,8 +65,10 @@ internal constructor(
     companion object {
         private var internalCounter = AtomicInteger(0)
 
-        // Create a JsValue which is a JS function as created with JS "new Function(args..., code)", e.g.:
-        // val jsValue = JsValue.newFunction(jsBridge, "a", "b", "return a + b;")
+        /**
+         * Create a JsValue which is a JS function as created with JS "new Function(args..., code)", e.g.:
+         * val jsValue = JsValue.newFunction(jsBridge, "a", "b", "return a + b;")
+         */
         fun newFunction(jsBridge: JsBridge, vararg args: String): JsValue {
             val jsValue = JsValue(jsBridge)
             jsValue.codeEvaluationDeferred = if (args.isEmpty()) {
@@ -78,41 +84,53 @@ internal constructor(
         // Proxy native to JS object
         // ---
 
-        // Create a JsValue which is a JS proxy to a native object
-        // Note: the native methods will be called in the JS thread!
+        /**
+         * Create a JsValue which is a JS proxy to a native object
+         *
+         * Note: the native methods will be called in the JS thread!
+         */
         inline fun <reified T: JsToNativeInterface> fromNativeObject(jsBridge: JsBridge, nativeObject: T): JsValue {
             return jsBridge.registerJsToNativeInterface(T::class, nativeObject)
         }
 
-        // Create a JsValue which is a JS proxy to a native object.
-        // Notes:
-        // - jsToNativeinterface must be an interface implementing JsToNativeInterface
-        // - the native object must implement the "jsToNativeInterface" interface
-        // - the native methods will be called in the JS thread!
-        // - from Kotlin, it is recommended to use the method overload with generic parameter,
-        // instead!
+        /**
+         * Create a JsValue which is a JS proxy to a native object.
+         *
+         * Notes:
+         * - jsToNativeinterface must be an interface implementing JsToNativeInterface
+         * - the native object must implement the "jsToNativeInterface" interface
+         * - the native methods will be called in the JS thread!
+         * - from Kotlin, it is recommended to use the method overload with generic parameter,
+         * instead!
+         */
         @JvmStatic
         fun fromNativeObject(jsBridge: JsBridge, nativeObject: Any, jsToNativeInterface: Class<*>): JsValue {
             return jsBridge.registerJsToNativeInterface(jsToNativeInterface.kotlin, nativeObject)
         }
 
-        // Create a JsValue which is a JS proxy to an AIDL interface instance.
-        // Note:
-        // - aidl must be an AIDL interface directly implementing android.os.IInterface
-        //   (e.g. your.AidlInterface.Stub.asInterface(...))
-        // - the native methods will be called in the JS thread!
+        /**
+         * Create a JsValue which is a JS proxy to an AIDL interface instance.
+         *
+         * Note:
+         * - aidl must be an AIDL interface directly implementing android.os.IInterface
+         *   (e.g. your.AidlInterface.Stub.asInterface(...))
+         * - the native methods will be called in the JS thread!
+         */
         inline fun <reified T> fromAidlInterface(jsBridge: JsBridge, aidl: T): JsValue
                 where T: android.os.IInterface {
             return jsBridge.registerNativeAidlInterface(T::class, aidl)
         }
 
-        // Create a JsValue which is a JS proxy to an AIDL interface instance.
-        // Note:
-        // - aidl must be an AIDL interface directly implementing android.os.IInterface
-        //   (e.g. your.AidlInterface.Stub.asInterface(...))
-        // - the native methods will be called in the JS thread!
-        // - from Kotlin, it is recommended to use the method overload with generic parameter,
-        // instead!@JvmStatic
+        /**
+         * Create a JsValue which is a JS proxy to an AIDL interface instance.
+         *
+         * Note:
+         * - aidl must be an AIDL interface directly implementing android.os.IInterface
+         *   (e.g. your.AidlInterface.Stub.asInterface(...))
+         * - the native methods will be called in the JS thread!
+         * - from Kotlin, it is recommended to use the method overload with generic parameter,
+         * instead!@JvmStatic
+         */
         @JvmStatic
         fun fromAidlInterface(jsBridge: JsBridge, aidl: Any, aidlInterface: Class<*>): JsValue {
             return jsBridge.registerNativeAidlInterface(aidlInterface.kotlin, aidl)
@@ -206,22 +224,26 @@ internal constructor(
         jsBridgeRef.clear()
     }
 
-    // Make sure that the instance is retained.
-    // This is useful when the JsValue is not stored and you want to prevent it from being
-    // garbage-collected (and thus deleting its associated JS value) while evaluating it via
-    // its associated JS name (see toString())
-    //
-    // e.g.:
-    // val jsValue = JsValue(jsBridge, "123")
-    // ...
-    // val ret = jsBridge.evaluate<Int>("$jsValue + 456")
-    //
-    // // Note: JsValue may be garbage-collected while performing the above evaluation in the JS thread...
-    // jsValue.hold()  // ...unless we ensure that the instance is held!
+    /**
+     * Make sure that the instance is retained.
+     * This is useful when the JsValue is not stored and you want to prevent it from being
+     * garbage-collected (and thus deleting its associated JS value) while evaluating it via
+     * its associated JS name (see toString())
+     *
+     * e.g.:
+     * val jsValue = JsValue(jsBridge, "123")
+     * ...
+     * val ret = jsBridge.evaluate<Int>("$jsValue + 456")
+     *
+     * // Note: JsValue may be garbage-collected while performing the above evaluation in the JS thread...
+     * jsValue.hold()  // ...unless we ensure that the instance is held!
+     */
     fun hold() = Unit
 
-    // Delete a JsValue via deleting the associated (global) JS variable. This can either be
-    // called manually or automatically when the JsValue has been garbage-collected
+    /**
+     * Delete a JsValue via deleting the associated (global) JS variable. This can either be
+     * called manually or automatically when the JsValue has been garbage-collected
+     */
     fun release() {
         val jsBridge = jsBridgeRef.get() ?: run {
             //Timber.v("No need to delete JsValue $associatedJsName because the JS interpreter has been deleted!")
@@ -232,10 +254,12 @@ internal constructor(
         jsBridge.deleteJsValue(this)
     }
 
-    // Return the associated JS name. Please be aware that the variable is only valid as long as
-    // the JsValue instance exists. If the string is evaluated after JsValue has been garbage-collected,
-    // the JS variable returned by toString() will be deleted before the evaluation!
-    // To ensure that a JsValue still exists, you can for example use JsValue.hold()
+    /**
+     * Return the associated JS name. Please be aware that the variable is only valid as long as
+     * the JsValue instance exists. If the string is evaluated after JsValue has been garbage-collected,
+     * the JS variable returned by toString() will be deleted before the evaluation!
+     * To ensure that a JsValue still exists, you can for example use JsValue.hold()
+     */
     override fun toString() = """globalThis["$associatedJsName"]"""
 
     override fun equals(other: Any?): Boolean {
@@ -297,9 +321,11 @@ internal constructor(
         return jsBridge.evaluateJsValueAsync(this, typeOf<T>())
     }
 
-    // Await a JS promise:
-    // - if the JS value is a promise, wait until the promise has been resolved (or rejected) and return a new JsValue
-    // - if the JS value is not a promise, return a new JsValue referencing the current one
+    /**
+     * Await a JS promise:
+     * - if the JS value is a promise, wait until the promise has been resolved (or rejected) and return a new JsValue
+     * - if the JS value is not a promise, return a new JsValue referencing the current one
+     */
     suspend inline fun await(): JsValue {
         return evaluate()
     }
@@ -313,13 +339,15 @@ internal constructor(
     // Proxy JS to native object
     // ---
 
-    // Create a native proxy to a JS object (without checks)
-    //
-    // Notes:
-    // - the proxy object will be returned even if the JS object is invalid or does not implement
-    // all of the methods of the NativeToJsInterface
-    // - the non-suspend methods of the returned proxy object will be running in the JS thread and
-    // block the caller thread if the return value is not Unit or Deferred
+    /**
+     * Create a native proxy to a JS object (without checks)
+     *
+     * Notes:
+     * - the proxy object will be returned even if the JS object is invalid or does not implement
+     * all of the methods of the NativeToJsInterface
+     * - the non-suspend methods of the returned proxy object will be running in the JS thread and
+     * block the caller thread if the return value is not Unit or Deferred
+     */
     inline fun <reified T: NativeToJsInterface> mapToNativeObject(): T {
         val jsBridge = jsBridge
                 ?: throw NativeToJsRegistrationError(T::class, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
@@ -329,15 +357,17 @@ internal constructor(
         return jsBridge.registerNativeToJsInterfaceBlocking(this, T::class, false, null)
     }
 
-    // Create a native proxy to a JS object
-    //
-    // Notes:
-    // - when check = true, this method will throw an exception if the JS object does not implement
-    // all the methods of the NativeToJsInterface
-    // - when check = false, the proxy object will be returned even if the JS object is invalid or
-    // does not implement all of the methods of the NativeToJsInterface
-    // - the non-suspend methods of the returned proxy object will be running in the JS thread and
-    // block the caller thread if the return value is not Unit or Deferred
+    /**
+     * Create a native proxy to a JS object
+     *
+     * Notes:
+     * - when check = true, this method will throw an exception if the JS object does not implement
+     * all the methods of the NativeToJsInterface
+     * - when check = false, the proxy object will be returned even if the JS object is invalid or
+     * does not implement all of the methods of the NativeToJsInterface
+     * - the non-suspend methods of the returned proxy object will be running in the JS thread and
+     * block the caller thread if the return value is not Unit or Deferred
+     */
     suspend inline fun <reified T: NativeToJsInterface> mapToNativeObject(check: Boolean): T {
         val jsBridge = jsBridge
                 ?: throw NativeToJsRegistrationError(T::class, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
@@ -345,8 +375,10 @@ internal constructor(
         return jsBridge.registerNativeToJsInterface(this, T::class, check)
     }
 
-    // Create a native proxy to a JS object (blocking)
-    // -> see JsValue.mapToNativeObject(check: Boolean)
+    /**
+     * Create a native proxy to a JS object (blocking)
+     * -> see JsValue.mapToNativeObject(check: Boolean)
+     */
     inline fun <reified T: NativeToJsInterface> mapToNativeObjectBlocking(check: Boolean, context: CoroutineContext? = null): T {
         val jsBridge = jsBridge
                 ?: throw NativeToJsRegistrationError(T::class, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
@@ -354,14 +386,16 @@ internal constructor(
         return jsBridge.registerNativeToJsInterfaceBlocking(this, T::class, check, context)
     }
 
-    // Create a native proxy to a JS object
-    //
-    // Notes:
-    // - the proxy object will be returned even if the JS object is invalid or
-    // does not implement/ all of the methods of the NativeToJsInterface
-    // - the methods of the returned proxy object will be running in the JS thread and block the
-    // caller thread if there is a return value
-    // - from Kotlin, it is recommended to use the method with generic parameter, instead!
+    /**
+     * Create a native proxy to a JS object
+     *
+     * Notes:
+     * - the proxy object will be returned even if the JS object is invalid or
+     * does not implement/ all of the methods of the NativeToJsInterface
+     * - the methods of the returned proxy object will be running in the JS thread and block the
+     * caller thread if there is a return value
+     * - from Kotlin, it is recommended to use the method with generic parameter, instead!
+     */
     fun <T: NativeToJsInterface> mapToNativeObject(nativeToJsInterface: Class<T>): T {
         val jsBridge = jsBridge
                 ?: throw NativeToJsRegistrationError(nativeToJsInterface.kotlin, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
@@ -371,18 +405,20 @@ internal constructor(
         return jsBridge.registerNativeToJsInterfaceBlocking(this, nativeToJsInterface.kotlin, false, null)
     }
 
-    // Create a native proxy to a JS object
-    //
-    // Notes:
-    // - this method will block the current thread until the object has been registered
-    // - when check = true, this method will block the current thread until the object has been
-    // registered or will throw an exception if the JS object does not implement  all the methods of
-    // the NativeToJsInterface
-    // - when check = false, the proxy object will be returned even if the JS object is invalid or
-    // does not implement/ all of the methods of the NativeToJsInterface
-    // - the methods of the returned proxy object will be running in the JS thread and block the
-    // caller thread if there is a return value
-    // - from Kotlin, it is recommended to use the method with generic parameter, instead!
+    /**
+     * Create a native proxy to a JS object
+     *
+     * Notes:
+     * - this method will block the current thread until the object has been registered
+     * - when check = true, this method will block the current thread until the object has been
+     * registered or will throw an exception if the JS object does not implement  all the methods of
+     * the NativeToJsInterface
+     * - when check = false, the proxy object will be returned even if the JS object is invalid or
+     * does not implement/ all of the methods of the NativeToJsInterface
+     * - the methods of the returned proxy object will be running in the JS thread and block the
+     * caller thread if there is a return value
+     * - from Kotlin, it is recommended to use the method with generic parameter, instead!
+     */
     @JvmOverloads
     fun <T: NativeToJsInterface> mapToNativeObjectBlocking(nativeToJsInterface: Class<T>, check: Boolean, context: CoroutineContext? = null): T {
         val jsBridge = jsBridge
