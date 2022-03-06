@@ -19,8 +19,6 @@ import org.json.JSONObject
 import org.json.JSONTokener
 import timber.log.Timber
 import java.util.*
-import kotlin.collections.HashSet
-import kotlin.reflect.jvm.internal.impl.load.kotlin.JvmType
 
 fun payloadObjectOf(vararg values: Pair<String, Any?>) = PayloadObject.fromValues(*values)
 
@@ -36,12 +34,11 @@ class PayloadObject: Payload {
 
             @Suppress("UNCHECKED_CAST")
             val mappedValues = values.mapValues { entry ->
-                val value = entry.value
-                when {
-                    value == null -> null
-                    value is Map<*, *> -> fromMap(value as Map<String, Any?>)
-                    value is Array<*> -> PayloadArray.fromArray(value as Array<Any?>)
-                    value is Collection<*> -> PayloadArray.fromCollection(value as Collection<Any?>)
+                when (val value = entry.value) {
+                    null -> null
+                    is Map<*, *> -> fromMap(value as Map<String, Any?>)
+                    is Array<*> -> PayloadArray.fromArray(value as Array<Any?>)
+                    is Collection<*> -> PayloadArray.fromCollection(value as Collection<Any?>)
                     else -> value
                 }
             }

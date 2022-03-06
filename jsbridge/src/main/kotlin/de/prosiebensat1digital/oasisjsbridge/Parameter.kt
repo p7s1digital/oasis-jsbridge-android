@@ -16,11 +16,8 @@
 package de.prosiebensat1digital.oasisjsbridge
 
 import com.google.gson.Gson
-import timber.log.Timber
 import kotlin.reflect.*
-import kotlin.reflect.full.declaredFunctions
 import kotlin.reflect.full.memberFunctions
-import kotlin.reflect.jvm.javaMethod
 
 // Represents a (reflected) function parameter (or return value) with its (optional) name based on:
 // - (ideally) Kotlin KParameter or KType which has the (full) reflection info

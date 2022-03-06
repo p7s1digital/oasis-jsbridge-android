@@ -29,13 +29,13 @@ class PayloadArray(length: Int): Payload {
     companion object {
         fun fromValues(vararg values: Any?): PayloadArray? = fromArray(arrayOf(*values))
 
-        fun fromArray(values: Array<Any?>): PayloadArray? {
+        fun fromArray(values: Array<Any?>): PayloadArray {
             val payloadArray = PayloadArray(values.size)
             values.forEachIndexed { index, value -> payloadArray.array[index] = value }
             return payloadArray
         }
 
-        fun fromCollection(values: Collection<Any?>): PayloadArray? {
+        fun fromCollection(values: Collection<Any?>): PayloadArray {
             val payloadArray = PayloadArray(values.size)
             values.forEachIndexed { index, value -> payloadArray.array[index] = value }
             return payloadArray
