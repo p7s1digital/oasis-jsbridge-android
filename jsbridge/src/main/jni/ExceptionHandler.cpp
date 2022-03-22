@@ -215,7 +215,9 @@ void ExceptionHandler::pushJavaException(const JniLocalRef<jthrowable> &throwabl
 
   auto ctx = m_jsBridgeContext->getDuktapeContext();
 
-  duk_push_error_object(ctx, DUK_ERR_ERROR, messageRef.toUtf8Chars());
+  const char *messageStr = messageRef.toUtf8Chars();
+  if (!messageStr) messageStr = "<null>";
+  duk_push_error_object(ctx, DUK_ERR_ERROR, messageStr);
 
   m_jsBridgeContext->getUtils()->pushJavaRefValue(throwable);
   duk_put_prop_string(ctx, -2, JAVA_EXCEPTION_PROP_NAME);
@@ -236,7 +238,9 @@ JSValue ExceptionHandler::javaExceptionToJsValue(const JniLocalRef<jthrowable> &
   auto ctx = m_jsBridgeContext->getQuickJsContext();
 
   JSValue errorValue = JS_NewError(ctx);
-  JSValue messageValue = JS_NewString(ctx, messageRef.toUtf8Chars());
+  const char *messageStr = messageRef.toUtf8Chars();
+  if (!messageStr) messageStr = "<null>";
+  JSValue messageValue = JS_NewString(ctx, messageStr);
   JS_SetPropertyStr(ctx, errorValue, "message", messageValue);
   // No JS_FreeValue(m_ctx, messageValue) after JS_SetPropertyStr()
 
