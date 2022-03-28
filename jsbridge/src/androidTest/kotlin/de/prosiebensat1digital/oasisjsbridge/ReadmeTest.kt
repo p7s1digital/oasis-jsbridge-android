@@ -61,10 +61,14 @@ class ReadmeTest {
     @Test
     fun testEvaluation() {
         // Without return value:
-        jsBridge.evaluateNoRetVal("console.log('hello');")
-        jsBridge.evaluateLocalFile(InstrumentationRegistry.getInstrumentation().context, "js/file.js")  // Android asset
+        jsBridge.evaluateUnsync("console.log('hello');")
+        jsBridge.evaluateFileContentUnsync("console.log('hello')", "js/test.js")
 
         runBlocking {
+            // Without return value:
+            jsBridge.evaluate<Unit>("console.log('hello');")
+            jsBridge.evaluateFileContent("console.log('hello')", "js/test.js")
+
             // With return value:
             val sum1: Int = jsBridge.evaluate("1+2")  // suspending call
             val sum2: Int = jsBridge.evaluate("new Promise(function(resolve) { resolve(1+2); })")  // suspending call (JS promise)
@@ -180,7 +184,7 @@ class ReadmeTest {
 
     @Test
     fun testUsageAdvanced() {
-        jsBridge.evaluateLocalFile(InstrumentationRegistry.getInstrumentation().context, "js/api.js")
+        jsBridge.evaluateLocalFileUnsync(InstrumentationRegistry.getInstrumentation().context, "js/api.js")
 
         // Implement native API
         val nativeApi = object: NativeApi {

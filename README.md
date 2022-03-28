@@ -63,14 +63,19 @@ implementation "de.prosiebensat1digital.oasis-jsbridge-android:oasis-jsbridge-qu
 
 ### Evaluating JS code
 
-Without return value:
+Unsync calls (will be evaluated synchronously):
 ```kotlin
-jsBridge.evaluateNoRetVal("console.log('hello');")
-jsBridge.evaluateLocalFile(context, "js/file.js")  // Android asset
+jsBridge.evaluateUnsync("console.log('hello');")
+jsBridge.evaluateFileContentUnsync("console.log('hello')", "js/test.js")
 ```
 
-With return value:
+Suspending calls:
 ```kotlin
+// Without return value:
+jsBridge.evaluate<Unit>("console.log('hello');")
+jsBridge.evaluateFileContent("console.log('hello')", "js/test.js")
+
+// With return value:
 val sum: Int = jsBridge.evaluate("1+2")  // suspending call
 val sum: Int = jsBridge.evaluate("new Promise(function(resolve) { resolve(1+2); })")  // suspending call (JS promise)
 val msg: String = jsBridge.evaluate("'message'.toUpperCase()")  // suspending call
@@ -374,7 +379,7 @@ val nativeApi = object: NativeApi {
 Bridging JavaScript and Kotlin:
 ```kotlin
 val jsBridge = JsBridge(JsBridgeConfig.standardConfig())
-jsBridge.evaluateLocalFile(context, "js/api.js")
+jsBridge.evaluateLocalFileUnsync(context, "js/api.js")
 
 // JS "proxy" to native API
 val nativeApiJsValue = JsValue.fromNativeObject(jsBridge, nativeApi)

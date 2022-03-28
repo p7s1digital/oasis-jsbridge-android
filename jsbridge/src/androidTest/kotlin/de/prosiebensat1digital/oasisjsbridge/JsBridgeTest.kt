@@ -295,9 +295,9 @@ class JsBridgeTest {
         // androidTestDuktape asset file "test.js"
         // - content:
         // nativeFunctionMock("localFileString");
-        subject.evaluateLocalFile(context, "js/test.js")
-
-        runBlocking { waitForDone(subject) }
+        runBlocking {
+            subject.evaluateLocalFile(context, "js/test.js")
+        }
 
         // THEN
         assertTrue(errors.isEmpty())
@@ -310,12 +310,35 @@ class JsBridgeTest {
         val subject = createAndSetUpJsBridge()
 
         // WHEN
-        subject.evaluateLocalFile(context, "non-existing/file.js")
-
-        runBlocking { waitForDone(subject) }
+        val t: Throwable? = runBlocking {
+            try {
+                subject.evaluateLocalFile(context, "non-existing/file.js")
+                null
+            } catch (t: Throwable) {
+                t
+            }
+        }
 
         // THEN
-        val fileEvaluationError = errors.firstOrNull() as? JsFileEvaluationError
+        assertEquals(0, errors.size)
+        assertTrue(t is JsBridgeError.JsFileEvaluationError)
+        assertEquals("non-existing/file.js", t.fileName)
+    }
+
+    @Test
+    fun testEvaluateLocalFileUnsyncNonExisting() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        subject.evaluateLocalFileUnsync(context, "non-existing/file.js")
+
+        runBlocking {
+            waitForDone(subject)
+        }
+
+        // THEN
+        val fileEvaluationError = errors.firstOrNull() as? JsBridgeError.JsFileEvaluationError
         assertNotNull(fileEvaluationError)
         assertEquals("non-existing/file.js", fileEvaluationError.fileName)
     }
@@ -326,9 +349,38 @@ class JsBridgeTest {
         val subject = createAndSetUpJsBridge()
 
         // WHEN
-        subject.evaluateLocalFile(context, "js/test_with_error.js")
+        val t: Throwable? = runBlocking {
+            try {
+                subject.evaluateLocalFile(context, "js/test_with_error.js")
+                null
+            } catch (t: Throwable) {
+                t
+            }
+        }
 
-        runBlocking { waitForDone(subject) }
+        // THEN
+        assertEquals(0, errors.size)
+        assertTrue(t is JsBridgeError.JsFileEvaluationError)
+        val jsException = t.jsException
+        assertNotNull(jsException)
+        assertTrue(jsException.stackTrace.isNotEmpty())
+        jsException.stackTrace[0].let { e ->
+            assertEquals("test_with_error.js", e.fileName)
+            assertEquals(1, e.lineNumber)
+        }
+    }
+
+    @Test
+    fun testEvaluateLocalFileUnsyncWithJsError() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        subject.evaluateLocalFileUnsync(context, "js/test_with_error.js")
+
+        runBlocking {
+            waitForDone(subject)
+        }
 
         // THEN
         val jsException = errors.firstOrNull()?.jsException
@@ -347,9 +399,60 @@ class JsBridgeTest {
 
         // WHEN
         val content = """nativeFunctionMock("fileContentString");"""
-        subject.evaluateFileContent(content, "file.js")
 
-        runBlocking { waitForDone(subject) }
+        runBlocking {
+            subject.evaluateFileContent(content, "file.js")
+        }
+
+        // THEN
+        assertTrue(errors.isEmpty())
+        verify { jsToNativeFunctionMock(eq("fileContentString")) }
+    }
+
+    @Test
+    fun testEvaluateFileContentAsModule() {
+        if (BuildConfig.FLAVOR == "duktape") {
+            // ES6 modules are not supported on Duktape
+            return
+        }
+
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        val jsModule1 = """
+            export function helperFunction() { return "testString" };
+        """.trimIndent()
+        val jsModule2 = """
+            import * as module1 from "module1.js"
+            globalThis.mainFunction = function() {
+                return module1.helperFunction();
+            }
+        """.trimIndent()
+
+        val ret = runBlocking {
+            subject.evaluateFileContent(jsModule1, "module1.js", JsBridge.JsFileEvaluationType.Module)
+            subject.evaluateFileContent(jsModule2, "module2.js", JsBridge.JsFileEvaluationType.Module)
+            subject.evaluate<String>("globalThis.mainFunction()");
+        }
+
+        // THEN
+        assertTrue(errors.isEmpty())
+        assertEquals("testString", ret)
+    }
+
+    @Test
+    fun testEvaluateFileContentUnsync() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        val content = """nativeFunctionMock("fileContentString");"""
+        subject.evaluateFileContentUnsync(content, "file.js")
+
+        runBlocking {
+            waitForDone(subject)
+        }
 
         // THEN
         assertTrue(errors.isEmpty())
@@ -362,9 +465,38 @@ class JsBridgeTest {
         val subject = createAndSetUpJsBridge()
 
         // WHEN
-        subject.evaluateFileContent("this will obviously fail", "file.js")
+        val t: Throwable? = runBlocking {
+            try {
+                subject.evaluateFileContent("this will obviously fail", "file.js")
+                null
+            } catch (t: Throwable) {
+                t
+            }
+        }
 
-        runBlocking { waitForDone(subject) }
+        // THEN
+        assertEquals(0, errors.size)
+        assertTrue(t is JsBridgeError.JsFileEvaluationError)
+        val jsException = t.jsException
+        assertNotNull(jsException)
+        assertTrue(jsException.stackTrace.isNotEmpty())
+        jsException.stackTrace[0].let { e ->
+            assertEquals("file.js", e.fileName)
+            assertEquals(1, e.lineNumber)
+        }
+    }
+
+    @Test
+    fun testEvaluateFileContentUnsyncWithError() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        subject.evaluateFileContentUnsync("this will obviously fail", "file.js")
+
+        runBlocking {
+            waitForDone(subject)
+        }
 
         // THEN
         val jsException = errors.firstOrNull()?.jsException

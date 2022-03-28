@@ -41,7 +41,7 @@ JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jn
   (JNIEnv *, jobject, jlong, jstring, jobject, jboolean);
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniEvaluateFileContent
-  (JNIEnv *, jobject, jlong, jstring, jstring);
+  (JNIEnv *, jobject, jlong, jstring, jstring, jboolean asModule);
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniRegisterJavaObject
     (JNIEnv *, jobject, jlong, jstring, jobject, jobjectArray);

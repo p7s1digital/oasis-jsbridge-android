@@ -92,7 +92,7 @@ void JsBridgeContext::cancelDebug() {
 
 JValue JsBridgeContext::evaluateString(const JStringLocalRef &strCode, const JniLocalRef<jsBridgeParameter> &returnParameter,
                                        bool awaitJsPromise) const {
-  JSValue v = JS_Eval(m_ctx, strCode.toUtf8Chars(), strCode.utf8Length(), "eval", 0);
+  JSValue v = JS_Eval(m_ctx, strCode.toUtf8Chars(), strCode.utf8Length(), "eval", JS_EVAL_TYPE_GLOBAL);
   JS_AUTORELEASE_VALUE(m_ctx, v);
 
   strCode.releaseChars();  // release chars now as we don't need them anymore
@@ -131,11 +131,12 @@ JValue JsBridgeContext::evaluateString(const JStringLocalRef &strCode, const Jni
   return value;
 }
 
-void JsBridgeContext::evaluateFileContent(const JStringLocalRef &strCode, const std::string &strFileName) const {
-  JSValue v = JS_Eval(m_ctx, strCode.toUtf8Chars(), strCode.utf8Length(), strFileName.c_str(), 0);
-  strCode.releaseChars();  // release chars now as we don't need them anymore
-
+void JsBridgeContext::evaluateFileContent(const JStringLocalRef &strCode, const std::string &strFileName, bool asModule) const {
+  const int flags = asModule ? JS_EVAL_TYPE_MODULE : JS_EVAL_TYPE_GLOBAL;
+  JSValue v = JS_Eval(m_ctx, strCode.toUtf8Chars(), strCode.utf8Length(), strFileName.c_str(), flags);
   JS_AUTORELEASE_VALUE(m_ctx, v);
+
+  strCode.releaseChars();  // release chars now as we don't need them anymore
 
   if (JS_IsException(v)) {
     throw m_exceptionHandler->getCurrentJsException();

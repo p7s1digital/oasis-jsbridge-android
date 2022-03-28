@@ -169,8 +169,7 @@ JValue JsBridgeContext::evaluateString(const JStringLocalRef &strCode, const Jni
   return returnType->pop();
 }
 
-void JsBridgeContext::evaluateFileContent(const JStringLocalRef &strCode, const std::string &strFileName) const {
-
+void JsBridgeContext::evaluateFileContent(const JStringLocalRef &strCode, const std::string &strFileName, bool) const {
   CHECK_STACK(m_ctx);
 
   duk_push_string(m_ctx, strFileName.c_str());
