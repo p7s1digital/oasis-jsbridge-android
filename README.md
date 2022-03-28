@@ -206,7 +206,7 @@ val obj = object : NativeApi {
 val nativeApi: JsValue = JsValue.fromNativeObject(jsBridge, obj)
 
 // Call native method from JS
-jsBridge.evaluateNoRetVal("globalThis.x = $nativeApi.method(1, 'two');")
+jsBridge.evaluateUnsync("globalThis.x = $nativeApi.method(1, 'two');")
 ```
 
 See [Example](#example-consuming-a-js-api-from-kotlin).
@@ -237,7 +237,7 @@ Available methods:
 ```kotlin
 val calcSumNative = JsValue.fromNativeFunction2(jsBridge) { a: Int, b: Int -> a + b }
 
-jsBridge.evaluateNoRetVal("console.log('Sum is', $calcSumNative(1, 2))");
+jsBridge.evaluateUnsync("console.log('Sum is', $calcSumNative(1, 2))");
 ```
 
 Note: the native function is triggered from the "JS" thread
@@ -257,7 +257,7 @@ To map an AIDL interface to JS:
 val aidlJsValue = JsValue.fromAidlInterface(jsBridge, aidlInterface)
 
 // Call an AIDL method from JS
-jsBridge.evaluateNoRetVal("""$aidlJsValue.aidlMethod({parcelableField1: 1, parcelableField2: "two"});""")
+jsBridge.evaluateUnsync("""$aidlJsValue.aidlMethod({parcelableField1: 1, parcelableField2: "two"});""")
 ```
 
 ### Extensions

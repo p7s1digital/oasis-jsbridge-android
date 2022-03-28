@@ -150,7 +150,7 @@ class ReadmeTest {
 
         val nativeApi: JsValue = JsValue.fromNativeObject(jsBridge, obj)
 
-        jsBridge.evaluateNoRetVal("globalThis.x = $nativeApi.method(1, 'two');")
+        jsBridge.evaluateUnsync("globalThis.x = $nativeApi.method(1, 'two');")
     }
 
     @Test
@@ -167,7 +167,7 @@ class ReadmeTest {
     fun testKotlinFunctionFromJs() {
         val calcSumNative = JsValue.fromNativeFunction2(jsBridge) { a: Int, b: Int -> a + b }
 
-        jsBridge.evaluateNoRetVal("""
+        jsBridge.evaluateUnsync("""
           console.log("Sum is", $calcSumNative(1, 2));
           """.trimIndent())
     }

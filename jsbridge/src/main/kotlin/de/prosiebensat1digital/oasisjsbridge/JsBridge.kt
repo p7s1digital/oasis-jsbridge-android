@@ -321,8 +321,9 @@ constructor(config: JsBridgeConfig): CoroutineScope {
             evaluateFileContent(content, filename, type)
         }
     }
+
     // Evaluate the given JS code without return value
-    fun evaluateNoRetVal(js: String) {
+    fun evaluateUnsync(js: String) {
         launch {
             val jniJsContext = jniJsContextOrThrow()
 

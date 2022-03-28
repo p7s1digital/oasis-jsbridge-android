@@ -44,7 +44,7 @@ public final class JsBridgeJavaTest {
         JsBridge subject = createAndSetUpJsBridge();
 
         // WHEN
-        subject.evaluateNoRetVal("console.log('test message');");
+        subject.evaluateUnsync("console.log('test message');");
     }
 
     @Test

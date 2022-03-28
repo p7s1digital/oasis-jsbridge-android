@@ -41,10 +41,10 @@ internal class PromiseExtension(
             jsBridge.notifyErrorListeners(e)
         }
 
-        jsBridge.evaluateNoRetVal(promiseJsCode)
+        jsBridge.evaluateUnsync(promiseJsCode)
 
         // Detect unhandled Promise rejections
-        jsBridge.evaluateNoRetVal("""
+        jsBridge.evaluateUnsync("""
             Promise.unhandledRejection = function (args) {
               if (args.event === 'reject') {
                 var value = args.reason;
