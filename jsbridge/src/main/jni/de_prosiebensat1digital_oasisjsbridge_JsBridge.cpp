@@ -95,6 +95,13 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniDe
   delete jniContext;
 }
 
+JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniEnableModuleLoader
+        (JNIEnv *env, jobject, jlong lctx) {
+
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
+  jsBridgeContext->enableModuleLoader();
+}
+
 JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniEvaluateString
     (JNIEnv *env, jobject, jlong lctx, jstring code, jobject returnParameter, jboolean awaitJsPromise) {
 

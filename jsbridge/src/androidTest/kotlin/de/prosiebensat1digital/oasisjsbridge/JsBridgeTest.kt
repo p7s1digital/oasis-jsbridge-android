@@ -508,6 +508,82 @@ class JsBridgeTest {
     }
 
     @Test
+    fun testSetJsModuleLoader() {
+        if (BuildConfig.FLAVOR == "duktape") {
+            // ES6 modules are not supported on Duktape
+            return
+        }
+
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        subject.setJsModuleLoader { moduleName ->
+            if (moduleName == "main.js") {
+                """ import * as eagle from "animals/eagle.js";
+                    export default function main() { return "Eagle name: " + eagle.getName() };
+                """.trimIndent()
+            } else if (moduleName == "animals/eagle.js") {
+                """ import * as bird from "./bird.js"
+                    export function getName() { return "EAGLE as a " + bird.getName() };
+                """.trimIndent()
+            } else if (moduleName == "animals/bird.js") {
+                "export function getName() { return 'BIRD' };"
+            } else {
+                throw JsBridgeError.JsFileEvaluationError(moduleName)
+            }
+        }
+
+        val ret = runBlocking {
+            subject.evaluateFileContent("""
+                    import main from "main.js"
+                    globalThis.entryPoint = function() {
+                        return main();
+                    }
+                """.trimIndent(), "moduleLoader", JsBridge.JsFileEvaluationType.Module)
+
+            subject.evaluate<String>("globalThis.entryPoint()");
+        }
+
+        // THEN
+        assertTrue(errors.isEmpty())
+        assertEquals("Eagle name: EAGLE as a BIRD", ret)
+    }
+
+    @Test
+    fun testSetJsModuleLoaderError() {
+        if (BuildConfig.FLAVOR == "duktape") {
+            // ES6 modules are not supported on Duktape
+            return
+        }
+
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        subject.setJsModuleLoader { moduleName ->
+            throw JsBridgeError.JsFileEvaluationError(moduleName)
+        }
+
+        val moduleError = assertFailsWith<JsBridgeError.JsFileEvaluationError> {
+            runBlocking {
+                subject.evaluateFileContent(
+                    """import main from "non-existing.js"""",
+                    "<moduleLoader>",
+                    JsBridge.JsFileEvaluationType.Module
+                )
+            }
+        }
+
+        // THEN
+        assertTrue(errors.isEmpty())
+        assertEquals("<moduleLoader>", moduleError.fileName)
+        val cause = moduleError.cause as? JsBridgeError.JsFileEvaluationError
+        assertNotNull(cause)
+        assertEquals("non-existing.js", cause.fileName)
+    }
+
+    @Test
     fun testJsValue() {
         // GIVEN
         val subject = createAndSetUpJsBridge()

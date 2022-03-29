@@ -55,6 +55,8 @@ public:
   void startDebugger(int port);
   void cancelDebug();
 
+  void enableModuleLoader();
+
   JValue evaluateString(const JStringLocalRef &strSourceCode, const JniLocalRef<jsBridgeParameter> &returnParameter,
                         bool awaitJsPromise) const;
   void evaluateFileContent(const JStringLocalRef &strSourceCode, const std::string &strFileName, bool asModule) const;

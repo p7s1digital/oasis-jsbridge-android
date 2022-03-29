@@ -37,6 +37,9 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniCa
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniDeleteContext
   (JNIEnv *, jobject, jlong);
 
+JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniEnableModuleLoader
+        (JNIEnv *, jobject, jlong);
+
 JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniEvaluateString
   (JNIEnv *, jobject, jlong, jstring, jobject, jboolean);
 

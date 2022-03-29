@@ -58,6 +58,7 @@ implementation "de.prosiebensat1digital.oasis-jsbridge-android:oasis-jsbridge-qu
 1. [Map JS functions to Kotlin](#calling-js-functions-from-kotlin)
 1. [Map Kotlin functions to JS](#calling-kotlin-functions-from-js)
 1. [Map JS objects to AIDL](#using-aidl-from-js)
+1. [ES6 modules](#es6-modules)
 1. [Extensions](#extensions)
 
 
@@ -258,6 +259,24 @@ val aidlJsValue = JsValue.fromAidlInterface(jsBridge, aidlInterface)
 
 // Call an AIDL method from JS
 jsBridge.evaluateUnsync("""$aidlJsValue.aidlMethod({parcelableField1: 1, parcelableField2: "two"});""")
+```
+
+### ES6 modules
+
+ES6 modules are fully supported on QuickJS. This is done by:
+
+- Evaluating files as modules:
+
+Example:
+```
+jsBridge.evaluateLocalFile(context, "js/module.js", false, JsBridge.JsFileEvaluationType.Module)
+```
+
+- Defining a custom module loader which is triggered as needed to get the JS code of a given module:
+
+Example:
+```
+jsBridge.setJsModuleLoader { moduleName -> "<module_content>" }
 ```
 
 ### Extensions

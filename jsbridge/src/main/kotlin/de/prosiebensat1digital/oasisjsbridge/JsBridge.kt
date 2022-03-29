@@ -257,6 +257,17 @@ constructor(config: JsBridgeConfig): CoroutineScope {
         Module,
     }
 
+    // Set a custom module loader which will return the content of the given module
+    private var jsModuleLoaderFunc: ((moduleName: String) -> String)? = null
+    fun setJsModuleLoader(func: (moduleName: String) -> String) {
+        jsModuleLoaderFunc = func
+
+        launch {
+            val jniJsContext = jniJsContextOrThrow()
+            jniEnableModuleLoader(jniJsContext)
+        }
+    }
+
     // Evaluate a local JS file which should be bundled as an asset.
     //
     // If the given file has a corresponding .max file, this one will be used in debug mode.
@@ -737,6 +748,11 @@ constructor(config: JsBridgeConfig): CoroutineScope {
         return jniCreateContext()
     }
 
+    @Suppress("UNUSED")  // Called from JNI
+    private fun callJsModuleLoader(moduleName: String): String {
+        return jsModuleLoaderFunc!!(moduleName)
+    }
+
     @Throws
     private fun getInputStream(context: Context, filename: String, useMaxJs: Boolean): Pair<InputStream, String> {
         if (filename.contains("""\.max\.js$""".toRegex())) {
@@ -1084,6 +1100,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
     private external fun jniStartDebugger(context: Long, port: Int)
     private external fun jniCancelDebug(context: Long)
     private external fun jniDeleteContext(context: Long)
+    private external fun jniEnableModuleLoader(context: Long)
     private external fun jniEvaluateString(context: Long, js: String, type: Parameter?, awaitJsPromise: Boolean): Any?
     private external fun jniEvaluateFileContent(context: Long, js: String, filename: String, asModule: Boolean)
     private external fun jniRegisterJavaLambda(context: Long, name: String, obj: Any, method: Any)
