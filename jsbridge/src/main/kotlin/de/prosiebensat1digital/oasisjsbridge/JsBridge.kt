@@ -249,18 +249,37 @@ constructor(config: JsBridgeConfig): CoroutineScope {
         }
     }
 
+    // Defines how the JS file will be interpreted:
+    // - global (default): run the JS code in the global context
+    // - module: run as an ES6 module (QuickJS only, Duktape not supported!)
+    enum class JsFileEvaluationType {
+        Global,
+        Module,
+    }
+
+    // Set a custom module loader which will return the content of the given module
+    private var jsModuleLoaderFunc: ((moduleName: String) -> String)? = null
+    fun setJsModuleLoader(func: (moduleName: String) -> String) {
+        jsModuleLoaderFunc = func
+
+        launch {
+            val jniJsContext = jniJsContextOrThrow()
+            jniEnableModuleLoader(jniJsContext)
+        }
+    }
+
     // Evaluate a local JS file which should be bundled as an asset.
     //
     // If the given file has a corresponding .max file, this one will be used in debug mode.
     // e.g.: "myfile.js" / "myfile.max.js"
-    fun evaluateLocalFile(context: Context, filename: String, useMaxJs: Boolean = false) {
-        launch {
+    suspend fun evaluateLocalFile(context: Context, filename: String, useMaxJs: Boolean = false, type: JsFileEvaluationType = JsFileEvaluationType.Global) {
+        withContext(coroutineContext) {
             val jniJsContext = jniJsContextOrThrow()
 
             try {
                 val (inputStream, jsFileName) = getInputStream(context, filename, useMaxJs)
                 val jsString = inputStream.bufferedReader().use { it.readText() }
-                jniEvaluateFileContent(jniJsContext, jsString, jsFileName)
+                jniEvaluateFileContent(jniJsContext, jsString, jsFileName, type == JsFileEvaluationType.Module)
                 Timber.d("-> $filename ($jsFileName) has been successfully evaluated!")
             } catch (t: Throwable) {
                 throw JsFileEvaluationError(filename, t)
@@ -270,13 +289,27 @@ constructor(config: JsBridgeConfig): CoroutineScope {
         }
     }
 
-    // Evaluate the content of a JavaScript file (e.g. fetched from the network).
-    fun evaluateFileContent(content: String, filename: String) {
+    // Evaluate a local JS file which should be bundled as an asset (blocking version)
+    fun evaluateLocalFileUnsync(context: Context, filename: String, useMaxJs: Boolean = false, type: JsFileEvaluationType = JsFileEvaluationType.Global) {
         launch {
+            evaluateLocalFile(context, filename, useMaxJs, type)
+        }
+    }
+
+    // Evaluate a local JS file which should be bundled as an asset (blocking version)
+    fun evaluateLocalFileBlocking(context: Context, filename: String, useMaxJs: Boolean = false, type: JsFileEvaluationType = JsFileEvaluationType.Global) {
+        runBlocking(coroutineContext) {
+            evaluateLocalFile(context, filename, useMaxJs, type)
+        }
+    }
+
+    // Evaluate the content of a JavaScript file (e.g. fetched from the network).
+    suspend fun evaluateFileContent(content: String, filename: String, type: JsFileEvaluationType = JsFileEvaluationType.Global) {
+        withContext(coroutineContext) {
             val jniJsContext = jniJsContextOrThrow()
 
             try {
-                jniEvaluateFileContent(jniJsContext, content, filename)
+                jniEvaluateFileContent(jniJsContext, content, filename, type == JsFileEvaluationType.Module)
                 Timber.d("-> file content ($filename) has been successfully evaluated!")
             } catch (t: Throwable) {
                 throw JsFileEvaluationError(filename, t)
@@ -286,8 +319,22 @@ constructor(config: JsBridgeConfig): CoroutineScope {
         }
     }
 
+    // Evaluate the content of a JavaScript file (e.g. fetched from the network).
+    fun evaluateFileContentUnsync(content: String, filename: String, type: JsFileEvaluationType = JsFileEvaluationType.Global) {
+        launch {
+            evaluateFileContent(content, filename, type)
+        }
+    }
+
+    // Evaluate the content of a JavaScript file (e.g. fetched from the network).
+    fun evaluateFileContentBlocking(content: String, filename: String, type: JsFileEvaluationType = JsFileEvaluationType.Global) {
+        runBlocking(coroutineContext) {
+            evaluateFileContent(content, filename, type)
+        }
+    }
+
     // Evaluate the given JS code without return value
-    fun evaluateNoRetVal(js: String) {
+    fun evaluateUnsync(js: String) {
         launch {
             val jniJsContext = jniJsContextOrThrow()
 
@@ -701,6 +748,11 @@ constructor(config: JsBridgeConfig): CoroutineScope {
         return jniCreateContext()
     }
 
+    @Suppress("UNUSED")  // Called from JNI
+    private fun callJsModuleLoader(moduleName: String): String {
+        return jsModuleLoaderFunc!!(moduleName)
+    }
+
     @Throws
     private fun getInputStream(context: Context, filename: String, useMaxJs: Boolean): Pair<InputStream, String> {
         if (filename.contains("""\.max\.js$""".toRegex())) {
@@ -1048,8 +1100,9 @@ constructor(config: JsBridgeConfig): CoroutineScope {
     private external fun jniStartDebugger(context: Long, port: Int)
     private external fun jniCancelDebug(context: Long)
     private external fun jniDeleteContext(context: Long)
+    private external fun jniEnableModuleLoader(context: Long)
     private external fun jniEvaluateString(context: Long, js: String, type: Parameter?, awaitJsPromise: Boolean): Any?
-    private external fun jniEvaluateFileContent(context: Long, js: String, filename: String)
+    private external fun jniEvaluateFileContent(context: Long, js: String, filename: String, asModule: Boolean)
     private external fun jniRegisterJavaLambda(context: Long, name: String, obj: Any, method: Any)
     private external fun jniRegisterJavaObject(context: Long, name: String, obj: Any, methods: Array<Any>)
     private external fun jniRegisterJsObject(context: Long, name: String, methods: Array<out Any>, check: Boolean)

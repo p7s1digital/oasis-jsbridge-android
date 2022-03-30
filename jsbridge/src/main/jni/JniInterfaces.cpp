@@ -40,6 +40,11 @@ void JsBridgeInterface::onDebuggerReady() const {
   m_jniCache->getJniContext()->callVoidMethod(m_object, methodId);
 }
 
+JStringLocalRef JsBridgeInterface::callJsModuleLoader(const JStringLocalRef &moduleName) const {
+  static thread_local jmethodID methodId = m_jniCache->getJniContext()->getMethodID(m_class, "callJsModuleLoader", "(Ljava/lang/String;)Ljava/lang/String;");
+  return m_jniCache->getJniContext()->callStringMethod(m_object, methodId, moduleName);
+}
+
 JniLocalRef<jobject> JsBridgeInterface::createJsLambdaProxy(
     const JStringLocalRef &globalName, const JniRef<jsBridgeMethod> &method) const {
 

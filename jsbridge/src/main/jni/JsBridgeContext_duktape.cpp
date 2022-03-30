@@ -127,6 +127,10 @@ void JsBridgeContext::cancelDebug() {
     duk_trans_socket_finish();
 }
 
+void JsBridgeContext::enableModuleLoader() {
+  throw std::invalid_argument("Cannot use JS module loader on Duktape!");
+}
+
 JValue JsBridgeContext::evaluateString(const JStringLocalRef &strCode, const JniLocalRef<jsBridgeParameter> &returnParameter,
                                        bool awaitJsPromise) const {
   CHECK_STACK(m_ctx);
@@ -169,8 +173,7 @@ JValue JsBridgeContext::evaluateString(const JStringLocalRef &strCode, const Jni
   return returnType->pop();
 }
 
-void JsBridgeContext::evaluateFileContent(const JStringLocalRef &strCode, const std::string &strFileName) const {
-
+void JsBridgeContext::evaluateFileContent(const JStringLocalRef &strCode, const std::string &strFileName, bool) const {
   CHECK_STACK(m_ctx);
 
   duk_push_string(m_ctx, strFileName.c_str());

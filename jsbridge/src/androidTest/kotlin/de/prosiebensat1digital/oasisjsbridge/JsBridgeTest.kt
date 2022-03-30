@@ -18,7 +18,6 @@ package de.prosiebensat1digital.oasisjsbridge
 import android.content.Context
 import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
-import de.prosiebensat1digital.oasisjsbridge.JsBridgeError.*
 import io.mockk.Ordering
 import io.mockk.every
 import io.mockk.mockk
@@ -84,7 +83,7 @@ class JsBridgeTest {
     private val okHttpClient = OkHttpClient.Builder().addInterceptor(httpInterceptor).build()
     private val jsToNativeFunctionMock = mockk<(p: Any) -> Unit>(relaxed = true)
     private lateinit var errors: MutableList<JsBridgeError>
-    private lateinit var unhandledPromiseErrors: MutableList<UnhandledJsPromiseError>
+    private lateinit var unhandledPromiseErrors: MutableList<JsBridgeError.UnhandledJsPromiseError>
 
     companion object {
         const val ITERATION_COUNT = 1000  // for miniBenchmark
@@ -116,13 +115,13 @@ class JsBridgeTest {
     }
 
     @Test
-    fun testEvaluateStringWithoutRetVal() {
+    fun testEvaluateUnsync() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
 
         // WHEN
         val js = """nativeFunctionMock("testString");"""
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         runBlocking { waitForDone(subject) }
 
@@ -132,7 +131,7 @@ class JsBridgeTest {
     }
 
     @Test
-    fun testEvaluateStringWithoutRetValWithError() {
+    fun testEvaluateUnsyncWithError() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
 
@@ -140,18 +139,18 @@ class JsBridgeTest {
         val js = """
             invalid.javaScript.instruction
             """
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         runBlocking { waitForDone(subject) }
 
         // THEN
-        val stringEvaluationError = errors.singleOrNull() as? JsStringEvaluationError
+        val stringEvaluationError = errors.singleOrNull() as? JsBridgeError.JsStringEvaluationError
         assertNotNull(stringEvaluationError)
         assertEquals(js, stringEvaluationError.js)
     }
 
     @Test
-    fun testEvaluateStringUnit() {
+    fun testEvaluateBlocking() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
 
@@ -165,29 +164,7 @@ class JsBridgeTest {
     }
 
     @Test
-    fun testEvaluateStringUnitWithError() {
-        // GIVEN
-        val subject = createAndSetUpJsBridge()
-
-        // WHEN
-        val js = "invalid.javaScript.instruction"
-        val jsException1: JsException = assertFailsWith {
-            subject.evaluateBlocking<Unit>(js)
-        }
-        val jsException2 = runBlocking {
-            assertFailsWith<JsException> {
-                subject.evaluate(js)
-            }
-        }
-
-        // THEN
-        assertEquals(true, jsException1.message?.contains("invalid"))
-        assertEquals(jsException2.message, jsException1.message)
-        assertTrue(errors.isEmpty())
-    }
-
-    @Test
-    fun testEvaluateString() {
+    fun testEvaluate() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
 
@@ -233,7 +210,7 @@ class JsBridgeTest {
             assertTrue(jsPromise.isActive)
 
             // Resolve pending promise
-            subject.evaluateNoRetVal("$resolveFuncJsValue(69);")
+            subject.evaluate<Unit>("$resolveFuncJsValue(69);")
             assertEquals(69, jsPromise.await())
 
             // Resolved promise
@@ -287,17 +264,39 @@ class JsBridgeTest {
     }
 
     @Test
+    fun testEvaluateWithError() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        val js = "invalid.javaScript.instruction"
+        val jsException1: JsException = assertFailsWith {
+            subject.evaluateBlocking<Unit>(js)
+        }
+        val jsException2 = runBlocking {
+            assertFailsWith<JsException> {
+                subject.evaluate(js)
+            }
+        }
+
+        // THEN
+        assertEquals(true, jsException1.message?.contains("invalid"))
+        assertEquals(jsException2.message, jsException1.message)
+        assertTrue(errors.isEmpty())
+    }
+
+    @Test
     fun testEvaluateLocalFile() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
 
         // WHEN
-        // androidTestDuktape asset file "test.js"
-        // - content:
-        // nativeFunctionMock("localFileString");
-        subject.evaluateLocalFile(context, "js/test.js")
-
-        runBlocking { waitForDone(subject) }
+        runBlocking {
+            // androidTestDuktape asset file "test.js"
+            // - content:
+            // nativeFunctionMock("localFileString");
+            subject.evaluateLocalFile(context, "js/test.js")
+        }
 
         // THEN
         assertTrue(errors.isEmpty())
@@ -310,12 +309,35 @@ class JsBridgeTest {
         val subject = createAndSetUpJsBridge()
 
         // WHEN
-        subject.evaluateLocalFile(context, "non-existing/file.js")
-
-        runBlocking { waitForDone(subject) }
+        val t: Throwable? = runBlocking {
+            try {
+                subject.evaluateLocalFile(context, "non-existing/file.js")
+                null
+            } catch (t: Throwable) {
+                t
+            }
+        }
 
         // THEN
-        val fileEvaluationError = errors.firstOrNull() as? JsFileEvaluationError
+        assertEquals(0, errors.size)
+        assertTrue(t is JsBridgeError.JsFileEvaluationError)
+        assertEquals("non-existing/file.js", t.fileName)
+    }
+
+    @Test
+    fun testEvaluateLocalFileUnsyncNonExisting() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        subject.evaluateLocalFileUnsync(context, "non-existing/file.js")
+
+        runBlocking {
+            waitForDone(subject)
+        }
+
+        // THEN
+        val fileEvaluationError = errors.firstOrNull() as? JsBridgeError.JsFileEvaluationError
         assertNotNull(fileEvaluationError)
         assertEquals("non-existing/file.js", fileEvaluationError.fileName)
     }
@@ -326,9 +348,38 @@ class JsBridgeTest {
         val subject = createAndSetUpJsBridge()
 
         // WHEN
-        subject.evaluateLocalFile(context, "js/test_with_error.js")
+        val t: Throwable? = runBlocking {
+            try {
+                subject.evaluateLocalFile(context, "js/test_with_error.js")
+                null
+            } catch (t: Throwable) {
+                t
+            }
+        }
 
-        runBlocking { waitForDone(subject) }
+        // THEN
+        assertEquals(0, errors.size)
+        assertTrue(t is JsBridgeError.JsFileEvaluationError)
+        val jsException = t.jsException
+        assertNotNull(jsException)
+        assertTrue(jsException.stackTrace.isNotEmpty())
+        jsException.stackTrace[0].let { e ->
+            assertEquals("test_with_error.js", e.fileName)
+            assertEquals(1, e.lineNumber)
+        }
+    }
+
+    @Test
+    fun testEvaluateLocalFileUnsyncWithJsError() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        subject.evaluateLocalFileUnsync(context, "js/test_with_error.js")
+
+        runBlocking {
+            waitForDone(subject)
+        }
 
         // THEN
         val jsException = errors.firstOrNull()?.jsException
@@ -347,9 +398,60 @@ class JsBridgeTest {
 
         // WHEN
         val content = """nativeFunctionMock("fileContentString");"""
-        subject.evaluateFileContent(content, "file.js")
 
-        runBlocking { waitForDone(subject) }
+        runBlocking {
+            subject.evaluateFileContent(content, "file.js")
+        }
+
+        // THEN
+        assertTrue(errors.isEmpty())
+        verify { jsToNativeFunctionMock(eq("fileContentString")) }
+    }
+
+    @Test
+    fun testEvaluateFileContentAsModule() {
+        if (BuildConfig.FLAVOR == "duktape") {
+            // ES6 modules are not supported on Duktape
+            return
+        }
+
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        val jsModule1 = """
+            export function helperFunction() { return "testString" };
+        """.trimIndent()
+        val jsModule2 = """
+            import * as module1 from "module1.js"
+            globalThis.mainFunction = function() {
+                return module1.helperFunction();
+            }
+        """.trimIndent()
+
+        val ret = runBlocking {
+            subject.evaluateFileContent(jsModule1, "module1.js", JsBridge.JsFileEvaluationType.Module)
+            subject.evaluateFileContent(jsModule2, "module2.js", JsBridge.JsFileEvaluationType.Module)
+            subject.evaluate<String>("globalThis.mainFunction()");
+        }
+
+        // THEN
+        assertTrue(errors.isEmpty())
+        assertEquals("testString", ret)
+    }
+
+    @Test
+    fun testEvaluateFileContentUnsync() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        val content = """nativeFunctionMock("fileContentString");"""
+        subject.evaluateFileContentUnsync(content, "file.js")
+
+        runBlocking {
+            waitForDone(subject)
+        }
 
         // THEN
         assertTrue(errors.isEmpty())
@@ -362,9 +464,38 @@ class JsBridgeTest {
         val subject = createAndSetUpJsBridge()
 
         // WHEN
-        subject.evaluateFileContent("this will obviously fail", "file.js")
+        val t: Throwable? = runBlocking {
+            try {
+                subject.evaluateFileContent("this will obviously fail", "file.js")
+                null
+            } catch (t: Throwable) {
+                t
+            }
+        }
 
-        runBlocking { waitForDone(subject) }
+        // THEN
+        assertEquals(0, errors.size)
+        assertTrue(t is JsBridgeError.JsFileEvaluationError)
+        val jsException = t.jsException
+        assertNotNull(jsException)
+        assertTrue(jsException.stackTrace.isNotEmpty())
+        jsException.stackTrace[0].let { e ->
+            assertEquals("file.js", e.fileName)
+            assertEquals(1, e.lineNumber)
+        }
+    }
+
+    @Test
+    fun testEvaluateFileContentUnsyncWithError() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        subject.evaluateFileContentUnsync("this will obviously fail", "file.js")
+
+        runBlocking {
+            waitForDone(subject)
+        }
 
         // THEN
         val jsException = errors.firstOrNull()?.jsException
@@ -374,6 +505,82 @@ class JsBridgeTest {
             assertEquals("file.js", e.fileName)
             assertEquals(1, e.lineNumber)
         }
+    }
+
+    @Test
+    fun testSetJsModuleLoader() {
+        if (BuildConfig.FLAVOR == "duktape") {
+            // ES6 modules are not supported on Duktape
+            return
+        }
+
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        subject.setJsModuleLoader { moduleName ->
+            if (moduleName == "main.js") {
+                """ import * as eagle from "animals/eagle.js";
+                    export default function main() { return "Eagle name: " + eagle.getName() };
+                """.trimIndent()
+            } else if (moduleName == "animals/eagle.js") {
+                """ import * as bird from "./bird.js"
+                    export function getName() { return "EAGLE as a " + bird.getName() };
+                """.trimIndent()
+            } else if (moduleName == "animals/bird.js") {
+                "export function getName() { return 'BIRD' };"
+            } else {
+                throw JsBridgeError.JsFileEvaluationError(moduleName)
+            }
+        }
+
+        val ret = runBlocking {
+            subject.evaluateFileContent("""
+                    import main from "main.js"
+                    globalThis.entryPoint = function() {
+                        return main();
+                    }
+                """.trimIndent(), "moduleLoader", JsBridge.JsFileEvaluationType.Module)
+
+            subject.evaluate<String>("globalThis.entryPoint()");
+        }
+
+        // THEN
+        assertTrue(errors.isEmpty())
+        assertEquals("Eagle name: EAGLE as a BIRD", ret)
+    }
+
+    @Test
+    fun testSetJsModuleLoaderError() {
+        if (BuildConfig.FLAVOR == "duktape") {
+            // ES6 modules are not supported on Duktape
+            return
+        }
+
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        subject.setJsModuleLoader { moduleName ->
+            throw JsBridgeError.JsFileEvaluationError(moduleName)
+        }
+
+        val moduleError = assertFailsWith<JsBridgeError.JsFileEvaluationError> {
+            runBlocking {
+                subject.evaluateFileContent(
+                    """import main from "non-existing.js"""",
+                    "<moduleLoader>",
+                    JsBridge.JsFileEvaluationType.Module
+                )
+            }
+        }
+
+        // THEN
+        assertTrue(errors.isEmpty())
+        assertEquals("<moduleLoader>", moduleError.fileName)
+        val cause = moduleError.cause as? JsBridgeError.JsFileEvaluationError
+        assertNotNull(cause)
+        assertEquals("non-existing.js", cause.fileName)
     }
 
     @Test
@@ -501,16 +708,18 @@ class JsBridgeTest {
         val subject = createAndSetUpJsBridge()
 
         // WHEN
-        subject.evaluateNoRetVal("""
-            new Promise(function(resolve, reject) {
-              throw Error("Test unhandled promise rejection");
-            });
-        """.trimIndent())
+        runBlocking {
+            subject.evaluate<Unit>("""
+                var promise = new Promise(function(resolve, reject) {
+                  throw Error("Test unhandled promise rejection");
+                });""".trimIndent()
+            )
 
-        runBlocking { waitForDone(subject) }
+            waitForDone(subject)
+        }
 
         // THEN
-        val unhandledJsPromiseError = unhandledPromiseErrors.firstOrNull()
+        val unhandledJsPromiseError = unhandledPromiseErrors.firstOrNull() as? JsBridgeError.UnhandledJsPromiseError
         assertNotNull(unhandledJsPromiseError?.jsException)
         assertEquals("Test unhandled promise rejection", unhandledJsPromiseError?.jsException?.message)
         assertEquals("Test unhandled promise rejection", unhandledJsPromiseError?.jsException?.jsonValue?.toPayloadObject()?.getString("message"))
@@ -1159,36 +1368,43 @@ class JsBridgeTest {
         val subject = createAndSetUpJsBridge()
         var flag = false
 
-        // WHEN
-        val setFlag = JsValue.fromNativeFunction0(subject) { flag = true }
-        val toUpperCaseNative = JsValue.fromNativeFunction1(subject) { s: String -> s.toUpperCase() }
-        val calcSumNative = JsValue.fromNativeFunction2(subject) { a: Int, b: Int -> a + b }
-        val setCustomTimeout: (() -> Unit, Long) -> Unit = { cb, msecs ->
-            GlobalScope.launch(Dispatchers.Main) {
-                delay(msecs)
-                cb()
-            }
-        }
-        JsValue.fromNativeFunction2(subject, setCustomTimeout).assignToGlobal("setCustomTimeout")
-
-        subject.evaluateBlocking<Unit>("$setFlag()")
-        assertTrue(flag)
-
-        assertEquals("TEST STRING", subject.evaluateBlocking("""$toUpperCaseNative("test string")"""))
-        assertEquals(15, subject.evaluateBlocking("$calcSumNative(7, 8)"))
-
-        subject.evaluateNoRetVal("""
-            |setCustomTimeout(function() {
-            |  nativeFunctionMock(true);
-            |}, 200);
-        """.trimMargin())
-        // Note: mockk verify with timeout has some issues on API < 24
-        if (android.os.Build.VERSION.SDK_INT >= 24) {
-            verify(timeout = 3000L) { jsToNativeFunctionMock(eq(true)) }
-        }
-
-        // AND WHEN
         runBlocking {
+            // WHEN
+            val setFlag = JsValue.fromNativeFunction0(subject) { flag = true }
+            val toUpperCaseNative =
+                JsValue.fromNativeFunction1(subject) { s: String -> s.toUpperCase() }
+            val calcSumNative = JsValue.fromNativeFunction2(subject) { a: Int, b: Int -> a + b }
+            val setCustomTimeout: (() -> Unit, Long) -> Unit = { cb, msecs ->
+                GlobalScope.launch(Dispatchers.Main) {
+                    delay(msecs)
+                    cb()
+                }
+            }
+            JsValue.fromNativeFunction2(subject, setCustomTimeout)
+                .assignToGlobal("setCustomTimeout")
+
+            subject.evaluateBlocking<Unit>("$setFlag()")
+            assertTrue(flag)
+
+            assertEquals(
+                "TEST STRING",
+                subject.evaluateBlocking("""$toUpperCaseNative("test string")""")
+            )
+            assertEquals(15, subject.evaluateBlocking("$calcSumNative(7, 8)"))
+
+            subject.evaluate<Unit>(
+                """
+                |setCustomTimeout(function() {
+                |  nativeFunctionMock(true);
+                |}, 200);
+            """.trimMargin()
+            )
+            // Note: mockk verify with timeout has some issues on API < 24
+            if (android.os.Build.VERSION.SDK_INT >= 24) {
+                verify(timeout = 3000L) { jsToNativeFunctionMock(eq(true)) }
+            }
+
+            // AND WHEN
             // Missing parameter (replaced with null)
             val missingParameterException = assertFailsWith<JsException> {
                 subject.evaluate<Unit>("$calcSumNative(2)")
@@ -1196,11 +1412,12 @@ class JsBridgeTest {
             assertTrue(missingParameterException.cause is NullPointerException)
 
             // Too many parameters
-            val tooManyParametersException = assertFailsWith<JsException> {
+            assertFailsWith<JsException> {
                 subject.evaluate<Unit>("$calcSumNative(2, 3, 4)")
             }
+
+            calcSumNative.hold()
         }
-        calcSumNative.hold()
     }
 
     // Port of similar test in Duktape Android
@@ -1373,7 +1590,7 @@ class JsBridgeTest {
               $jsExpectationsJsValue.addExpectation("nativeException", e);
             }
             """
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         runBlocking { waitForDone(subject) }
 
@@ -1700,7 +1917,7 @@ class JsBridgeTest {
 
         // WHEN
         subject.release()
-        subject.evaluateNoRetVal("""nativeFunctionMock("Should not be called.");""")
+        subject.evaluateUnsync("""nativeFunctionMock("Should not be called.");""")
         jsApi.jsMethodWithCallback { _, _, _, _, _, _, _, _, _ ->
             callbackCalled = true
             "CallbackRetVal"
@@ -1734,7 +1951,7 @@ class JsBridgeTest {
             js += """setTimeout(function() { nativeFunctionMock("timeout$i"); }, ${initialDelay + i * 10L});""" + "\n"
         }
 
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         runBlocking { waitForDone(subject) }
 
@@ -1773,7 +1990,7 @@ class JsBridgeTest {
             }, 100, "aString", null, 69);
         """.trimIndent()
 
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         runBlocking { delay(1000); waitForDone(subject) }
 
@@ -1802,7 +2019,7 @@ class JsBridgeTest {
             }, null, "aString", null, 69);
         """.trimIndent()
 
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         runBlocking { delay(1000); waitForDone(subject) }
 
@@ -1831,7 +2048,7 @@ class JsBridgeTest {
             }, undefined, "aString", null, 69);
         """.trimIndent()
 
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         runBlocking { delay(1000); waitForDone(subject) }
 
@@ -1860,7 +2077,7 @@ class JsBridgeTest {
             }, "100", "aString", null, 69);
         """.trimIndent()
 
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         runBlocking { delay(1000); waitForDone(subject) }
 
@@ -1889,7 +2106,7 @@ class JsBridgeTest {
             }, "not_a_number_is_zero_timeout", "aString", null, 69);
         """.trimIndent()
 
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         runBlocking { delay(1000); waitForDone(subject) }
 
@@ -1927,7 +2144,7 @@ class JsBridgeTest {
             |}, 100);
         """.trimMargin()
 
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         // THEN
         runBlocking {
@@ -1962,7 +2179,7 @@ class JsBridgeTest {
             }, 50);
         """
 
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         runBlocking { waitForDone(subject) }
 
@@ -2004,7 +2221,7 @@ class JsBridgeTest {
             }, null);
         """
 
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         runBlocking { waitForDone(subject) }
 
@@ -2046,7 +2263,7 @@ class JsBridgeTest {
             }, undefined);
         """
 
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         runBlocking { waitForDone(subject) }
 
@@ -2088,7 +2305,7 @@ class JsBridgeTest {
             }, "not_a_number_is_zero_timeout");
         """
 
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         runBlocking { waitForDone(subject) }
 
@@ -2130,7 +2347,7 @@ class JsBridgeTest {
             }, "100");
         """
 
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         runBlocking { waitForDone(subject) }
 
@@ -2183,7 +2400,7 @@ class JsBridgeTest {
             |  nativeFunctionMock(JSON.stringify(xhr.response));
             |  nativeFunctionMock(JSON.stringify(headers));
             |}""".trimMargin()
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         // THEN
         // Note: mock verify with ordering currently has some issues on API < 24
@@ -2248,7 +2465,7 @@ class JsBridgeTest {
             |  nativeFunctionMock(JSON.stringify(xhr.response));
             |  nativeFunctionMock(JSON.stringify(headers));
             |}""".trimMargin()
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         // THEN
         // Note: mock verify with ordering currently has some issues on API < 24
@@ -2305,7 +2522,7 @@ class JsBridgeTest {
             }
             req.abort();
             """
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         // THEN
         // Note: mockk verify with timeout has some issues on API < 24
@@ -2333,7 +2550,7 @@ class JsBridgeTest {
                 nativeFunctionMock("XHR error: " + req.responseText);
             }
             """
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         // THEN
         // Note: mockk verify with timeout has some issues on API < 24
@@ -2367,7 +2584,7 @@ class JsBridgeTest {
             console.assert(1 == 1, "should not be displayed");
             console.assert(1 == 2, "should be displayed");
             """
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         runBlocking { waitForDone(subject) }
 
@@ -2405,7 +2622,7 @@ class JsBridgeTest {
             console.assert(1 == 1, "should not be displayed");
             console.assert(1 == 2, "should be displayed");
             """.trimMargin()
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         runBlocking { waitForDone(subject) }
 
@@ -2443,7 +2660,7 @@ class JsBridgeTest {
             console.assert(1 == 1, "should not be displayed");
             console.assert(1 == 2, "should be displayed");
             """
-        subject.evaluateNoRetVal(js)
+        subject.evaluateUnsync(js)
 
         runBlocking { waitForDone(subject) }
 
@@ -2665,7 +2882,7 @@ class JsBridgeTest {
 
         return object: JsBridge.ErrorListener(Dispatchers.Main) {
             override fun onError(error: JsBridgeError) {
-                if (error is UnhandledJsPromiseError) {
+                if (error is JsBridgeError.UnhandledJsPromiseError) {
                     unhandledPromiseErrors.add(error)
                 } else {
                     errors.add(error)

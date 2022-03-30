@@ -47,6 +47,7 @@ public:
   void checkJsThread() const;
   void onDebuggerPending() const;
   void onDebuggerReady() const;
+  JStringLocalRef callJsModuleLoader(const JStringLocalRef &moduleName) const;
   JniLocalRef<jobject> createJsLambdaProxy(const JStringLocalRef &, const JniRef<jsBridgeMethod> &) const;
   JniLocalRef<jobject> createAidlInterfaceProxy(const JStringLocalRef &, const JniRef<jsBridgeParameter> &) const;
   void consoleLogHelper(const JStringLocalRef &logType, const JStringLocalRef &msg) const;

@@ -26,6 +26,7 @@
 #include "QuickJsUtils.h"
 #include "custom_stringify.h"
 #include "log.h"
+#include "exceptions/JniException.h"
 #include "exceptions/JsException.h"
 #include "java-types/Deferred.h"
 #include "java-types/Object.h"
@@ -41,6 +42,34 @@ namespace {
   //int interrupt_handler(JSRuntime *rt, void *opaque) {
   //  return 0;
   //}
+
+  JSModuleDef *jsModuleLoader(JSContext *ctx, const char *moduleName, void *opaque) {
+    JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
+    JniContext *jniContext = jsBridgeContext->getJniContext();
+    auto contentRef = jsBridgeContext->getJniCache()->getJsBridgeInterface().callJsModuleLoader(JStringLocalRef(jniContext, moduleName));
+
+    if (jniContext->exceptionCheck()) {
+      throw JniException(jniContext);
+    }
+
+    if (contentRef.isNull()) {
+      throw std::invalid_argument("JS module returned a null content");
+    }
+
+    const char *content = contentRef.toUtf8Chars();
+    const size_t contentLength = contentRef.utf8Length();
+
+    JSValue funcVal = JS_Eval(ctx, content, contentLength, moduleName, JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY);
+
+    if (JS_IsException(funcVal)) {
+      return nullptr;
+    }
+
+    auto m = (JSModuleDef *) JS_VALUE_GET_PTR(funcVal);
+    JS_FreeValue(ctx, funcVal);
+
+    return m;
+  }
 }
 
 
@@ -90,9 +119,13 @@ void JsBridgeContext::cancelDebug() {
   // Not supported yet
 }
 
+void JsBridgeContext::enableModuleLoader() {
+  JS_SetModuleLoaderFunc(m_runtime, nullptr, jsModuleLoader, nullptr);
+}
+
 JValue JsBridgeContext::evaluateString(const JStringLocalRef &strCode, const JniLocalRef<jsBridgeParameter> &returnParameter,
                                        bool awaitJsPromise) const {
-  JSValue v = JS_Eval(m_ctx, strCode.toUtf8Chars(), strCode.utf8Length(), "eval", 0);
+  JSValue v = JS_Eval(m_ctx, strCode.toUtf8Chars(), strCode.utf8Length(), "eval", JS_EVAL_TYPE_GLOBAL);
   JS_AUTORELEASE_VALUE(m_ctx, v);
 
   strCode.releaseChars();  // release chars now as we don't need them anymore
@@ -131,11 +164,12 @@ JValue JsBridgeContext::evaluateString(const JStringLocalRef &strCode, const Jni
   return value;
 }
 
-void JsBridgeContext::evaluateFileContent(const JStringLocalRef &strCode, const std::string &strFileName) const {
-  JSValue v = JS_Eval(m_ctx, strCode.toUtf8Chars(), strCode.utf8Length(), strFileName.c_str(), 0);
-  strCode.releaseChars();  // release chars now as we don't need them anymore
-
+void JsBridgeContext::evaluateFileContent(const JStringLocalRef &strCode, const std::string &strFileName, bool asModule) const {
+  const int flags = asModule ? JS_EVAL_TYPE_MODULE : JS_EVAL_TYPE_GLOBAL;
+  JSValue v = JS_Eval(m_ctx, strCode.toUtf8Chars(), strCode.utf8Length(), strFileName.c_str(), flags);
   JS_AUTORELEASE_VALUE(m_ctx, v);
+
+  strCode.releaseChars();  // release chars now as we don't need them anymore
 
   if (JS_IsException(v)) {
     throw m_exceptionHandler->getCurrentJsException();

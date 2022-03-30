@@ -61,10 +61,14 @@ class ReadmeTest {
     @Test
     fun testEvaluation() {
         // Without return value:
-        jsBridge.evaluateNoRetVal("console.log('hello');")
-        jsBridge.evaluateLocalFile(InstrumentationRegistry.getInstrumentation().context, "js/file.js")  // Android asset
+        jsBridge.evaluateUnsync("console.log('hello');")
+        jsBridge.evaluateFileContentUnsync("console.log('hello')", "js/test.js")
 
         runBlocking {
+            // Without return value:
+            jsBridge.evaluate<Unit>("console.log('hello');")
+            jsBridge.evaluateFileContent("console.log('hello')", "js/test.js")
+
             // With return value:
             val sum1: Int = jsBridge.evaluate("1+2")  // suspending call
             val sum2: Int = jsBridge.evaluate("new Promise(function(resolve) { resolve(1+2); })")  // suspending call (JS promise)
@@ -146,7 +150,7 @@ class ReadmeTest {
 
         val nativeApi: JsValue = JsValue.fromNativeObject(jsBridge, obj)
 
-        jsBridge.evaluateNoRetVal("globalThis.x = $nativeApi.method(1, 'two');")
+        jsBridge.evaluateUnsync("globalThis.x = $nativeApi.method(1, 'two');")
     }
 
     @Test
@@ -163,7 +167,7 @@ class ReadmeTest {
     fun testKotlinFunctionFromJs() {
         val calcSumNative = JsValue.fromNativeFunction2(jsBridge) { a: Int, b: Int -> a + b }
 
-        jsBridge.evaluateNoRetVal("""
+        jsBridge.evaluateUnsync("""
           console.log("Sum is", $calcSumNative(1, 2));
           """.trimIndent())
     }
@@ -180,7 +184,7 @@ class ReadmeTest {
 
     @Test
     fun testUsageAdvanced() {
-        jsBridge.evaluateLocalFile(InstrumentationRegistry.getInstrumentation().context, "js/api.js")
+        jsBridge.evaluateLocalFileUnsync(InstrumentationRegistry.getInstrumentation().context, "js/api.js")
 
         // Implement native API
         val nativeApi = object: NativeApi {

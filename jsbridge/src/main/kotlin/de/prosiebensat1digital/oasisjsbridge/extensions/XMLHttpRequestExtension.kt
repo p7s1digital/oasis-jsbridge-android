@@ -39,11 +39,11 @@ internal class XMLHttpRequestExtension(
             .assignToGlobal("XMLHttpRequestExtension_send_native")
 
         // Evaluate JS file
-        jsBridge.evaluateNoRetVal(xhrJsCode)
+        jsBridge.evaluateUnsync(xhrJsCode)
     }
 
     fun release() {
-        jsBridge.evaluateNoRetVal("""delete globalThis["XMLHttpRequestExtension_send_native"]""")
+        jsBridge.evaluateUnsync("""delete globalThis["XMLHttpRequestExtension_send_native"]""")
     }
 
     private fun nativeSend(

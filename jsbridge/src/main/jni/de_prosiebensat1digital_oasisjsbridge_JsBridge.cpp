@@ -95,6 +95,13 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniDe
   delete jniContext;
 }
 
+JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniEnableModuleLoader
+        (JNIEnv *env, jobject, jlong lctx) {
+
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
+  jsBridgeContext->enableModuleLoader();
+}
+
 JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniEvaluateString
     (JNIEnv *env, jobject, jlong lctx, jstring code, jobject returnParameter, jboolean awaitJsPromise) {
 
@@ -118,7 +125,7 @@ JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jn
 }
 
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniEvaluateFileContent
-    (JNIEnv *env, jobject, jlong lctx, jstring code, jstring filename) {
+    (JNIEnv *env, jobject, jlong lctx, jstring code, jstring filename, jboolean asModule) {
 
   //alog("jniEvaluateFileContent()");
 
@@ -128,7 +135,7 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniEv
   std::string strFilename = JStringLocalRef(jniContext, filename, JniLocalRefMode::Borrowed).toStdString();
 
   try {
-    jsBridgeContext->evaluateFileContent(JStringLocalRef(jniContext, code, JniLocalRefMode::Borrowed), strFilename);
+    jsBridgeContext->evaluateFileContent(JStringLocalRef(jniContext, code, JniLocalRefMode::Borrowed), strFilename, asModule);
   } catch (const std::exception &e) {
     jsBridgeContext->getExceptionHandler()->jniThrow(e);
   }
