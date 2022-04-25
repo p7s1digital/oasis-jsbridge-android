@@ -190,6 +190,8 @@ constructor(config: JsBridgeConfig): CoroutineScope {
                 .also(::notifyErrorListeners)
         }
 
+        Timber.d("Releasing JsBridge")
+
         rootJob.cancel()
 
         // As we are at the end of the lifecycle, we use here the GlobalScope
@@ -200,7 +202,10 @@ constructor(config: JsBridgeConfig): CoroutineScope {
             }
 
             try {
-                jniJsContext?.let { jniDeleteContext(it) }
+                jniJsContext?.let {
+                    jniJsContext = null
+                    jniDeleteContext(it)
+                }
             } catch (t: Throwable) {
                 val e = DestroyError(t)
                 throw e
@@ -385,7 +390,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
             if (isMainThread()) {
                 Timber.w("WARNING: evaluating JS code in the main thread! Consider using non-blocking API or evaluating JS code in another thread!")
             }
-            evaluate<Any?>(js, javaClass?.kotlin?.createType(), false)
+            evaluate(js, javaClass?.kotlin?.createType(), false)
         }
     }
 
@@ -919,6 +924,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
             }
         }
 
+        // Create proxy listener for the JS object
         val proxyListener = ProxyListener(jsValue, type.java)
 
         @Suppress("UNCHECKED_CAST")
@@ -970,7 +976,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
     // asynchronously and shall not block the current thread. As a result, only JS lambdas without
     // return value are supported (which is usually fine for callbacks).
     @Suppress("UNUSED")  // Called from JNI
-    private fun createJsLambdaProxy(globalObjectName: String, method: Method): Function<Any?>? {
+    private fun createJsLambdaProxy(globalObjectName: String, method: Method): Function<Any?> {
         checkJsThread()
 
         val returnClass = method.returnParameter.getJava()
