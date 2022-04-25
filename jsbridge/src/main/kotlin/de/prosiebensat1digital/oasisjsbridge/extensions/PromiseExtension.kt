@@ -21,7 +21,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlin.reflect.typeOf
 
-@UseExperimental(ExperimentalStdlibApi::class)
+@OptIn(ExperimentalStdlibApi::class)
 internal class PromiseExtension(
     private val jsBridge: JsBridge,
     val config: JsBridgeConfig.PromiseConfig
@@ -78,7 +78,7 @@ internal class PromiseExtension(
         onUnhandledPromiseRejectedJsValue = null
     }
 
-    @UseExperimental(ExperimentalCoroutinesApi::class)
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun processPolyfillQueue() {
         val processQueueJsValue = processPolyfillQueueJsValue ?: return
         if (!processQueueJsValue.isCompleted) {

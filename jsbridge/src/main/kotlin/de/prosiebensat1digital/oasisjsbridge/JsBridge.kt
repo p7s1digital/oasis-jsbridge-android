@@ -190,6 +190,8 @@ constructor(config: JsBridgeConfig): CoroutineScope {
                 .also(::notifyErrorListeners)
         }
 
+        Timber.d("Releasing JsBridge")
+
         rootJob.cancel()
 
         // As we are at the end of the lifecycle, we use here the GlobalScope
@@ -200,7 +202,10 @@ constructor(config: JsBridgeConfig): CoroutineScope {
             }
 
             try {
-                jniJsContext?.let { jniDeleteContext(it) }
+                jniJsContext?.let {
+                    jniJsContext = null
+                    jniDeleteContext(it)
+                }
             } catch (t: Throwable) {
                 val e = DestroyError(t)
                 throw e
@@ -385,7 +390,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
             if (isMainThread()) {
                 Timber.w("WARNING: evaluating JS code in the main thread! Consider using non-blocking API or evaluating JS code in another thread!")
             }
-            evaluate<Any?>(js, javaClass?.kotlin?.createType(), false)
+            evaluate(js, javaClass?.kotlin?.createType(), false)
         }
     }
 
@@ -919,6 +924,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
             }
         }
 
+        // Create proxy listener for the JS object
         val proxyListener = ProxyListener(jsValue, type.java)
 
         @Suppress("UNCHECKED_CAST")
@@ -970,7 +976,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
     // asynchronously and shall not block the current thread. As a result, only JS lambdas without
     // return value are supported (which is usually fine for callbacks).
     @Suppress("UNUSED")  // Called from JNI
-    private fun createJsLambdaProxy(globalObjectName: String, method: Method): Function<Any?>? {
+    private fun createJsLambdaProxy(globalObjectName: String, method: Method): Function<Any?> {
         checkJsThread()
 
         val returnClass = method.returnParameter.getJava()
@@ -1014,7 +1020,10 @@ constructor(config: JsBridgeConfig): CoroutineScope {
     private fun createAidlInterfaceProxy(globalObjectName: String, parameter: Parameter): Any? {
         checkJsThread()
 
-        val jsValue = JsValue(this, globalObjectName, globalObjectName)
+        // Take over global JS variable with name "globalObjectName" as JsValue
+        val jsValue = JsValue(this, null, globalObjectName)
+
+        // Create proxy listener for the JS object
         val proxyListener = ProxyListener(jsValue, parameter.javaClass as Class<*>)
 
         // We use the ProxyBuilder from dexmaker instead of the standard Java Proxy because
@@ -1131,21 +1140,18 @@ constructor(config: JsBridgeConfig): CoroutineScope {
         private val jsValue: JsValue,
         private val type: Class<*>,
     ) : java.lang.reflect.InvocationHandler {
-        override fun invoke(proxy: Any, method: JavaMethod, args: Array<Any?>): Any? {
+        override fun invoke(proxy: Any, method: JavaMethod, args_: Array<Any?>?): Any? {
+            val args = args_ ?: arrayOf()
             return when {
                 method.name == "hashCode" -> jsValue.hashCode()
                 method.name == "equals" -> jsValue.toString() == args.firstOrNull()?.toString()
                 method.name == "toString" -> jsValue.toString()
+
+                // AIDL-specific
                 method.name == "asBinder" -> ProxyBuilder.callSuper(proxy, method, *args)
                 method.name == "onTransact" -> ProxyBuilder.callSuper(proxy, method, *args)
 
-                method.returnType == Unit::class.java ||
-                method.returnType == Void::class.java ||
-                method.returnType == Void::class.javaPrimitiveType -> {
-                    callJsMethodWithoutRetVal(method, args)
-                    CompletableDeferred(Unit)
-                }
-
+                // Suspending method
                 args.lastOrNull() is Continuation<*> -> {
                     @Suppress("UNCHECKED_CAST")
                     val continuation = args.last() as Continuation<Any?>
@@ -1153,6 +1159,15 @@ constructor(config: JsBridgeConfig): CoroutineScope {
                     callJsMethodSuspended(method, jsArgs, continuation)
                 }
 
+                // Without return value
+                method.returnType == Unit::class.java ||
+                method.returnType == Void::class.java ||
+                method.returnType == Void::class.javaPrimitiveType -> {
+                    callJsMethodWithoutRetVal(method, args)
+                    CompletableDeferred(Unit)
+                }
+
+                // Deferred
                 method.returnType.isAssignableFrom(Deferred::class.java) -> callJsMethodAsync(method, args)
 
                 else -> callJsMethodBlocking(method, args)
