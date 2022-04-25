@@ -1014,7 +1014,10 @@ constructor(config: JsBridgeConfig): CoroutineScope {
     private fun createAidlInterfaceProxy(globalObjectName: String, parameter: Parameter): Any? {
         checkJsThread()
 
-        val jsValue = JsValue(this, globalObjectName, globalObjectName)
+        // Take over global JS variable with name "globalObjectName" as JsValue
+        val jsValue = JsValue(this, null, globalObjectName)
+
+        // Create proxy listener for the JS object
         val proxyListener = ProxyListener(jsValue, parameter.javaClass as Class<*>)
 
         // We use the ProxyBuilder from dexmaker instead of the standard Java Proxy because
@@ -1131,21 +1134,18 @@ constructor(config: JsBridgeConfig): CoroutineScope {
         private val jsValue: JsValue,
         private val type: Class<*>,
     ) : java.lang.reflect.InvocationHandler {
-        override fun invoke(proxy: Any, method: JavaMethod, args: Array<Any?>): Any? {
+        override fun invoke(proxy: Any, method: JavaMethod, args_: Array<Any?>?): Any? {
+            val args = args_ ?: arrayOf()
             return when {
                 method.name == "hashCode" -> jsValue.hashCode()
                 method.name == "equals" -> jsValue.toString() == args.firstOrNull()?.toString()
                 method.name == "toString" -> jsValue.toString()
+
+                // AIDL-specific
                 method.name == "asBinder" -> ProxyBuilder.callSuper(proxy, method, *args)
                 method.name == "onTransact" -> ProxyBuilder.callSuper(proxy, method, *args)
 
-                method.returnType == Unit::class.java ||
-                method.returnType == Void::class.java ||
-                method.returnType == Void::class.javaPrimitiveType -> {
-                    callJsMethodWithoutRetVal(method, args)
-                    CompletableDeferred(Unit)
-                }
-
+                // Suspending method
                 args.lastOrNull() is Continuation<*> -> {
                     @Suppress("UNCHECKED_CAST")
                     val continuation = args.last() as Continuation<Any?>
@@ -1153,6 +1153,15 @@ constructor(config: JsBridgeConfig): CoroutineScope {
                     callJsMethodSuspended(method, jsArgs, continuation)
                 }
 
+                // Without return value
+                method.returnType == Unit::class.java ||
+                method.returnType == Void::class.java ||
+                method.returnType == Void::class.javaPrimitiveType -> {
+                    callJsMethodWithoutRetVal(method, args)
+                    CompletableDeferred(Unit)
+                }
+
+                // Deferred
                 method.returnType.isAssignableFrom(Deferred::class.java) -> callJsMethodAsync(method, args)
 
                 else -> callJsMethodBlocking(method, args)
