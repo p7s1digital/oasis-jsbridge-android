@@ -43,6 +43,7 @@ JavaMethod::JavaMethod(const JsBridgeContext *jsBridgeContext, const JniLocalRef
   JObjectArrayLocalRef parameters = methodInterface.getParameters();
   const jsize numParameters = parameters.getLength();
 
+
   m_argumentTypes.resize((size_t) numParameters);
 
   // Create JavaType instances
@@ -146,7 +147,6 @@ duk_ret_t JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRe
 JSValue JavaMethod::invoke(const JsBridgeContext *jsBridgeContext, const JniRef<jobject> &javaThis, int argc, JSValueConst *argv) const {
 
   JSContext *ctx = jsBridgeContext->getQuickJsContext();
-  const JniContext *jniContext = jsBridgeContext->getJniContext();
 
   const int minArgs = m_isVarArgs
       ? m_argumentTypes.size() - 1
@@ -218,5 +218,3 @@ JValue JavaMethod::callLambda(const JsBridgeContext *jsBridgeContext, const JniR
 
   return JValue(ret);
 }
-
-

@@ -32,6 +32,7 @@
 #include "jni-helpers/JStringLocalRef.h"
 #include "jni-helpers/JValue.h"
 #include "jni-helpers/JniLocalRef.h"
+#include "log.h"
 #include <string>
 #include <vector>
 
@@ -128,7 +129,7 @@ JValue JavaType::toJavaArray(JSValueConst jsValue) const {
   uint32_t count = JS_VALUE_GET_INT(lengthValue);
   JS_FreeValue(m_ctx, lengthValue);
 
-  JObjectArrayLocalRef objectArray(m_jniContext, count, getJavaClass());
+  JObjectArrayLocalRef objectArray(m_jniContext, (jsize) count, getJavaClass());
   if (objectArray.isNull()) {
     throw JniException(m_jniContext);
   }
@@ -139,7 +140,7 @@ JValue JavaType::toJavaArray(JSValueConst jsValue) const {
     JValue elementJavaValue = toJava(elementJsValue);
     JS_FreeValue(m_ctx, elementJsValue);
     const JniLocalRef<jobject> &jElement = elementJavaValue.getLocalRef();
-    objectArray.setElement(i, jElement);
+    objectArray.setElement((jsize) i, jElement);
 
     if (m_jniContext->exceptionCheck()) {
       throw JniException(m_jniContext);
@@ -184,4 +185,3 @@ JValue JavaType::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
 
  return JValue(returnValue);
 }
-
