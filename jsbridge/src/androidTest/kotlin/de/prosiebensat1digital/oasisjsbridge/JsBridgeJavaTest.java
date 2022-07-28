@@ -18,14 +18,18 @@ package de.prosiebensat1digital.oasisjsbridge;
 import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Test;
+
+import androidx.test.platform.app.InstrumentationRegistry;
 import timber.log.Timber;
 import static org.junit.Assert.assertEquals;
+
+import android.content.Context;
 import android.os.RemoteException;
 
 // Minimal test for using JsBridge from Java
 public final class JsBridgeJavaTest {
     private JsBridge jsBridge;
-
+    private final Context context = InstrumentationRegistry.getInstrumentation().getContext();
     @BeforeClass
     static public void setUpClass() {
         Timber.plant(new Timber.DebugTree());
@@ -149,7 +153,7 @@ public final class JsBridgeJavaTest {
     // ---
 
     private JsBridge createAndSetUpJsBridge() {
-        JsBridge jsBridge = new JsBridge(JsBridgeConfig.standardConfig());
+        JsBridge jsBridge = new JsBridge(JsBridgeConfig.standardConfig(), context);
         this.jsBridge = jsBridge;
         return jsBridge;
     }

@@ -1161,7 +1161,7 @@ class JsBridgeTest {
         val config = JsBridgeConfig.standardConfig().apply {
             xhrConfig.okHttpClient = okHttpClient
         }
-        val subject = JsBridge(config)
+        val subject = JsBridge(config, context)
 
         val jsExpectations = JsExpectations()
         val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
@@ -1532,7 +1532,7 @@ class JsBridgeTest {
         val config = JsBridgeConfig.standardConfig().apply {
             xhrConfig.okHttpClient = okHttpClient
         }
-        val subject = JsBridge(config)
+        val subject = JsBridge(config, context)
 
         val jsExpectations = JsExpectations()
         val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
@@ -2572,7 +2572,7 @@ class JsBridgeTest {
                 messages.add(priority to message)
             }
         }
-        val subject = JsBridge(config)
+        val subject = JsBridge(config, context)
         jsBridge = subject
 
         // WHEN
@@ -2610,7 +2610,7 @@ class JsBridgeTest {
                 messages.add(priority to message)
             }
         }
-        val subject = JsBridge(config)
+        val subject = JsBridge(config, context)
         jsBridge = subject
 
         // WHEN
@@ -2648,7 +2648,7 @@ class JsBridgeTest {
                 hasMessage = true
             }
         }
-        val subject = JsBridge(config)
+        val subject = JsBridge(config, context)
         jsBridge = subject
 
         // WHEN
@@ -2818,6 +2818,31 @@ class JsBridgeTest {
         }
     }
 
+    @Test
+    fun testLocalStorage() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        // WHEN
+        subject.evaluateBlocking<Unit>("""localStorage.setItem("foo", "bar");""")
+        val result = subject.evaluateBlocking<String>("""localStorage.getItem("foo");""")
+
+        // THEN
+        assertEquals(result, "bar")
+        assertTrue(errors.isEmpty())
+
+        // GIVEN
+        val subjectNoLocalStorage = createAndSetUpJsBridge(JsBridgeConfig.standardConfig().apply {
+            localStorageConfig.useDefaultLocalStorage = false
+        })
+
+        // WHEN
+        val localStorageNotSet = subjectNoLocalStorage.evaluateBlocking<Boolean>("""typeof localStorage == 'undefined';""")
+
+        // THEN
+        assertTrue(localStorageNotSet)
+        assertTrue(errors.isEmpty())
+    }
 
     // JsExpectations
     // ---
@@ -2860,18 +2885,20 @@ class JsBridgeTest {
     // Private methods
     // ---
 
-    private fun createAndSetUpJsBridge(): JsBridge {
-        val config = JsBridgeConfig.standardConfig().apply {
+    private fun createAndSetUpJsBridge(
+        config: JsBridgeConfig = JsBridgeConfig.standardConfig().apply {
             xhrConfig.okHttpClient = okHttpClient
         }
+    ): JsBridge {
 
-        return JsBridge(config).also { jsBridge ->
+        return JsBridge(config, context).also { jsBridge ->
             this@JsBridgeTest.jsBridge = jsBridge
 
             jsBridge.registerErrorListener(createErrorListener())
 
             // Map "jsToNativeFunctionMock" to JS as a global var "NativeFunctionMock"
-            JsValue.fromNativeFunction1(jsBridge, jsToNativeFunctionMock).assignToGlobal("nativeFunctionMock")
+            JsValue.fromNativeFunction1(jsBridge, jsToNativeFunctionMock)
+                .assignToGlobal("nativeFunctionMock")
         }
     }
 

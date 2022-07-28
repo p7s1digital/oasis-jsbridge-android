@@ -15,6 +15,7 @@ private constructor() {
             xhrConfig.enabled = true
             promiseConfig.enabled = true
             consoleConfig.enabled = true
+            localStorageConfig.enabled = true
         }
     }
 
@@ -23,6 +24,7 @@ private constructor() {
     val promiseConfig = PromiseConfig()
     val consoleConfig = ConsoleConfig()
     val jsDebuggerConfig = JsDebuggerConfig()
+    val localStorageConfig = LocalStorageConfig()
 
     class SetTimeoutExtensionConfig {
         var enabled: Boolean = false
@@ -54,5 +56,10 @@ private constructor() {
     class JsDebuggerConfig {
         var enabled: Boolean = false
         var port: Int = 9092
+    }
+
+    class LocalStorageConfig {
+        var enabled: Boolean = false
+        var useDefaultLocalStorage: Boolean = true
     }
 }

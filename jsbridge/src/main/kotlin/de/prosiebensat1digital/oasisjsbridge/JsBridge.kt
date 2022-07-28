@@ -57,7 +57,7 @@ import java.lang.reflect.Proxy
 // can be safely called in a "synchronous" way. though, because their executions are guaranteed
 // to be performed sequentially (via an internal queue).
 class JsBridge
-constructor(config: JsBridgeConfig): CoroutineScope {
+    constructor(config: JsBridgeConfig, context: Context) : CoroutineScope {
 
     companion object {
         private var isLibraryLoaded = false
@@ -95,6 +95,7 @@ constructor(config: JsBridgeConfig): CoroutineScope {
     private var setTimeoutExtension: SetTimeoutExtension? = null
     private var consoleExtension: ConsoleExtension? = null
     private var xhrExtension: XMLHttpRequestExtension? = null
+    private var localStorageExtension: LocalStorageExtension? = null
 
     private var internalCounter = AtomicInteger(0)
 
@@ -152,6 +153,8 @@ constructor(config: JsBridgeConfig): CoroutineScope {
                 consoleExtension = ConsoleExtension(this@JsBridge, config.consoleConfig)
             if (config.xhrConfig.enabled)
                 xhrExtension = XMLHttpRequestExtension(this@JsBridge, config.xhrConfig)
+            if (config.localStorageConfig.enabled)
+                localStorageExtension = LocalStorageExtension(this@JsBridge, config.localStorageConfig, context.applicationContext)
         }
     }
 

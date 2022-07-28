@@ -15,6 +15,7 @@
  */
 package de.prosiebensat1digital.oasisjsbridge
 
+import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlin.test.assertEquals
 import kotlinx.coroutines.*
@@ -26,6 +27,7 @@ import timber.log.Timber
 
 class ReadmeTest {
     private lateinit var jsBridge: JsBridge
+    private val context: Context = InstrumentationRegistry.getInstrumentation().context
 
     companion object {
         @BeforeClass
@@ -37,7 +39,7 @@ class ReadmeTest {
 
     @Before
     fun setUp() {
-        jsBridge = JsBridge(JsBridgeConfig.standardConfig())
+        jsBridge = JsBridge(JsBridgeConfig.standardConfig(), context)
     }
 
     @After
