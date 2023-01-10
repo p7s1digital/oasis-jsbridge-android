@@ -96,6 +96,7 @@ internal class Method {
                         inParameterTypes.add(genericArgumentType)
                     }
                 }
+                else -> Unit
             }
         }
 
