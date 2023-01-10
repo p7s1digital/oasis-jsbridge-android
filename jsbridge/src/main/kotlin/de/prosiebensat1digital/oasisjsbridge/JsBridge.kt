@@ -42,20 +42,22 @@ import timber.log.Timber
 import java.lang.reflect.Proxy
 
 
-// Execute JS code via Duktape or QuickJS and handle the bi-directional communication between native
-// and JS code via interface registration.
-//
-// All the given types are transfered and converted between Native and JS via reflection.
-//
-// Most basic types are supported, as well as lambda parameters. More complex objects can be
-// transferred using the JsonObjectWrapper class.
-//
-// JS values which do not need to be converted to native values can be encapsulated into a
-// JsValue object.
-//
-// Note: all the public methods are asynchronous and will not block the caller threads. They
-// can be safely called in a "synchronous" way. though, because their executions are guaranteed
-// to be performed sequentially (via an internal queue).
+/**
+ * Execute JS code via Duktape or QuickJS and handle the bi-directional communication between native
+ * and JS code via interface registration.
+ *
+ * All the given types are transferred and converted between Native and JS via reflection.
+ *
+ * Most basic types are supported, as well as lambda parameters. More complex objects can be
+ * transferred using the JsonObjectWrapper class.
+ *
+ * JS values which do not need to be converted to native values can be encapsulated into a
+ * JsValue object.
+ *
+ * Note: all the public methods are asynchronous and will not block the caller threads. They
+ * can be safely called in a "synchronous" way. though, because their executions are guaranteed
+ * to be performed sequentially (via an internal queue).
+ */
 class JsBridge
     constructor(config: JsBridgeConfig, context: Context) : CoroutineScope {
 
@@ -170,11 +172,13 @@ class JsBridge
     // Public methods
     // ---
 
-    // Destroy the JsBridge
-    //
-    // - Cancel (and join) all the active jobs
-    // - Destroy the JS context via JNI
-    // - Clean up resources
+    /**
+     * Destroy the JsBridge
+     *
+     * - Cancel (and join) all the active jobs
+     * - Destroy the JS context via JNI
+     * - Clean up resources
+     */
     fun release(): Unit = startReleaseLock.withLock {
         if (state.get() == State.Releasing.intValue || state.get() == State.Released.intValue) {
             Timber.w("JsBridge is already in state $currentState and does not need to be released again!")
@@ -257,15 +261,21 @@ class JsBridge
         }
     }
 
-    // Defines how the JS file will be interpreted:
-    // - global (default): run the JS code in the global context
-    // - module: run as an ES6 module (QuickJS only, Duktape not supported!)
+    /**
+     * Defines how the JS file will be evaluated.
+     *
+     * Evaluation types:
+     * - global (default): run the JS code in the global context
+     * - module: run as an ES6 module (QuickJS only, Duktape not supported!)
+     */
     enum class JsFileEvaluationType {
         Global,
         Module,
     }
 
-    // Set a custom module loader which will return the content of the given module
+    /**
+     * Set a custom module loader which will return the content of the given module
+     */
     private var jsModuleLoaderFunc: ((moduleName: String) -> String)? = null
     fun setJsModuleLoader(func: (moduleName: String) -> String) {
         jsModuleLoaderFunc = func
@@ -276,10 +286,12 @@ class JsBridge
         }
     }
 
-    // Evaluate a local JS file which should be bundled as an asset.
-    //
-    // If the given file has a corresponding .max file, this one will be used in debug mode.
-    // e.g.: "myfile.js" / "myfile.max.js"
+    /**
+     * Evaluate a local JS file which should be bundled as an asset.
+     *
+     * If the given file has a corresponding .max file, this one will be used in debug mode.
+     * e.g.: "myfile.js" / "myfile.max.js"
+     */
     suspend fun evaluateLocalFile(context: Context, filename: String, useMaxJs: Boolean = false, type: JsFileEvaluationType = JsFileEvaluationType.Global) {
         withContext(coroutineContext) {
             val jniJsContext = jniJsContextOrThrow()
@@ -297,21 +309,27 @@ class JsBridge
         }
     }
 
-    // Evaluate a local JS file which should be bundled as an asset (blocking version)
+    /**
+     * Evaluate a local JS file which should be bundled as an asset (blocking version).
+     */
     fun evaluateLocalFileUnsync(context: Context, filename: String, useMaxJs: Boolean = false, type: JsFileEvaluationType = JsFileEvaluationType.Global) {
         launch {
             evaluateLocalFile(context, filename, useMaxJs, type)
         }
     }
 
-    // Evaluate a local JS file which should be bundled as an asset (blocking version)
+    /**
+     * Evaluate a local JS file which should be bundled as an asset (blocking version)
+     */
     fun evaluateLocalFileBlocking(context: Context, filename: String, useMaxJs: Boolean = false, type: JsFileEvaluationType = JsFileEvaluationType.Global) {
         runBlocking(coroutineContext) {
             evaluateLocalFile(context, filename, useMaxJs, type)
         }
     }
 
-    // Evaluate the content of a JavaScript file (e.g. fetched from the network).
+    /*
+     * Evaluate the content of a JavaScript file (e.g. fetched from the network).
+     */
     suspend fun evaluateFileContent(content: String, filename: String, type: JsFileEvaluationType = JsFileEvaluationType.Global) {
         withContext(coroutineContext) {
             val jniJsContext = jniJsContextOrThrow()
@@ -327,21 +345,27 @@ class JsBridge
         }
     }
 
-    // Evaluate the content of a JavaScript file (e.g. fetched from the network).
+    /**
+     * Evaluate the content of a JavaScript file (e.g. fetched from the network).
+     */
     fun evaluateFileContentUnsync(content: String, filename: String, type: JsFileEvaluationType = JsFileEvaluationType.Global) {
         launch {
             evaluateFileContent(content, filename, type)
         }
     }
 
-    // Evaluate the content of a JavaScript file (e.g. fetched from the network).
+    /**
+     * Evaluate the content of a JavaScript file (e.g. fetched from the network).
+     */
     fun evaluateFileContentBlocking(content: String, filename: String, type: JsFileEvaluationType = JsFileEvaluationType.Global) {
         runBlocking(coroutineContext) {
             evaluateFileContent(content, filename, type)
         }
     }
 
-    // Evaluate the given JS code without return value
+    /**
+     * Evaluate the given JS code without return value.
+     */
     fun evaluateUnsync(js: String) {
         launch {
             val jniJsContext = jniJsContextOrThrow()
@@ -360,7 +384,9 @@ class JsBridge
         }
     }
 
-    // Evaluate the given JS code without and return the value as a Deferred
+    /**
+     * Evaluate the given JS code and return the value as a Deferred
+     */
     fun <T: Any?> evaluateAsync(js: String, type: KType?): Deferred<T> = async {
         evaluate(js, type, false)
     }

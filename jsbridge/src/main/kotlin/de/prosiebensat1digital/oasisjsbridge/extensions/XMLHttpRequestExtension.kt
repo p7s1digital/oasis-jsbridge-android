@@ -62,7 +62,7 @@ internal class XMLHttpRequestExtension(
             var responseText: String? = null
             try {
                 // Validate HTTP method
-                when (httpMethod.toLowerCase(Locale.ROOT)) {
+                when (httpMethod.lowercase(Locale.ROOT)) {
                     "get", "post", "put", "delete" -> Unit
                     else -> throw Throwable("Unsupported http method: $httpMethod")
                 }
@@ -97,7 +97,7 @@ internal class XMLHttpRequestExtension(
                      we should instead send request with body with no data.
                      Otherwise, OkHttp will throw an exception:
                      "Method post must have a request body */
-                    data == null && httpMethod.toLowerCase(Locale.ROOT) == "post" -> {
+                    data == null && httpMethod.lowercase(Locale.ROOT) == "post" -> {
                         "".toRequestBody(contentType.toMediaTypeOrNull())
                     }
                     else -> {
@@ -113,7 +113,7 @@ internal class XMLHttpRequestExtension(
                 request = Request.Builder()
                     .url(httpUrl)
                     .headers(requestHeaders)
-                    .method(httpMethod.toUpperCase(Locale.ROOT), requestBody)
+                    .method(httpMethod.uppercase(Locale.ROOT), requestBody)
                     .build()
                 val response = okHttpClient.newCall(request).execute()
 

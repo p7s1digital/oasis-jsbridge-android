@@ -57,12 +57,14 @@ interface Payload {
     fun isNull() = (this as? PayloadNull) != null
 }
 
-inline class PayloadString(val value: String): Payload {
+@JvmInline
+value class PayloadString(val value: String): Payload {
     override fun toJsString(orderAlphabetically: Boolean) = "\"${escape(value)}\""
     override fun toJsonString(orderAlphabetically: Boolean) = toJsString(orderAlphabetically)
 }
 
-inline class PayloadNumber(val value: Number): Payload {
+@JvmInline
+value class PayloadNumber(val value: Number): Payload {
     override fun toJsString(orderAlphabetically: Boolean) = "$value"
     override fun toJsonString(orderAlphabetically: Boolean) = "$value"
 }
