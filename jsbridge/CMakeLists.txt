@@ -44,6 +44,7 @@ add_library(
     src/main/jni/java-types/Integer.cpp
     src/main/jni/java-types/JsonObjectWrapper.cpp
     src/main/jni/java-types/JsValue.cpp
+    src/main/jni/java-types/List.cpp
     src/main/jni/java-types/Long.cpp
     src/main/jni/java-types/Object.cpp
     src/main/jni/java-types/Primitive.cpp

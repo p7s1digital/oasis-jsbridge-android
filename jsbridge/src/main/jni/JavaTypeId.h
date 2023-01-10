@@ -43,6 +43,7 @@ enum class JavaTypeId {
   Object = 40,
 
   ObjectArray = 50,
+  List = 51,
 
   BooleanArray = 60,
   ByteArray = 61,

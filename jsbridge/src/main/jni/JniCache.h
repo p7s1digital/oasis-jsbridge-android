@@ -39,6 +39,7 @@ public:
 
   const JniGlobalRef<jclass> &getJavaClass(JavaTypeId) const;
   const JniRef<jclass> &getObjectClass() const { return m_objectClass; }
+  const JniRef<jclass> &getListClass() const { return m_listClass; }
   const JniRef<jclass> &getJsBridgeClass() const { return m_jsBridgeClass; }
   const JniRef<jclass> &getJsBridgeMethodClass() const { return m_jsBridgeMethodClass; }
   const JniRef<jclass> &getJsBridgeParameterClass() const { return m_jsBridgeParameterClass; }
@@ -71,6 +72,12 @@ public:
   JniLocalRef<jobject> newJsonObjectWrapper(const JStringLocalRef &jsonString) const;
   JStringLocalRef getJsonObjectWrapperString(const JniRef<jobject> &jsonObjectWrapper) const;
 
+  // List (java.util.List)
+  JniLocalRef<jobject> newList() const;
+  void addToList(const JniLocalRef<jobject> &list, const JniLocalRef<jobject> &element) const;
+  int getListLength(const JniLocalRef<jobject> &list) const;
+  JniLocalRef<jobject> getListElement(const JniLocalRef<jobject> &list, int i) const;
+
   const JniContext *getJniContext() const { return m_jniContext; }
 
 private:
@@ -80,6 +87,8 @@ private:
   mutable std::unordered_map<JavaTypeId, JniGlobalRef<jclass>> m_javaClasses;
 
   JniGlobalRef<jclass> m_objectClass;
+  JniGlobalRef<jclass> m_listClass;
+  JniGlobalRef<jclass> m_arrayListClass;
   JniGlobalRef<jclass> m_jsBridgeClass;
   JniGlobalRef<jclass> m_jsExceptionClass;
   JniGlobalRef<jclass> m_illegalArgumentExceptionClass;

@@ -32,6 +32,7 @@
 #include "jni-helpers/JStringLocalRef.h"
 #include "jni-helpers/JValue.h"
 #include "jni-helpers/JniLocalRef.h"
+#include "log.h"
 #include <string>
 #include <vector>
 
@@ -61,13 +62,13 @@ JValue JavaType::popArray(uint32_t count, bool expanded) const {
 
  count = expanded ? count : duk_get_length(m_ctx, -1);
 
- JObjectArrayLocalRef objectArray(m_jniContext, count, getJavaClass());
+ JObjectArrayLocalRef objectArray(m_jniContext, (jint) count, getJavaClass());
  if (objectArray.isNull()) {
-  duk_pop_n(m_ctx, expanded ? count : 1);  // pop the expanded elements or the array
+  duk_pop_n(m_ctx, expanded ? (duk_idx_t) count : 1);  // pop the expanded elements or the array
   throw JniException(m_jniContext);
  }
 
- for (int i = count - 1; i >= 0; --i) {
+ for (int i = (int) count - 1; i >= 0; --i) {
   if (!expanded) {
     duk_get_prop_index(m_ctx, -1, static_cast<duk_uarridx_t>(i));
   }
@@ -128,7 +129,7 @@ JValue JavaType::toJavaArray(JSValueConst jsValue) const {
   uint32_t count = JS_VALUE_GET_INT(lengthValue);
   JS_FreeValue(m_ctx, lengthValue);
 
-  JObjectArrayLocalRef objectArray(m_jniContext, count, getJavaClass());
+  JObjectArrayLocalRef objectArray(m_jniContext, (jsize) count, getJavaClass());
   if (objectArray.isNull()) {
     throw JniException(m_jniContext);
   }
@@ -139,7 +140,7 @@ JValue JavaType::toJavaArray(JSValueConst jsValue) const {
     JValue elementJavaValue = toJava(elementJsValue);
     JS_FreeValue(m_ctx, elementJsValue);
     const JniLocalRef<jobject> &jElement = elementJavaValue.getLocalRef();
-    objectArray.setElement(i, jElement);
+    objectArray.setElement((jsize) i, jElement);
 
     if (m_jniContext->exceptionCheck()) {
       throw JniException(m_jniContext);
@@ -184,4 +185,3 @@ JValue JavaType::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
 
  return JValue(returnValue);
 }
-

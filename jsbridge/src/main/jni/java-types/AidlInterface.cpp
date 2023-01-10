@@ -126,7 +126,7 @@ JValue AidlInterface::toJava(JSValueConst v) const {
   const QuickJsUtils *utils = m_jsBridgeContext->getUtils();
   assert(utils != nullptr);
 
-  if (!JS_IsObject(v) && !JS_IsNull(v)) {
+  if (!JS_IsObject(v) || JS_IsNull(v)) {
     throw std::invalid_argument("Cannot convert return value to AidlInterface");
   }
 
