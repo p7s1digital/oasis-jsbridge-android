@@ -23,6 +23,8 @@ JniCache::JniCache(const JsBridgeContext *jsBridgeContext, const JniLocalRef<job
  : m_jsBridgeContext(jsBridgeContext)
  , m_jniContext(m_jsBridgeContext->getJniContext())
  , m_objectClass(m_jniContext->findClass("java/lang/Object"))
+ , m_arrayListClass(m_jniContext->findClass("java/util/ArrayList"))
+ , m_listClass(m_jniContext->findClass("java/util/List"))
  , m_jsBridgeClass(m_jniContext->findClass(JSBRIDGE_PKG_PATH "/JsBridge"))
  , m_jsExceptionClass(m_jniContext->findClass(JSBRIDGE_PKG_PATH "/JsException"))
  , m_illegalArgumentExceptionClass(m_jniContext->findClass("java/lang/IllegalArgumentException"))
@@ -118,4 +120,27 @@ JniLocalRef<jobject> JniCache::newJsonObjectWrapper(const JStringLocalRef &jsonS
 JStringLocalRef JniCache::getJsonObjectWrapperString(const JniRef<jobject> &jsonObjectWrapper) const {
   static thread_local jmethodID getJsonString = m_jniContext->getMethodID(m_jsonObjectWrapperClass, "getJsonString", "()Ljava/lang/String;");
   return m_jniContext->callStringMethod(jsonObjectWrapper, getJsonString);
+}
+
+// List
+// ---
+
+JniLocalRef<jobject> JniCache::newList() const {
+  static thread_local jmethodID methodId = m_jniContext->getMethodID(m_arrayListClass, "<init>", "()V");
+  return m_jniContext->newObject<jobject>(m_arrayListClass, methodId);
+}
+
+void JniCache::addToList(const JniLocalRef<jobject> &list, const JniLocalRef<jobject> &element) const {
+  static thread_local jmethodID methodId = m_jniContext->getMethodID(m_listClass, "add", "(Ljava/lang/Object;)Z");
+  m_jniContext->callBooleanMethod(list, methodId, element);
+}
+
+int JniCache::getListLength(const JniLocalRef<jobject> &list) const {
+  static thread_local jmethodID methodId = m_jniContext->getMethodID(m_listClass, "size", "()I");
+  return m_jniContext->callIntMethod(list, methodId);
+}
+
+JniLocalRef<jobject> JniCache::getListElement(const JniLocalRef<jobject> &list, int i) const {
+  static thread_local jmethodID methodId = m_jniContext->getMethodID(m_listClass, "get", "(I)Ljava/lang/Object;");
+  return m_jniContext->callObjectMethod(list, methodId, i);
 }

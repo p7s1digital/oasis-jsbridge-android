@@ -324,6 +324,7 @@ JS debugger support (Duktape only via Visual Studio Code plugin)
 | `FloatArray`        | `float[]`            | `Array`    |
 | `DoubleArray`       | `double[]`           | `Array`    |
 | `Array<T: Any>`     | `T[]`                | `Array`    | T must be a supported type
+| `List<T: Any>`      | `List                | `Array`    | T must be a supported type. Backed up by ArrayList.
 | `Function<R>`       | n.a.                 | `function` | lambda with supported types
 | `Deferred<T>`       | n.a.                 | `Promise`  | T must be a supported type
 | `JsonObjectWrapper` | `JsonObjectWrapper`  | `object`   | serializes JS objects via JSON

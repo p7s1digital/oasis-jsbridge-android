@@ -967,6 +967,25 @@ class JsBridgeTest {
             val jsArrayNullableString = JsValue.fromNativeValue(subject, arrayOf("a", null, "c"))
             assertArrayEquals(arrayOf("a", "b", "c"), jsArrayString.evaluate())
             assertArrayEquals(arrayOf("a", null, "c"), jsArrayNullableString.evaluate())
+
+            val jsListString = JsValue.fromNativeValue(subject, listOf("a", "b", "c"))
+            assertEquals(listOf("a", "b", "c"), jsListString.evaluate())
+
+            val payloadObject = payloadObjectOf("key1" to "value1", "key2" to "value2")
+            val listObject = JsonObjectWrapper(payloadObject.toJsonString(false))
+
+            val jsListObject = JsValue.fromNativeValue(subject, listOf(listObject, null, listObject))
+            val javaListObject: List<JsonObjectWrapper> = jsListObject.evaluate()
+            assertEquals(3, javaListObject.size)
+            assertEquals(payloadObject, javaListObject[0].toPayloadObject())
+            assertEquals("null", javaListObject[1].jsonString)
+            assertEquals(payloadObject, javaListObject[2].toPayloadObject())
+
+            val javaListNullableObject: List<JsonObjectWrapper?> = jsListObject.evaluate()
+            assertEquals(3, javaListNullableObject.size)
+            assertEquals(payloadObject, javaListNullableObject[0]!!.toPayloadObject())
+            assertNull(javaListNullableObject[1])
+            assertEquals(payloadObject, javaListNullableObject[2]!!.toPayloadObject())
         }
     }
 

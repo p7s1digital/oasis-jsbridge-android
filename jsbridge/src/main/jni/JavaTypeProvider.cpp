@@ -30,6 +30,7 @@
 #include "java-types/Integer.h"
 #include "java-types/JsValue.h"
 #include "java-types/JsonObjectWrapper.h"
+#include "java-types/List.h"
 #include "java-types/Long.h"
 #include "java-types/Object.h"
 #include "java-types/String.h"
@@ -109,6 +110,10 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
     case JavaTypeId::ObjectArray: {
       auto genericParameterType = getGenericParameterType(parameter);
       return new Array(m_jsBridgeContext, std::move(genericParameterType));
+    }
+    case JavaTypeId::List: {
+      auto genericParameterType = getGenericParameterType(parameter);
+      return new List(m_jsBridgeContext, std::move(genericParameterType));
     }
     case JavaTypeId::BooleanArray:
       return createPrimitiveArray<Boolean>(m_jsBridgeContext);

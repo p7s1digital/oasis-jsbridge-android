@@ -47,7 +47,8 @@ static thread_local std::unordered_map<std::u16string_view, JavaTypeId> sJavaNam
   { u"java.lang.String", JavaTypeId::String },
   { u"java.lang.Object", JavaTypeId::Object },
 
-  { u"[Ljava.lang.Object;",JavaTypeId::ObjectArray },
+  { u"[Ljava.lang.Object;", JavaTypeId::ObjectArray },
+  { u"java.util.List", JavaTypeId::List },
 
   { u"[Z", JavaTypeId::BooleanArray },
   { u"[B", JavaTypeId::ByteArray },
