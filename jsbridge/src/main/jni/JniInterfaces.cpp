@@ -146,6 +146,12 @@ jboolean MethodInterface::isVarArgs() const {
   return m_jniCache->getJniContext()->callBooleanMethod(m_object, methodId);
 }
 
+jboolean MethodInterface::isAidl() const {
+  static thread_local jmethodID methodId = m_jniCache->getJniContext()->getMethodID(m_class, "isAidl", "()Z");
+  return m_jniCache->getJniContext()->callBooleanMethod(m_object, methodId);
+}
+
+
 // ParameterInterface
 // ---
 
@@ -198,6 +204,11 @@ JniLocalRef<jsBridgeParameter> ParameterInterface::getGenericParameter() const {
 JStringLocalRef ParameterInterface::getName() const {
   static thread_local jmethodID methodId = m_jniCache->getJniContext()->getMethodID(m_class, "getName", "()Ljava/lang/String;");
   return m_jniCache->getJniContext()->callStringMethod(m_object, methodId);
+}
+
+JniLocalRef<jsBridgeMethod> ParameterInterface::getParentMethod() const {
+  static thread_local jmethodID methodId = m_jniCache->getJniContext()->getMethodID(m_class, "getParentMethod", "()L" JSBRIDGE_PKG_PATH "/Method;");
+  return m_jniCache->getJniContext()->callObjectMethod<jsBridgeMethod>(m_object, methodId);
 }
 
 JStringLocalRef ParameterInterface::getParentMethodName() const {

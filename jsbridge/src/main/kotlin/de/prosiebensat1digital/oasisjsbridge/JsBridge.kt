@@ -493,8 +493,8 @@ class JsBridge
     // - native methods returning a "Kotlin coroutine" Deferred are mapped to a JS Promise
     // - if the JS value is a promise, you need to resolve it first with jsValue.await() or jsValue.awaitAsync()
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
-    suspend fun <T : NativeToJsInterface> registerNativeToJsInterface(jsValue: JsValue, type: KClass<T>, check: Boolean): T {
-        return registerNativeToJsInterfaceHelper(jsValue, type, check, true)
+    suspend fun <T : NativeToJsInterface> registerNativeToJsInterface(jsValue: JsValue, type: KClass<T>, check: Boolean, isAidl: Boolean): T {
+        return registerNativeToJsInterfaceHelper(jsValue, type, check, true, isAidl)
     }
 
     // Register a "JS" interface called by native (blocking)
@@ -503,10 +503,10 @@ class JsBridge
     // When check = true, the method will block the current thread until the registration has been
     // done and then return the proxy object
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
-    fun <T : NativeToJsInterface> registerNativeToJsInterfaceBlocking(jsValue: JsValue, type: KClass<T>, check: Boolean, context: CoroutineContext?): T {
+    fun <T : NativeToJsInterface> registerNativeToJsInterfaceBlocking(jsValue: JsValue, type: KClass<T>, check: Boolean, context: CoroutineContext?, isAidl: Boolean): T {
 
         return runBlocking(context ?: Dispatchers.Unconfined) {
-            registerNativeToJsInterfaceHelper(jsValue, type, check, waitForRegistration = check)
+            registerNativeToJsInterfaceHelper(jsValue, type, check, waitForRegistration = check, isAidl)
         }
     }
 
@@ -828,7 +828,7 @@ class JsBridge
             // Collect class Methods using Kotlin reflection
             for (kFunction in apiInterface.kotlin.declaredMemberFunctions) {
                 // TODO: check that there is no optional!
-                val method = Method(kFunction, false)
+                val method = Method(kFunction, false, isAidl)
                 if (methods.put(kFunction.name, method) != null) {
                     throw JsToNativeRegistrationError(type, customMessage = ("${kFunction.name} is overloaded in $type"))
                 }
@@ -842,7 +842,7 @@ class JsBridge
             Timber.w("Cannot reflect object of type $type (exception: $t) using Kotlin reflection! Falling back to Java reflection...")
 
             for (javaMethod in type.java.methods) {
-                val method = Method(javaMethod)
+                val method = Method(javaMethod, isAidl)
                 if (methods.put(javaMethod.name, method) != null) {
                     throw JsToNativeRegistrationError(type, Throwable("${method.name} is overloaded in $type"))
                 }
@@ -884,7 +884,7 @@ class JsBridge
     // done asynchronously)
     // - If async = false, the proxy object is only returned after a successful registration
     @Throws
-    private suspend fun <T: Any> registerNativeToJsInterfaceHelper(jsValue: JsValue, type: KClass<T>, check: Boolean, waitForRegistration: Boolean): T {
+    private suspend fun <T: Any> registerNativeToJsInterfaceHelper(jsValue: JsValue, type: KClass<T>, check: Boolean, waitForRegistration: Boolean, isAidl: Boolean): T {
         if (!type.java.isInterface) {
             throw NativeToJsRegistrationError(type, customMessage = "$type must be an interface")
         }
@@ -923,7 +923,7 @@ class JsBridge
 
             // Group by name
             // -> Map<methodName, List<Method>>
-            .groupBy({ it.name }, { Method(it, false) })
+            .groupBy({ it.name }, { Method(it, false, isAidl) })
 
             // Map to unique value
             // -> Map<methodName, Method>

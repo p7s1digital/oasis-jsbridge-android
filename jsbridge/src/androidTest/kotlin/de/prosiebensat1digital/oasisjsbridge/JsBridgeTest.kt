@@ -22,16 +22,16 @@ import io.mockk.Ordering
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import kotlin.test.*
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import org.junit.After
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.BeforeClass
 import org.junit.Test
-import org.junit.Assert.assertArrayEquals
-import org.junit.Assert.fail
 import timber.log.Timber
+import kotlin.test.*
 
 interface TestNativeApiInterface : JsToNativeInterface {
     fun nativeMethodReturningTrue(): Boolean
@@ -2706,9 +2706,11 @@ class JsBridgeTest {
                 p.stringField = "kotlinParcelableArrayItem2"
             },
         )
+        val kotlinParcelableList: List<TestAidlParcelable> = kotlinParcelableArray.toList()
         val kotlinEnum = TestAidlEnum.SECOND
         var jsParcelable: TestAidlParcelable? = null
         var jsParcelableArray: Array<TestAidlParcelable>? = null
+        var jsParcelableList: List<TestAidlParcelable>? = null
         var jsEnum: Byte? = null
         val expectedJsValues = JsValue(subject, "({})")
 
@@ -2718,6 +2720,8 @@ class JsBridgeTest {
                 o.onDone()
                 o.onDoneWithParcelable(kotlinParcelable)
                 o.onDoneWithParcelableArray(kotlinParcelableArray)
+                o.onDoneWithParcelableList(kotlinParcelableList)
+                o.onDoneWithParcelableListWithoutGeneric(kotlinParcelableList)
             }
             override fun setParcelable(payload: TestAidlParcelable) {
                 jsParcelable = payload
@@ -2725,6 +2729,10 @@ class JsBridgeTest {
             override fun setParcelableArray(payload: Array<TestAidlParcelable>) {
                 jsParcelableArray = payload
             }
+            override fun setParcelableList(payload: List<TestAidlParcelable>) {
+                jsParcelableList = payload
+            }
+            override fun setParcelableListWithoutGeneric(payload: List<*>) = Unit
             override fun setEnum(payload: Byte) {
                 jsEnum = payload
             }
@@ -2749,17 +2757,41 @@ class JsBridgeTest {
               onDoneWithParcelableArray: function(pa) {
                 $expectedJsValues.onDoneWithParcelableArray = pa;
               },
+              onDoneWithParcelableList: function(pl) {
+                $expectedJsValues.onDoneWithParcelableList = pl;
+              },
+              onDoneWithParcelableListWithoutGeneric: function(pl) {
+                $expectedJsValues.onDoneWithParcelableListWithoutGeneric = pl;
+              }
             });
             
             // Pass parcelable to AIDL interface method
             $aidlInstanceJsValue.setParcelable({intField: 1, stringField: "one"});
             
-            // Pass parcelable to AIDL interface method
+            // Pass parcelable array to AIDL interface method
             $aidlInstanceJsValue.setParcelableArray([
                 {intField: 1, stringField: "one"},
                 {intField: 2, stringField: "two"},
                 {intField: 3, stringField: "three"},
             ]);
+            
+            // Pass parcelable list to AIDL interface method
+            $aidlInstanceJsValue.setParcelableList([
+                {intField: 3, stringField: "three"},
+                {intField: 2, stringField: "two"},
+                {intField: 1, stringField: "one"},
+            ]);
+            
+            // Pass parcelable list without generic to AIDL interface method => not supported!!!
+            try {
+                $aidlInstanceJsValue.setParcelableListWithoutGeneric([
+                    {intField: 3, stringField: "three"},
+                    {intField: 2, stringField: "two"},
+                    {intField: 1, stringField: "one"}
+                ]);
+            } catch (e) {
+              $expectedJsValues.parcelableListWithoutGenericException = true;
+            }
             
             // Pass enum to AIDL interface method
             $aidlInstanceJsValue.setEnum(${TestAidlEnum.FIRST});
@@ -2784,14 +2816,22 @@ class JsBridgeTest {
             assertEquals(1, jsParcelableArray!![0].intField)
             assertEquals(2, jsParcelableArray!![1].intField)
             assertEquals(3, jsParcelableArray!![2].intField)
+            assertEquals(3, jsParcelableList?.size)
+            assertEquals(3, jsParcelableList!![0].intField)
+            assertEquals(2, jsParcelableList!![1].intField)
+            assertEquals(1, jsParcelableList!![2].intField)
             assertEquals(TestAidlEnum.FIRST, jsEnum)
+            val payloadArray = payloadArrayOf(
+                payloadObjectOf("intField" to kotlinParcelableArray[0].intField, "stringField" to kotlinParcelableArray[0].stringField),
+                payloadObjectOf("intField" to kotlinParcelableArray[1].intField, "stringField" to kotlinParcelableArray[1].stringField),
+            )
             assertEquals(payloadObjectOf(
                 "onDone" to true,
                 "onDoneWithParcelable" to payloadObjectOf("intField" to kotlinParcelable.intField, "stringField" to kotlinParcelable.stringField),
-                "onDoneWithParcelableArray" to payloadArrayOf(
-                    payloadObjectOf("intField" to kotlinParcelableArray[0].intField, "stringField" to kotlinParcelableArray[0].stringField),
-                    payloadObjectOf("intField" to kotlinParcelableArray[1].intField, "stringField" to kotlinParcelableArray[1].stringField),
-                ),
+                "onDoneWithParcelableArray" to payloadArray,
+                "onDoneWithParcelableList" to payloadArray,
+                "onDoneWithParcelableListWithoutGeneric" to payloadArray,
+                "parcelableListWithoutGenericException" to true,
                 "parcelableFromKotlin" to payloadObjectOf("intField" to kotlinParcelable.intField, "stringField" to kotlinParcelable.stringField),
                 "enumFromKotlin" to kotlinEnum.toInt(),
             ), expectedJsValuesMap.toPayloadObject())

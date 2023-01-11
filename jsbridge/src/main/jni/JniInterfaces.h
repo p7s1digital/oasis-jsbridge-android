@@ -68,6 +68,7 @@ public:
   JniLocalRef<jsBridgeParameter> getReturnParameter() const;
   JObjectArrayLocalRef getParameters() const;
   jboolean isVarArgs() const;
+  jboolean isAidl() const;
 };
 
 // de.prosiebensat1digital.oasisjsbridge.Parameter
@@ -82,6 +83,7 @@ public:
   jboolean isNullable() const;
   JniLocalRef<jsBridgeParameter> getGenericParameter() const;
   JStringLocalRef getName() const;
+  JniLocalRef<jsBridgeMethod> getParentMethod() const;
   JStringLocalRef getParentMethodName() const;
   jboolean isAidlInterface() const;
   jboolean isAidlParcelable() const;

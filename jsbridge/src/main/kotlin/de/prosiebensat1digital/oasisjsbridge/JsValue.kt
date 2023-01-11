@@ -354,7 +354,7 @@ internal constructor(
 
         // Note: as check = false, the method will actually directly return without blocking the
         // current thread
-        return jsBridge.registerNativeToJsInterfaceBlocking(this, T::class, false, null)
+        return jsBridge.registerNativeToJsInterfaceBlocking(this, T::class, false, null, false)
     }
 
     /**
@@ -372,7 +372,7 @@ internal constructor(
         val jsBridge = jsBridge
                 ?: throw NativeToJsRegistrationError(T::class, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
 
-        return jsBridge.registerNativeToJsInterface(this, T::class, check)
+        return jsBridge.registerNativeToJsInterface(this, T::class, check, false)
     }
 
     /**
@@ -383,7 +383,7 @@ internal constructor(
         val jsBridge = jsBridge
                 ?: throw NativeToJsRegistrationError(T::class, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
 
-        return jsBridge.registerNativeToJsInterfaceBlocking(this, T::class, check, context)
+        return jsBridge.registerNativeToJsInterfaceBlocking(this, T::class, check, context, false)
     }
 
     /**
@@ -402,7 +402,7 @@ internal constructor(
 
         // Note: as check = false, the method will actually directly return without blocking the
         // current thread
-        return jsBridge.registerNativeToJsInterfaceBlocking(this, nativeToJsInterface.kotlin, false, null)
+        return jsBridge.registerNativeToJsInterfaceBlocking(this, nativeToJsInterface.kotlin, false, null, false)
     }
 
     /**
@@ -424,7 +424,7 @@ internal constructor(
         val jsBridge = jsBridge
                 ?: throw NativeToJsRegistrationError(nativeToJsInterface.kotlin, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
 
-        return jsBridge.registerNativeToJsInterfaceBlocking(this, nativeToJsInterface.kotlin, check, context)
+        return jsBridge.registerNativeToJsInterfaceBlocking(this, nativeToJsInterface.kotlin, check, context, false)
     }
 
 
