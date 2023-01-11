@@ -31,6 +31,7 @@ internal class Method {
     val name: String?
 
     val javaMethod: JavaMethod?
+    val isAidl: Boolean
 
     @Suppress("UNUSED")  // Called from JNI
     var returnParameter: Parameter
@@ -43,9 +44,10 @@ internal class Method {
     val isVarArgs: Boolean
 
     // KFunction with full reflection information
-    constructor(kotlinFunction: KFunction<*>, isLambda: Boolean) {
-        this.javaMethod = kotlinFunction.javaMethod ?: throw Throwable("Given kotlin Function does not have any Java method")
+    constructor(kotlinFunction: KFunction<*>, isLambda: Boolean, isAidl: Boolean) {
         this.name = kotlinFunction.name
+        this.javaMethod = kotlinFunction.javaMethod ?: throw Throwable("Given kotlin Function does not have any Java method")
+        this.isAidl = isAidl
 
         // The return type of Unit functions must be "Unit" for lambdas but "Void" for methods
         val returnType = if (!isLambda && kotlinFunction.returnType.classifier == Unit::class) Void::class.createType() else kotlinFunction.returnType
@@ -56,9 +58,10 @@ internal class Method {
     }
 
     // Java-only reflection
-    constructor(javaMethod: JavaMethod) {
+    constructor(javaMethod: JavaMethod, isAidl: Boolean) {
         this.name = javaMethod.name
         this.javaMethod = javaMethod
+        this.isAidl = isAidl
         this.returnParameter = Parameter(this, javaMethod.returnType)
         this.parameters = javaMethod.parameterTypes.map { Parameter(this, it) }.toTypedArray()
         this.isVarArgs = javaMethod.isVarArgs
@@ -74,9 +77,9 @@ internal class Method {
     // arguments are reflected with the INVARIANT projection, though. In that case the asumption is
     // that the return type is the last argument.
     constructor(javaMethod: JavaMethod, genericArguments: List<KTypeProjection>, isLambda: Boolean) {
-        this.javaMethod = javaMethod
-
         this.name = javaMethod.name
+        this.javaMethod = javaMethod
+        this.isAidl = false
         this.isVarArgs = javaMethod.isVarArgs
 
         var outParameterType: KType? = null
@@ -113,8 +116,9 @@ internal class Method {
 
     constructor(parameters: Array<Parameter>, returnParameter: Parameter, isVarArgs: Boolean) {
         this.name = null
-        this.isVarArgs = isVarArgs
         this.javaMethod = null
+        this.isAidl = false
+        this.isVarArgs = isVarArgs
         this.parameters = parameters
         this.returnParameter = returnParameter
     }

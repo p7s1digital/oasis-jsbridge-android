@@ -78,6 +78,9 @@ public:
   int getListLength(const JniLocalRef<jobject> &list) const;
   JniLocalRef<jobject> getListElement(const JniLocalRef<jobject> &list, int i) const;
 
+  // Parameter (de.prosiebensat1digital.oasisjsbridge.Parameter)
+  JniLocalRef<jsBridgeParameter> newParameter(const JniLocalRef<jclass> &javaClass) const;
+
   const JniContext *getJniContext() const { return m_jniContext; }
 
 private:

@@ -144,3 +144,12 @@ JniLocalRef<jobject> JniCache::getListElement(const JniLocalRef<jobject> &list, 
   static thread_local jmethodID methodId = m_jniContext->getMethodID(m_listClass, "get", "(I)Ljava/lang/Object;");
   return m_jniContext->callObjectMethod(list, methodId, i);
 }
+
+
+// Parameter
+// ---
+
+JniLocalRef<jsBridgeParameter> JniCache::newParameter(const JniLocalRef<jclass> &javaClass) const {
+  static thread_local jmethodID methodId = m_jniContext->getMethodID(m_jsBridgeParameterClass, "<init>", "(Ljava/lang/Class;)V");
+  return m_jniContext->newObject<jsBridgeParameter>(m_jsBridgeParameterClass, methodId, javaClass);
+}

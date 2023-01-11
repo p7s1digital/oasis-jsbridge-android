@@ -18,6 +18,7 @@
  */
 #include "List.h"
 
+#include "AutoReleasedJSValue.h"
 #include "JniCache.h"
 #include "JsBridgeContext.h"
 #include "Primitive.h"
@@ -67,7 +68,14 @@ JValue List::pop() const {
   for (int i = 0; i < count; ++i) {
     duk_get_prop_index(m_ctx, -1, static_cast<duk_uarridx_t>(i));
 
-    JValue elementValue = m_componentType->pop();
+    JValue elementValue;
+
+    try {
+      elementValue = m_componentType->pop();
+    } catch (const std::exception &) {
+      duk_pop(m_ctx);  // pop array
+      throw;
+    }
     const JniLocalRef<jobject> &jElement = elementValue.getLocalRef();
     m_jsBridgeContext->getJniCache()->addToList(javaList, jElement);
 
@@ -129,8 +137,8 @@ JValue List::toJava(JSValueConst v) const {
 
   for (int i = 0; i < count; ++i) {
     JSValue elementJsValue = JS_GetPropertyUint32(m_ctx, v, i);
+    JS_AUTORELEASE_VALUE(m_ctx, elementJsValue);  // also released in case of exception!
     JValue elementValue = m_componentType->toJava(elementJsValue);
-    JS_FreeValue(m_ctx, elementJsValue);
 
     const JniLocalRef<jobject> &jElement = elementValue.getLocalRef();
     m_jsBridgeContext->getJniCache()->addToList(javaList, jElement);
@@ -144,7 +152,7 @@ JValue List::toJava(JSValueConst v) const {
 }
 
 JSValue List::fromJava(const JValue &value) const {
-  JniLocalRef<jobject> jList(value.getLocalRef());
+  const JniLocalRef<jobject> &jList = value.getLocalRef();
 
   if (jList.isNull()) {
     return JS_NULL;

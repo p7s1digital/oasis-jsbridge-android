@@ -16,6 +16,7 @@
 package de.prosiebensat1digital.oasisjsbridge
 
 import com.google.gson.Gson
+import timber.log.Timber
 import kotlin.reflect.*
 import kotlin.reflect.full.memberFunctions
 
@@ -24,7 +25,7 @@ import kotlin.reflect.full.memberFunctions
 // - Java Class which has the reflection info without generic type info
 @PublishedApi
 internal open class Parameter private constructor(
-    private val parentMethod: Method?,
+    val parentMethod: Method?,
     internal val kotlinType: KType?,
     internal val javaClass: Class<*>?,
     val name: String?,
@@ -93,7 +94,7 @@ internal open class Parameter private constructor(
                 val kotlinClass = kotlinType.classifier as? KClass<*>
                 val kotlinFunction =
                     kotlinClass?.memberFunctions?.firstOrNull { it.name == "invoke" }
-                return@lazy kotlinFunction?.let { Method(it, true) }
+                return@lazy kotlinFunction?.let { Method(it, true, false) }
             }
         } catch (t: Throwable) {}
 
@@ -101,7 +102,7 @@ internal open class Parameter private constructor(
 
         if (kotlinType == null) {
             // Java-only reflection
-            return@lazy Method(javaMethod)
+            return@lazy Method(javaMethod, false)
         }
 
         // Add the FunctionX generic arguments to create type info for function parameters
@@ -169,7 +170,7 @@ internal open class Parameter private constructor(
     //
     @Suppress("UNUSED")  // Called from JNI
     val methods: Array<Method>? by lazy {
-        javaClass?.methods?.filter { it.declaringClass == javaClass }?.map { Method(it) }?.toTypedArray()
+        javaClass?.methods?.filter { it.declaringClass == javaClass }?.map { Method(it, false) }?.toTypedArray()
     }
 
     @Suppress("UNUSED")  // Called from JNI

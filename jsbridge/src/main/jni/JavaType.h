@@ -45,6 +45,8 @@ class JavaType {
 public:
     virtual ~JavaType() = default;
 
+    JavaTypeId getTypeId() const { return m_id; }
+
 #if defined(DUKTAPE)
     // Pop values from JS to Java
     // Note: in case of exception, no value will be popped

@@ -150,7 +150,7 @@ std::unique_ptr<const JavaType> JavaTypeProvider::makeUniqueType(const JniRef<js
 }
 
 const std::unique_ptr<const JavaType> &JavaTypeProvider::getObjectType() const {
-  if (m_objectType.get() == nullptr)   {
+  if (m_objectType == nullptr)   {
     m_objectType.reset(new Object(m_jsBridgeContext));
   }
 
@@ -202,6 +202,19 @@ JniLocalRef<jsBridgeParameter> JavaTypeProvider::getGenericParameter(const JniRe
 }
 
 std::unique_ptr<const JavaType> JavaTypeProvider::getGenericParameterType(const JniRef<jsBridgeParameter> &parameter) const {
-  return makeUniqueType(getGenericParameter(parameter), true /*boxed*/);
+  auto type = makeUniqueType(getGenericParameter(parameter), true /*boxed*/);
+
+  if (type->getTypeId() == JavaTypeId::Object) {
+    // Because a java.lang.Object could mean that the real generic type has been erased, we need to add more hints
+    auto parentMethod = m_jsBridgeContext->getJniCache()->getParameterInterface(parameter).getParentMethod();
+    if (!parentMethod.isNull()) {
+      // Check if the parent method is an AIDL method and pass the information to the Object
+      bool isAidlMethod = m_jsBridgeContext->getJniCache()->getMethodInterface(parentMethod).isAidl();
+      auto objectType = const_cast<Object *>(dynamic_cast<const Object *>(type.get()));
+      objectType->setInsideAidl(true);
+    }
+  }
+
+  return type;
 }
 
