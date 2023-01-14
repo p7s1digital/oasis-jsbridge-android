@@ -25,7 +25,7 @@ Powered by:
  * non-blocking API (via coroutines)
  * support for suspending functions and JavaScript promises
  * support for AIDL interfaces and parcelable (experimental)
- * extensions (optional): console, setTimeout/setInterval, XmlHttpRequest, Promise, JS debugger
+ * extensions (optional): console, setTimeout/setInterval, XmlHttpRequest, Promise, JS debugger, JVM
 
 See [Example](#example-consuming-a-js-api-from-kotlin).
 
@@ -306,6 +306,9 @@ after each evaluation.
 
 - **JS Debugger:**<br/>
 JS debugger support (Duktape only via Visual Studio Code plugin)
+
+- **JVM config:**<br/>
+Offers the possibility to set a custom class loader which will be used by the JsBridge to find classes.
 
 
 ## Supported types

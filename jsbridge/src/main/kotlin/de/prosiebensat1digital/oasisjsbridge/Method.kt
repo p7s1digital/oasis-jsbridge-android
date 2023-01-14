@@ -44,26 +44,26 @@ internal class Method {
     val isVarArgs: Boolean
 
     // KFunction with full reflection information
-    constructor(kotlinFunction: KFunction<*>, isLambda: Boolean, isAidl: Boolean) {
+    constructor(kotlinFunction: KFunction<*>, isLambda: Boolean, isAidl: Boolean, customClassLoader: ClassLoader?) {
         this.name = kotlinFunction.name
         this.javaMethod = kotlinFunction.javaMethod ?: throw Throwable("Given kotlin Function does not have any Java method")
         this.isAidl = isAidl
 
         // The return type of Unit functions must be "Unit" for lambdas but "Void" for methods
         val returnType = if (!isLambda && kotlinFunction.returnType.classifier == Unit::class) Void::class.createType() else kotlinFunction.returnType
-        this.returnParameter = Parameter(this, returnType)
+        this.returnParameter = Parameter(this, returnType, customClassLoader)
 
-        this.parameters = kotlinFunction.valueParameters.map { Parameter(this, it) }.toTypedArray()
+        this.parameters = kotlinFunction.valueParameters.map { Parameter(this, it, customClassLoader) }.toTypedArray()
         this.isVarArgs = kotlinFunction.valueParameters.lastOrNull()?.isVararg == true
     }
 
     // Java-only reflection
-    constructor(javaMethod: JavaMethod, isAidl: Boolean) {
+    constructor(javaMethod: JavaMethod, isAidl: Boolean, customClassLoader: ClassLoader?) {
         this.name = javaMethod.name
         this.javaMethod = javaMethod
         this.isAidl = isAidl
-        this.returnParameter = Parameter(this, javaMethod.returnType)
-        this.parameters = javaMethod.parameterTypes.map { Parameter(this, it) }.toTypedArray()
+        this.returnParameter = Parameter(this, javaMethod.returnType, customClassLoader)
+        this.parameters = javaMethod.parameterTypes.map { Parameter(this, it, customClassLoader) }.toTypedArray()
         this.isVarArgs = javaMethod.isVarArgs
     }
 
@@ -76,7 +76,7 @@ internal class Method {
     // Ideally, the projection is OUT for return values and IN for parameters. The lambda parameters
     // arguments are reflected with the INVARIANT projection, though. In that case the asumption is
     // that the return type is the last argument.
-    constructor(javaMethod: JavaMethod, genericArguments: List<KTypeProjection>, isLambda: Boolean) {
+    constructor(javaMethod: JavaMethod, genericArguments: List<KTypeProjection>, isLambda: Boolean, customClassLoader: ClassLoader?) {
         this.name = javaMethod.name
         this.javaMethod = javaMethod
         this.isAidl = false
@@ -107,10 +107,10 @@ internal class Method {
         if (!isLambda && outParameterType?.classifier == Unit::class) outParameterType = Void::class.createType()
 
         // Create the parameters and always wrap them as Object
-        this.returnParameter = outParameterType?.let { Parameter(this, it) }
-            ?: Parameter(this, Unit.javaClass)
+        this.returnParameter = outParameterType?.let { Parameter(this, it, customClassLoader) }
+            ?: Parameter(this, Unit.javaClass, customClassLoader)
 
-        this.parameters = inParameterTypes.map { Parameter(this, it) }
+        this.parameters = inParameterTypes.map { Parameter(this, it, customClassLoader) }
             .toTypedArray()
     }
 

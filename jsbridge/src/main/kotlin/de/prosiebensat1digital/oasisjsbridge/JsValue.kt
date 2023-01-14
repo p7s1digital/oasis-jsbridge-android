@@ -201,12 +201,12 @@ internal constructor(
 
         @OptIn(ExperimentalStdlibApi::class)
         inline fun <reified T> fromNativeValue(jsBridge: JsBridge, nativeValue: T): JsValue {
-            return jsBridge.convertJavaValueToJs(nativeValue, Parameter(typeOf<T>()))
+            return jsBridge.convertJavaValueToJs(nativeValue, Parameter(typeOf<T>(), jsBridge.customClassLoader))
         }
 
         @JvmStatic
         fun fromNativeValue(jsBridge: JsBridge, nativeValue: Any, javaClass: Class<*>): JsValue {
-            return jsBridge.convertJavaValueToJs(nativeValue, Parameter(javaClass))
+            return jsBridge.convertJavaValueToJs(nativeValue, Parameter(javaClass, jsBridge.customClassLoader))
         }
 
 

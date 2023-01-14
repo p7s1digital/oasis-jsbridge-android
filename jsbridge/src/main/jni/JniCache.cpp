@@ -150,6 +150,9 @@ JniLocalRef<jobject> JniCache::getListElement(const JniLocalRef<jobject> &list, 
 // ---
 
 JniLocalRef<jsBridgeParameter> JniCache::newParameter(const JniLocalRef<jclass> &javaClass) const {
-  static thread_local jmethodID methodId = m_jniContext->getMethodID(m_jsBridgeParameterClass, "<init>", "(Ljava/lang/Class;)V");
-  return m_jniContext->newObject<jsBridgeParameter>(m_jsBridgeParameterClass, methodId, javaClass);
+  static thread_local jmethodID getCustomClassLoader = m_jniContext->getMethodID(m_jsBridgeClass, "getCustomClassLoader", "()Ljava/lang/ClassLoader;");
+  const auto bridgeCustomClassLoader = m_jniContext->callObjectMethod(m_jsBridgeInterface.object(), getCustomClassLoader);
+
+  static thread_local jmethodID parameterInit = m_jniContext->getMethodID(m_jsBridgeParameterClass, "<init>", "(Ljava/lang/Class;Ljava/lang/ClassLoader;)V");
+  return m_jniContext->newObject<jsBridgeParameter>(m_jsBridgeParameterClass, parameterInit, javaClass, bridgeCustomClassLoader);
 }
