@@ -25,6 +25,7 @@ private constructor() {
     val consoleConfig = ConsoleConfig()
     val jsDebuggerConfig = JsDebuggerConfig()
     val localStorageConfig = LocalStorageConfig()
+    val jvmConfig = JvmConfig()
 
     class SetTimeoutExtensionConfig {
         var enabled: Boolean = false
@@ -61,5 +62,9 @@ private constructor() {
     class LocalStorageConfig {
         var enabled: Boolean = false
         var useDefaultLocalStorage: Boolean = true
+    }
+
+    class JvmConfig {
+        var customClassLoader: ClassLoader? = null
     }
 }

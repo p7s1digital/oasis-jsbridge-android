@@ -70,9 +70,6 @@ sealed class JsBridgeError(message: String? = null, cause: Throwable?): Exceptio
     class NativeToJsCallError(val jsCall: String, cause: Throwable? = null, customMessage: String? = null)
         : JsBridgeError(customMessage ?: "Error while calling JS method $jsCall", cause)
 
-    class NativeToJsFunctionCallError(val jsCall: String, cause: Throwable? = null, customMessage: String? = null)
-        : JsBridgeError(customMessage ?: "Error while calling JS method $jsCall", cause)
-
     class JsCallbackError(cause: Throwable? = null): JsBridgeError(cause = cause)
     class UnhandledJsPromiseError(jsException: JsException): JsBridgeError("Unhandled Promise error", cause = jsException)
     class XhrError(val query: String, cause: Throwable? = null): JsBridgeError(cause = cause)

@@ -88,6 +88,8 @@ class JsBridge
     override val coroutineContext = rootJob + jsDispatcher + coroutineExceptionHandler
 
     private var jniJsContext: Long? = null
+    var customClassLoader: ClassLoader? = null
+        private set
 
     private val errorListeners = CopyOnWriteArraySet<ErrorListener>()
 
@@ -157,6 +159,7 @@ class JsBridge
                 xhrExtension = XMLHttpRequestExtension(this@JsBridge, config.xhrConfig)
             if (config.localStorageConfig.enabled)
                 localStorageExtension = LocalStorageExtension(this@JsBridge, config.localStorageConfig, context.applicationContext)
+            config.jvmConfig.customClassLoader?.let { customClassLoader = it }
         }
     }
 
@@ -430,7 +433,7 @@ class JsBridge
     @PublishedApi
     internal suspend fun <T: Any?> evaluate(js: String, type: KType?, awaitJsPromise: Boolean): T {
         //val initialStackTrace = Thread.currentThread().stackTrace
-        val parameter = type?.let { Parameter(type) }
+        val parameter = type?.let { Parameter(type, customClassLoader) }
 
         val doAwaitJsPromise = awaitJsPromise && type?.classifier != Deferred::class
 
@@ -586,7 +589,7 @@ class JsBridge
 
     @PublishedApi
     internal suspend fun registerJsLambdaHelper(jsValue: JsValue, types: List<KType>, waitForRegistration: Boolean): JsValue {
-        val parameters = types.map { Parameter(it) }
+        val parameters = types.map { Parameter(it, customClassLoader) }
         val inputParameters = parameters.take(types.count() - 1)
         val outputParameter = parameters.last()
         val method = Method(inputParameters.toTypedArray(), outputParameter, false)
@@ -671,7 +674,7 @@ class JsBridge
                 val invokeMethod = Method(invokeJavaMethod, types.mapIndexed { typeIndex, type ->
                     val variance = if (typeIndex == types.count() - 1) KVariance.OUT else KVariance.IN
                     KTypeProjection(variance, type)
-                }, true)
+                }, true, customClassLoader)
 
                 jniRegisterJavaLambda(jniJsContext, jsFunctionValue.associatedJsName, func, invokeMethod)
                 jsFunctionValue.hold()
@@ -828,7 +831,7 @@ class JsBridge
             // Collect class Methods using Kotlin reflection
             for (kFunction in apiInterface.kotlin.declaredMemberFunctions) {
                 // TODO: check that there is no optional!
-                val method = Method(kFunction, false, isAidl)
+                val method = Method(kFunction, false, isAidl, customClassLoader)
                 if (methods.put(kFunction.name, method) != null) {
                     throw JsToNativeRegistrationError(type, customMessage = ("${kFunction.name} is overloaded in $type"))
                 }
@@ -842,7 +845,7 @@ class JsBridge
             Timber.w("Cannot reflect object of type $type (exception: $t) using Kotlin reflection! Falling back to Java reflection...")
 
             for (javaMethod in type.java.methods) {
-                val method = Method(javaMethod, isAidl)
+                val method = Method(javaMethod, isAidl, customClassLoader)
                 if (methods.put(javaMethod.name, method) != null) {
                     throw JsToNativeRegistrationError(type, Throwable("${method.name} is overloaded in $type"))
                 }
@@ -923,7 +926,7 @@ class JsBridge
 
             // Group by name
             // -> Map<methodName, List<Method>>
-            .groupBy({ it.name }, { Method(it, false, isAidl) })
+            .groupBy({ it.name }, { Method(it, false, isAidl, customClassLoader) })
 
             // Map to unique value
             // -> Map<methodName, Method>
@@ -957,7 +960,7 @@ class JsBridge
         val proxyListener = ProxyListener(jsValue, type.java)
 
         @Suppress("UNCHECKED_CAST")
-        val proxy = Proxy.newProxyInstance(type.java.classLoader, arrayOf(type.java), proxyListener) as T
+        val proxy = Proxy.newProxyInstance(customClassLoader ?: type.java.classLoader, arrayOf(type.java), proxyListener) as T
         Timber.v("Created proxy instance for ${type.java.name}, js value name: $jsValue")
 
         return proxy
@@ -1057,10 +1060,11 @@ class JsBridge
 
         // We use the ProxyBuilder from dexmaker instead of the standard Java Proxy because
         // it makes it possible to make the proxy extend another class (AIDL Stub)
-        //val proxy = Proxy.newProxyInstance(parameter.aidlInterfaceStub!!.javaClass!!.classLoader, arrayOf(parameter.javaClass), proxyListener)
-        val proxy = ProxyBuilder.forClass(parameter.aidlInterfaceStub!!.javaClass)
-             .handler(proxyListener)
-             .build()
+        val proxyBuilder = ProxyBuilder
+            .forClass(parameter.aidlInterfaceStub!!.javaClass)
+            .handler(proxyListener)
+        customClassLoader?.let { proxyBuilder.parentClassLoader(it) }
+        val proxy = proxyBuilder.build()
         Timber.v("Created proxy instance for ${parameter.javaClass.name}, js value name: $jsValue")
 
         return proxy
@@ -1206,10 +1210,10 @@ class JsBridge
         private fun callJsMethodWithoutRetVal(method: JavaMethod, args: Array<Any?>?) {
             runInJsThread {
                 try {
-                    Timber.v("Calling (void) JS method ${type.canonicalName}/$jsValue.${method.name}...")
+                    Timber.v("Calling (void) JS method ${type.name}::${method.name}()...")
                     callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf(), false)
                 } catch (t: Throwable) {
-                    throw NativeToJsCallError("${type.canonicalName}/$jsValue.${method.name}", t)
+                    throw NativeToJsCallError("${type.name}::${method.name}()", t)
                 }
             }
         }
@@ -1217,7 +1221,7 @@ class JsBridge
         private fun callJsMethodSuspended(method: JavaMethod, args: Array<Any?>, continuation: Continuation<Any?>): Any {
             launch {
                 val retVal = try {
-                    Timber.v("Calling (suspend) JS method ${type.canonicalName}/$jsValue.${method.name}...")
+                    Timber.v("Calling (suspend) JS method ${type.name}::${method.name}()...")
                     callJsMethod(jsValue.associatedJsName, method, args, true)
                 } catch (t: Throwable) {
                     // Throw JS exception (which must be directly caught by the caller)
@@ -1246,7 +1250,7 @@ class JsBridge
 
             launch {
                 val retVal = try {
-                    Timber.v("Calling (deferred) JS method ${type.canonicalName}/$jsValue.${method.name}...")
+                    Timber.v("Calling (deferred) JS method ${type.name}::${method.name}()...")
                     callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf(), false)
                 } catch (t: Throwable) {
                     // Reject the deferred with the JS exception (which must be directly caught by the caller)
@@ -1271,9 +1275,9 @@ class JsBridge
 
         private fun callJsMethodBlocking(method: JavaMethod, args: Array<Any?>?): Any? {
             if (isMainThread()) {
-                Timber.w("WARNING: executing JS method ${type.canonicalName}/$jsValue.${method.name} in the main thread! Consider using a Deferred or calling the method in another thread!")
+                Timber.w("WARNING: executing JS method ${type.name}::${method.name}() in the main thread! Consider using a Deferred or calling the method in another thread!")
             } else {
-                Timber.v("Calling (blocking) JS method ${type.canonicalName}/$jsValue.${method.name}...")
+                Timber.v("Calling (blocking) JS method ${type.name}::${method.name}()...")
             }
 
             return runBlocking(coroutineContext) {

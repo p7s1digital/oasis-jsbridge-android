@@ -16,7 +16,6 @@
 package de.prosiebensat1digital.oasisjsbridge
 
 import com.google.gson.Gson
-import timber.log.Timber
 import kotlin.reflect.*
 import kotlin.reflect.full.memberFunctions
 
@@ -29,32 +28,35 @@ internal open class Parameter private constructor(
     internal val kotlinType: KType?,
     internal val javaClass: Class<*>?,
     val name: String?,
-    val isOptional: Boolean
+    val isOptional: Boolean,
+    private val customClassLoader: ClassLoader?,
 ) {
-    constructor(kotlinType: KType)
-        : this(null, kotlinType, findJavaClass(kotlinType), null, false)
+    constructor(kotlinType: KType, customClassLoader: ClassLoader?)
+        : this(null, kotlinType, findJavaClass(kotlinType, customClassLoader), null, false, customClassLoader)
 
-    constructor(parentMethod: Method, kotlinType: KType)
-            : this(parentMethod, kotlinType, findJavaClass(kotlinType), null, false)
+    constructor(parentMethod: Method, kotlinType: KType, customClassLoader: ClassLoader?)
+            : this(parentMethod, kotlinType, findJavaClass(kotlinType, customClassLoader), null, false, customClassLoader)
 
-    constructor(kotlinParameter: KParameter) : this(
+    constructor(kotlinParameter: KParameter, customClassLoader: ClassLoader?) : this(
         null,
         kotlinParameter.type,
-        findJavaClass(kotlinParameter.type),
+        findJavaClass(kotlinParameter.type, customClassLoader),
         kotlinParameter.name,
-        kotlinParameter.isOptional
+        kotlinParameter.isOptional,
+        customClassLoader,
     )
 
-    constructor(parentMethod: Method, kotlinParameter: KParameter) : this(
+    constructor(parentMethod: Method, kotlinParameter: KParameter, customClassLoader: ClassLoader?) : this(
         parentMethod,
         kotlinParameter.type,
-        findJavaClass(kotlinParameter.type),
+        findJavaClass(kotlinParameter.type, customClassLoader),
         kotlinParameter.name,
-        kotlinParameter.isOptional
+        kotlinParameter.isOptional,
+        customClassLoader,
     )
 
-    constructor(javaClass: Class<*>) : this(null, null, javaClass, javaClass.name, false)
-    constructor(parentMethod: Method, javaClass: Class<*>) : this(parentMethod, null, javaClass, javaClass.name, false)
+    constructor(javaClass: Class<*>, customClassLoader: ClassLoader?) : this(null, null, javaClass, javaClass.name, false, customClassLoader)
+    constructor(parentMethod: Method, javaClass: Class<*>, customClassLoader: ClassLoader?) : this(parentMethod, null, javaClass, javaClass.name, false, customClassLoader)
 
     @Suppress("UNUSED")  // Called from JNI
     fun getJava(): Class<*>? {
@@ -94,7 +96,7 @@ internal open class Parameter private constructor(
                 val kotlinClass = kotlinType.classifier as? KClass<*>
                 val kotlinFunction =
                     kotlinClass?.memberFunctions?.firstOrNull { it.name == "invoke" }
-                return@lazy kotlinFunction?.let { Method(it, true, false) }
+                return@lazy kotlinFunction?.let { Method(it, true, false, customClassLoader) }
             }
         } catch (t: Throwable) {}
 
@@ -102,11 +104,11 @@ internal open class Parameter private constructor(
 
         if (kotlinType == null) {
             // Java-only reflection
-            return@lazy Method(javaMethod, false)
+            return@lazy Method(javaMethod, false, customClassLoader)
         }
 
         // Add the FunctionX generic arguments to create type info for function parameters
-        Method(javaMethod, kotlinType.arguments, true)
+        Method(javaMethod, kotlinType.arguments, true, customClassLoader)
     }
 
     // Return the JavaClass of the first generic parameters
@@ -119,20 +121,20 @@ internal open class Parameter private constructor(
         val javaComponentType = javaClass?.componentType
         if (javaComponentType?.isPrimitive == true) {
             // Primitives (for arrays) are always given by the Java component type
-            return Parameter(javaComponentType)
+            return Parameter(javaComponentType, customClassLoader)
         }
 
         return if (kotlinType == null) {
             if (javaComponentType == null) {
                 // No type information => using generic Object type
-                Parameter(Any::class.java)
+                Parameter(Any::class.java, customClassLoader)
             } else {
-                Parameter(javaComponentType)
+                Parameter(javaComponentType, customClassLoader)
             }
         } else {
             // Use KType instance to create the (only) generic type
             kotlinType.arguments.firstOrNull()?.type?.let { genericParameterType ->
-                Parameter(genericParameterType)
+                Parameter(genericParameterType, customClassLoader)
             }
         }
     }
@@ -157,7 +159,7 @@ internal open class Parameter private constructor(
             if (kotlinType != null) {
                 val kotlinClass = kotlinType.classifier as? KClass<*>
                 val stubKotlinClass = kotlinClass?.nestedClasses?.singleOrNull { it.simpleName == "Stub" }
-                return@lazy stubKotlinClass?.let { Parameter(it.java) }
+                return@lazy stubKotlinClass?.let { Parameter(it.java, customClassLoader) }
             }
         } catch (t: Throwable) {}
 
@@ -170,7 +172,7 @@ internal open class Parameter private constructor(
     //
     @Suppress("UNUSED")  // Called from JNI
     val methods: Array<Method>? by lazy {
-        javaClass?.methods?.filter { it.declaringClass == javaClass }?.map { Method(it, false) }?.toTypedArray()
+        javaClass?.methods?.filter { it.declaringClass == javaClass }?.map { Method(it, false, customClassLoader) }?.toTypedArray()
     }
 
     @Suppress("UNUSED")  // Called from JNI
@@ -188,10 +190,10 @@ internal open class Parameter private constructor(
 // Private
 // ---
 
-private fun findJavaClass(kotlinType: KType): Class<*>? {
+private fun findJavaClass(kotlinType: KType, customClassLoader: ClassLoader?): Class<*>? {
     return when (val kotlinClassifier = kotlinType.classifier) {
         is KType -> {
-            findJavaClass(kotlinClassifier)
+            findJavaClass(kotlinClassifier, customClassLoader)
         }
         is KClass<*> -> {
             if (kotlinType.toString().startsWith("kotlin.Array")) {
@@ -199,7 +201,7 @@ private fun findJavaClass(kotlinType: KType): Class<*>? {
                 val componentClass = kotlinType.arguments.firstOrNull()?.type?.classifier as? KClass<*>
                 if (componentClass?.java?.isPrimitive == true) {
                     val componentJvmName = componentClass.javaObjectType.canonicalName ?: "java.lang.Object"
-                    Class.forName("[L$componentJvmName;")
+                    Class.forName("[L$componentJvmName;", false, customClassLoader)
                 } else {
                     kotlinClassifier.javaObjectType
                 }
