@@ -2714,6 +2714,25 @@ class JsBridgeTest {
         assertTrue(errors.isEmpty())
     }
 
+
+    data class EmbeddedObject(val a: Int, val b: String)
+
+    @Test
+    fun testWrapNativeObject() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+        val embeddedObject = EmbeddedObject(1, "two");
+        val jsEmbeddedObject = JsValue.fromNativeValue(subject, NativeObjectWrapper(embeddedObject))
+        val jsNull = JsValue(subject, "null")
+
+        // WHEN
+        val objectBack: NativeObjectWrapper<EmbeddedObject> = jsEmbeddedObject.evaluateBlocking()
+        val nullObjectBack: NativeObjectWrapper<EmbeddedObject?> = jsNull.evaluateBlocking()
+
+        // THEN
+        assertSame(embeddedObject, objectBack.obj)
+        assertSame(null, nullObjectBack.obj)
+    }
     // JsExpectations
     // ---
 

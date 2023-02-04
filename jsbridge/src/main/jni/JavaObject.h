@@ -38,11 +38,15 @@ public:
   ~JavaObject() = delete;
 
 #if defined(DUKTAPE)
+  static duk_ret_t push(const JsBridgeContext *, const std::string &strName, const JniLocalRef<jobject> &object);
   static duk_ret_t push(const JsBridgeContext *, const std::string &strName, const JniLocalRef<jobject> &object, const JObjectArrayLocalRef &methods);
   static duk_ret_t pushLambda(const JsBridgeContext *, const std::string &strName, const JniLocalRef<jobject> &object, const JniLocalRef<jsBridgeMethod> &method);
+  static JniLocalRef<jobject> getJavaThis(const JsBridgeContext *, duk_idx_t);
 #elif defined(QUICKJS)
+  static JSValue create(const JsBridgeContext *, const std::string &strName, const JniLocalRef<jobject> &object);
   static JSValue create(const JsBridgeContext *, const std::string &strName, const JniLocalRef<jobject> &object, const JObjectArrayLocalRef &methods);
   static JSValue createLambda(const JsBridgeContext *, const std::string &strName, const JniLocalRef<jobject> &object, const JniLocalRef<jsBridgeMethod> &method);
+  static JniLocalRef<jobject> getJavaThis(const JsBridgeContext *, JSValue jsObject);
 #endif
 };
 
