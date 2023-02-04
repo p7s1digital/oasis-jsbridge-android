@@ -24,7 +24,6 @@ Powered by:
  * propagate exceptions between JavaScript and Kotlin/Java (including stack trace)
  * non-blocking API (via coroutines)
  * support for suspending functions and JavaScript promises
- * support for AIDL interfaces and parcelable (experimental)
  * extensions (optional): console, setTimeout/setInterval, XmlHttpRequest, Promise, JS debugger, JVM
 
 See [Example](#example-consuming-a-js-api-from-kotlin).
@@ -57,18 +56,11 @@ implementation "de.prosiebensat1digital.oasis-jsbridge-android:oasis-jsbridge-qu
 1. [Map Kotlin/Java objects to JS](#using-kotlinjava-objects-from-js)
 1. [Map JS functions to Kotlin](#calling-js-functions-from-kotlin)
 1. [Map Kotlin functions to JS](#calling-kotlin-functions-from-js)
-1. [Map JS objects to AIDL](#using-aidl-from-js)
 1. [ES6 modules](#es6-modules)
 1. [Extensions](#extensions)
 
 
 ### Evaluating JS code
-
-Unsync calls (will be evaluated synchronously):
-```kotlin
-jsBridge.evaluateUnsync("console.log('hello');")
-jsBridge.evaluateFileContentUnsync("console.log('hello')", "js/test.js")
-```
 
 Suspending calls:
 ```kotlin
@@ -89,8 +81,15 @@ val result1: Int = jsBridge.evaluateBlocking("1+2")  // generic type inferred
 val result2 = jsBridge.evaluateBlocking<Int>("1+2")  // with explicit generic type
 ```
 
-From Java (blocking):
+Fire-and-forget evaluation:
+```kotlin
+jsBridge.evaluateUnsync("console.log('hello');")
+jsBridge.evaluateFileContentUnsync("console.log('hello')", "js/test.js")
+```
+
+From Java (fire-and-forget and blocking):
 ```java
+jsBridge.evaluateUnsync("console.log('hello');");
 Integer sum = (Integer) jsBridge.evaluateBlocking("1+2", Integer.class);
 ```
 
@@ -243,23 +242,6 @@ jsBridge.evaluateUnsync("console.log('Sum is', $calcSumNative(1, 2))");
 
 Note: the native function is triggered from the "JS" thread
 
-
-### Using AIDL from JS
-
-Note: this feature is still experimental!
-
-It is also possible to register AIDL interfaces and call AIDL methods, send and receive
-parcelable values, pass AIDL interfaces as parameter.
-
-To map an AIDL interface to JS:
-
-```kotlin
-// Register existing AIDL interface
-val aidlJsValue = JsValue.fromAidlInterface(jsBridge, aidlInterface)
-
-// Call an AIDL method from JS
-jsBridge.evaluateUnsync("""$aidlJsValue.aidlMethod({parcelableField1: 1, parcelableField2: "two"});""")
-```
 
 ### ES6 modules
 
