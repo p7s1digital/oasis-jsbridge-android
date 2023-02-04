@@ -41,6 +41,7 @@ add_library(
     src/main/jni/java-types/FunctionX.cpp
     src/main/jni/java-types/Integer.cpp
     src/main/jni/java-types/JsonObjectWrapper.cpp
+    src/main/jni/java-types/JsToNativeProxy.cpp
     src/main/jni/java-types/JsValue.cpp
     src/main/jni/java-types/List.cpp
     src/main/jni/java-types/Long.cpp

@@ -39,7 +39,7 @@ import kotlin.reflect.full.createType
  * - `val jsObject = JsValue(jsBridge, "({ a: 1, b: 'two' })")
  * - `val jsFunction = JsValue(jsBridge, "(function(a, b) { return a + b; })")
  */
-class JsValue
+open class JsValue
 internal constructor(
     jsBridge: JsBridge,
     jsCode: String?,
@@ -185,7 +185,8 @@ internal constructor(
         // Private
         // ---
 
-        private fun generateJsGlobalName(): String {
+        @JvmStatic
+        protected fun generateJsGlobalName(): String {
             val suffix = internalCounter.incrementAndGet()
             return "__jsBridge_jsValue$suffix"
         }

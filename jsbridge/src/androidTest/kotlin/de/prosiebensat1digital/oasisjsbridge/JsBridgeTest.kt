@@ -2733,6 +2733,32 @@ class JsBridgeTest {
         assertSame(embeddedObject, objectBack.obj)
         assertSame(null, nullObjectBack.obj)
     }
+
+    interface SimpleJsToNativeInterface : JsToNativeInterface {
+        fun ping(): String
+    }
+
+    @Test
+    fun testJsToNativeProxy() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+        val nativeObject = object : SimpleJsToNativeInterface {
+            override fun ping() = "pong"
+        }
+        val jsToNativeProxy = JsValue.fromNativeObject(subject, nativeObject)
+
+        // WHEN
+        val objectBack: JsToNativeProxy<SimpleJsToNativeInterface> = jsToNativeProxy.evaluateBlocking()
+
+        // THEN
+        assertSame(nativeObject, objectBack.obj)
+
+        runBlocking {
+            waitForDone(subject)
+        }
+    }
+
+
     // JsExpectations
     // ---
 
