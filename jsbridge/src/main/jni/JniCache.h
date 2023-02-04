@@ -72,6 +72,10 @@ public:
   JniLocalRef<jobject> newJsonObjectWrapper(const JStringLocalRef &jsonString) const;
   JStringLocalRef getJsonObjectWrapperString(const JniRef<jobject> &jsonObjectWrapper) const;
 
+  // NativeObjectWrapper (de.prosiebensat1digital.oasisjsbridge.NativeObjectWrapper)
+  JniLocalRef<jobject> nativeObjectWrapperFromJavaObject(const JniRef<jobject> &javaObject) const;
+  JniLocalRef<jobject> getNativeObjectWrapperJavaObject(const JniRef<jobject> &nativeObjectWrapper) const;
+
   // List (java.util.List)
   JniLocalRef<jobject> newList() const;
   void addToList(const JniLocalRef<jobject> &list, const JniLocalRef<jobject> &element) const;
@@ -103,6 +107,7 @@ private:
   JniGlobalRef<jclass> m_jsBridgeDebugStringClass;
   JniGlobalRef<jclass> m_jsBridgeJsValueClass;
   JniGlobalRef<jclass> m_jsonObjectWrapperClass;
+  JniGlobalRef<jclass> m_nativeObjectWrapperClass;
 
   const JsBridgeInterface m_jsBridgeInterface;
 };

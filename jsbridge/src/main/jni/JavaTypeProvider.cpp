@@ -30,6 +30,7 @@
 #include "java-types/JsonObjectWrapper.h"
 #include "java-types/List.h"
 #include "java-types/Long.h"
+#include "java-types/NativeObjectWrapper.h"
 #include "java-types/Object.h"
 #include "java-types/String.h"
 #include "java-types/Void.h"
@@ -64,8 +65,6 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
   JavaTypeId id = parameter.isNull() ? JavaTypeId::Object : getJavaTypeId(parameter);
 
   switch (id) {
-    case JavaTypeId::Unknown:
-      return nullptr;
     case JavaTypeId::Void:
       return new Void(m_jsBridgeContext, id, false /*boxed*/);
     case JavaTypeId::Unit:
@@ -132,8 +131,13 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
       return new JsValue(m_jsBridgeContext, isParameterNullable(parameter));
     case JavaTypeId::JsonObjectWrapper:
       return new JsonObjectWrapper(m_jsBridgeContext, isParameterNullable(parameter));
+  case JavaTypeId::NativeObjectWrapper:
+      return new NativeObjectWrapper(m_jsBridgeContext);
     case JavaTypeId::Deferred:
       return new Deferred(m_jsBridgeContext, getGenericParameterType(parameter));
+
+    case JavaTypeId::Unknown:
+      return nullptr;
   }
 }
 
@@ -170,6 +174,7 @@ JavaTypeId JavaTypeProvider::getJavaTypeId(const JniRef<jsBridgeParameter> &para
   JavaTypeId id = getJavaTypeIdByJavaName(javaName.getUtf16View());
   if (id == JavaTypeId::Unknown) {
     throw std::invalid_argument(std::string("Unsupported Java type: ") + javaName.toStdString());
+    //return JavaTypeId::Unknown;
   }
 
   return id;

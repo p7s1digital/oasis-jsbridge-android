@@ -26,8 +26,9 @@
 #include "JsBridgeContext.h"
 
 #if defined(DUKTAPE)
-# include "StackChecker.h"
 # include "JniCache.h"
+# include "DuktapeUtils.h"
+# include "StackChecker.h"
 #elif defined(QUICKJS)
 # include "AutoReleasedJSValue.h"
 # include "QuickJsUtils.h"
@@ -178,6 +179,11 @@ namespace {
 }
 
 // static
+duk_ret_t JavaObject::push(const JsBridgeContext *jsBridgeContext, const std::string &strName, const JniLocalRef<jobject> &object) {
+  return push(jsBridgeContext, strName, object, JObjectArrayLocalRef());
+}
+
+// static
 duk_ret_t JavaObject::push(const JsBridgeContext *jsBridgeContext, const std::string &strName, const JniLocalRef<jobject> &object, const JObjectArrayLocalRef &methods) {
   duk_context *ctx = jsBridgeContext->getDuktapeContext();
   const JniContext *jniContext = jsBridgeContext->getJniContext();
@@ -190,7 +196,7 @@ duk_ret_t JavaObject::push(const JsBridgeContext *jsBridgeContext, const std::st
   duk_push_c_function(ctx, javaObjectFinalizer, 1);
   duk_set_finalizer(ctx, objIndex);
 
-  const jsize numMethods = methods.getLength();
+  const jsize numMethods = methods.isNull() ? 0 : methods.getLength();
   std::string qualifiedMethodPrefix = strName + "::";
 
   for (jsize i = 0; i < numMethods; ++i) {
@@ -277,10 +283,37 @@ duk_ret_t JavaObject::pushLambda(const JsBridgeContext *jsBridgeContext, const s
   return 1;
 }
 
+// static
+JniLocalRef<jobject> JavaObject::getJavaThis(const JsBridgeContext *jsBridgeContext, duk_idx_t index) {
+  duk_context *ctx = jsBridgeContext->getDuktapeContext();
+  CHECK_STACK_OFFSET(ctx, 0);
+
+  if (!duk_is_object(ctx, index) || duk_is_null(ctx, index)) {
+    return JniLocalRef<jobject>();
+  }
+
+  const JniContext *jniContext = jsBridgeContext->getJniContext();
+  duk_get_prop_string(ctx, index, JAVA_THIS_PROP_NAME);
+  if (duk_is_undefined(ctx, -1)) {
+    duk_pop(ctx);
+    return JniLocalRef<jobject>();
+  }
+
+  JNIEnv *env = jsBridgeContext->getJniContext()->getJNIEnv();
+  assert(env != nullptr);
+
+  auto thisObjectRaw = reinterpret_cast<jobject>(duk_require_pointer(ctx, -1));
+  JniLocalRef <jobject> thisObject(jniContext, env->NewLocalRef(thisObjectRaw));
+
+  duk_pop(ctx);  // pointer
+  return thisObject;
+}
+
 #elif defined(QUICKJS)
 
 namespace {
   // Called by QuickJS when JS invokes a method on our bound Java object
+  // TODO: use this_val and read JAVA_THIS property instead of datav!
   JSValue javaMethodHandler(JSContext *ctx, JSValueConst /*this_val*/, int argc, JSValueConst *argv, int /*magic*/, JSValueConst *datav) {
     JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
     assert(jsBridgeContext != nullptr);
@@ -311,13 +344,18 @@ namespace {
 }
 
 // static
+JSValue JavaObject::create(const JsBridgeContext *jsBridgeContext, const std::string &strName, const JniLocalRef<jobject> &object) {
+    return create(jsBridgeContext, strName, object, JObjectArrayLocalRef());
+}
+
+// static
 JSValue JavaObject::create(const JsBridgeContext *jsBridgeContext, const std::string &strName, const JniLocalRef<jobject> &object, const JObjectArrayLocalRef &methods) {
   JSContext *ctx = jsBridgeContext->getQuickJsContext();
   const QuickJsUtils *utils = jsBridgeContext->getUtils();
 
   JSValue javaObjectValue = JS_NewObject(ctx);
 
-  const jsize numMethods = methods.getLength();
+  const jsize numMethods = methods.isNull() ? 0 : methods.getLength();
   std::string qualifiedMethodPrefix = strName + "::";
 
   for (jsize i = 0; i < numMethods; ++i) {
@@ -389,6 +427,22 @@ JSValue JavaObject::createLambda(const JsBridgeContext *jsBridgeContext, const s
   JS_FreeValue(ctx, javaThisValue);
 
   return javaLambdaHandlerValue;
+}
+
+// static
+JniLocalRef<jobject> JavaObject::getJavaThis(const JsBridgeContext *jsBridgeContext, JSValue jsObject) {
+  if (!JS_IsObject(jsObject) || JS_IsNull(jsObject)) {
+    return JniLocalRef<jobject>();
+  }
+
+  auto ctx = jsBridgeContext->getQuickJsContext();
+  JSValue javaThisValue = JS_GetPropertyStr(ctx, jsObject, JAVA_THIS_PROP_NAME);
+  JS_AUTORELEASE_VALUE(ctx, javaThisValue);
+  if (!JS_IsObject(jsObject) || JS_IsNull(jsObject)) {
+    return JniLocalRef<jobject>();
+  }
+
+  return jsBridgeContext->getUtils()->getJavaRef<jobject>(javaThisValue);
 }
 
 #endif
