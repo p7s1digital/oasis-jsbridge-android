@@ -24,7 +24,6 @@ import timber.log.Timber;
 import static org.junit.Assert.assertEquals;
 
 import android.content.Context;
-import android.os.RemoteException;
 
 // Minimal test for using JsBridge from Java
 public final class JsBridgeJavaTest {
@@ -84,7 +83,7 @@ public final class JsBridgeJavaTest {
         };
 
         // WHEN
-        JsValue nativeApiJsValue = JsValue.fromNativeObject(subject, nativeApi, NativeApi.class);
+        JsValue nativeApiJsValue = JsValue.createJsToNativeProxy(subject, nativeApi, NativeApi.class);
 
         // THEN
         Integer sum = (Integer) subject.evaluateBlocking(
@@ -112,7 +111,7 @@ public final class JsBridgeJavaTest {
         );
 
         // THEN
-        JsApi jsApi = nativeApiJsValue.mapToNativeObject(JsApi.class);
+        JsApi jsApi = nativeApiJsValue.createNativeToJsProxy(JsApi.class);
         int sum = jsApi.calcSum(6, 4);
 
         // THEN

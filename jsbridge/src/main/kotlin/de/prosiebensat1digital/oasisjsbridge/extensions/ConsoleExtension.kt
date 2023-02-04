@@ -86,7 +86,7 @@ internal class ConsoleExtension(
             }
         }
 
-        return JsValue.fromNativeObject(jsBridge, consoleNativeObject)
+        return JsValue.createJsToNativeProxy(jsBridge, consoleNativeObject)
     }
 
     private fun createJsonConsole(): JsValue {
@@ -106,7 +106,7 @@ internal class ConsoleExtension(
             }
         }
 
-        return JsValue.fromNativeObject(jsBridge, consoleNativeObject)
+        return JsValue.createJsToNativeProxy(jsBridge, consoleNativeObject)
     }
 
     private fun createEmptyConsole(): JsValue {
@@ -121,7 +121,7 @@ internal class ConsoleExtension(
             override fun assert(assertion: Boolean, vararg args: Unit) = Unit
         }
 
-        return JsValue.fromNativeObject(jsBridge, consoleNativeObject)
+        return JsValue.createJsToNativeProxy(jsBridge, consoleNativeObject)
     }
 
     private fun j2s(json: Array<out JsonObjectWrapper>): Array<out String> {

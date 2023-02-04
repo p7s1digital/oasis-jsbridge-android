@@ -61,7 +61,7 @@ sealed class JsBridgeError(message: String? = null, cause: Throwable?): Exceptio
     class JsToNativeFunctionCallError(val nativeCall: String, cause: Throwable? = null, customMessage: String? = null)
         : JsBridgeError(customMessage ?: "Error while calling native function $nativeCall", cause)
 
-    class NativeToJsRegistrationError(val type: KClass<*>, cause: Throwable? = null, customMessage: String? = null)
+    class NativeToJsInterfaceRegistrationError(val type: KClass<*>, cause: Throwable? = null, customMessage: String? = null)
         : JsBridgeError(customMessage ?: "Error while registering JS interface ($type)", cause)
 
     class NativeToJsFunctionRegistrationError(val jsFunction: String, cause: Throwable? = null, customMessage: String? = null)

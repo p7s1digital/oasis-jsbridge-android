@@ -27,7 +27,7 @@ internal class SetTimeoutExtension(private val jsBridge: JsBridge) {
     private var timerCounter = 0
 
     init {
-        setTimeoutHelperJs = JsValue.fromNativeFunction3(jsBridge, ::setTimeoutHelper)
+        setTimeoutHelperJs = JsValue.createJsToNativeFunctionProxy3(jsBridge, ::setTimeoutHelper)
 
         // As setTimeout(cb, ms, args...) can also receive arguments passed to the given callback,
         // we need to convert them to an array and wrap the callback lambda
@@ -47,7 +47,7 @@ internal class SetTimeoutExtension(private val jsBridge: JsBridge) {
         """.trimIndent())
             .assignToGlobal("setTimeout")
 
-        JsValue.fromNativeFunction1(jsBridge) { id: String? -> clearTimeoutHelper(id) }
+        JsValue.createJsToNativeFunctionProxy1(jsBridge) { id: String? -> clearTimeoutHelper(id) }
             .assignToGlobal("clearTimeout")
 
         // Same as for setTimeout but with setTimeoutHelper repeat parameter set to true
@@ -67,7 +67,7 @@ internal class SetTimeoutExtension(private val jsBridge: JsBridge) {
         """.trimIndent())
             .assignToGlobal("setInterval")
 
-        JsValue.fromNativeFunction1(jsBridge) { id: String? -> clearTimeoutHelper(id) }
+        JsValue.createJsToNativeFunctionProxy1(jsBridge) { id: String? -> clearTimeoutHelper(id) }
             .assignToGlobal("clearInterval")
     }
 

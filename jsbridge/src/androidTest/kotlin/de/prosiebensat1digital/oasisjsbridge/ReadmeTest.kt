@@ -106,7 +106,7 @@ class ReadmeTest {
             val jsObject2 = JsValue.fromNativeValue(jsBridge, JsonObjectWrapper("one" to 1, "two" to "two"))
             val calcSumJs1 = JsValue(jsBridge, "(function(a, b) { return a + b; })")
             val calcSumJs2 = JsValue.newFunction(jsBridge, "a", "b", "return a + b;")
-            val calcSumJs3 = JsValue.fromNativeFunction2(jsBridge) { a: Int, b: Int -> a + b }
+            val calcSumJs3 = JsValue.createJsToNativeFunctionProxy2(jsBridge) { a: Int, b: Int -> a + b }
 
             val sum: Int = jsBridge.evaluate("$calcSumJs1(2, 3)")
 
@@ -128,11 +128,11 @@ class ReadmeTest {
           method2: function(c) { return "Value: " + c; }
         })""")
 
-        val jsApi1: JsApi1 = jsObject.mapToNativeObject()  // no check
+        val jsApi1: JsApi1 = jsObject.createNativeToJsProxy()  // no check
         runBlocking {
-            val jsApi2: JsApi1 = jsObject.mapToNativeObject(check = true)  // suspending, optionally check that all methods are defined in the JS object
+            val jsApi2: JsApi1 = jsObject.createNativeToJsProxy(check = true)  // suspending, optionally check that all methods are defined in the JS object
         }
-        val jsApi3: JsApi1 = jsObject.mapToNativeObjectBlocking(check = true)  // blocking (with optional check)
+        val jsApi3: JsApi1 = jsObject.createNativeToJsProxyBlocking(check = true)  // blocking (with optional check)
 
         jsApi1.method1(1, "two")
         runBlocking {
@@ -150,7 +150,7 @@ class ReadmeTest {
             override fun method(a: Int, b: String): Double { return 123.456 }
         }
 
-        val nativeApi: JsValue = JsValue.fromNativeObject(jsBridge, obj)
+        val nativeApi: JsValue = JsValue.createJsToNativeProxy(jsBridge, obj)
 
         jsBridge.evaluateUnsync("globalThis.x = $nativeApi.method(1, 'two');")
     }
@@ -160,14 +160,14 @@ class ReadmeTest {
         val calcSumJs: suspend (Int, Int) -> Int = JsValue.newFunction(jsBridge, "a", "b", """
           return a + b;
           """.trimIndent()
-        ).mapToNativeFunction2()
+        ).createNativeToJsFunctionProxy2()
 
         println("Sum is $calcSumJs(1, 2)")
     }
 
     @Test
     fun testKotlinFunctionFromJs() {
-        val calcSumNative = JsValue.fromNativeFunction2(jsBridge) { a: Int, b: Int -> a + b }
+        val calcSumNative = JsValue.createJsToNativeFunctionProxy2(jsBridge) { a: Int, b: Int -> a + b }
 
         jsBridge.evaluateUnsync("""
           console.log("Sum is", $calcSumNative(1, 2));
@@ -196,14 +196,14 @@ class ReadmeTest {
                 37.2f
             }
         }
-        val nativeApiJsValue = JsValue.fromNativeObject(jsBridge, nativeApi)
+        val nativeApiJsValue = JsValue.createJsToNativeProxy(jsBridge, nativeApi)
 
         // Create JS API
         val config = JsonObjectWrapper("debug" to true, "useFahrenheit" to false)  // {debug: true, useFahrenheit: false}
         runBlocking {
             val createJsApi: suspend (JsValue, JsonObjectWrapper) -> JsValue
-                    = JsValue(jsBridge, "createApi").mapToNativeFunction2()  // JS: global.createApi(nativeApi, config)
-            val jsApi: JsApi = createJsApi(nativeApiJsValue, config).mapToNativeObject()
+                    = JsValue(jsBridge, "createApi").createNativeToJsFunctionProxy2()  // JS: global.createApi(nativeApi, config)
+            val jsApi: JsApi = createJsApi(nativeApiJsValue, config).createNativeToJsProxy()
 
             // Call JS API methods
             val msg = jsApi.createMessage()  // (suspending) "Hello Android, the temperature is 37.2 degrees C."

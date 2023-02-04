@@ -35,7 +35,7 @@ internal class XMLHttpRequestExtension(
 
     init {
         // Register XMLHttpRequestNativeHelper_send()
-        JsValue.fromNativeFunction5(jsBridge, ::nativeSend)
+        JsValue.createJsToNativeFunctionProxy5(jsBridge, ::nativeSend)
             .assignToGlobal("XMLHttpRequestExtension_send_native")
 
         // Evaluate JS file

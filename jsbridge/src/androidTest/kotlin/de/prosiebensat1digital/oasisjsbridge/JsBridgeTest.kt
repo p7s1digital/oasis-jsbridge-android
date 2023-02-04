@@ -796,7 +796,7 @@ class JsBridgeTest {
     fun testJavaExceptionInJs() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
-        val createExceptionNative = JsValue.fromNativeFunction0<Unit>(subject) { throw Exception("Kotlin exception") }
+        val createExceptionNative = JsValue.createJsToNativeFunctionProxy0<Unit>(subject) { throw Exception("Kotlin exception") }
 
         // WHEN
         val jsException: JsException = assertFailsWith {
@@ -848,7 +848,7 @@ class JsBridgeTest {
     fun testNullPointerException() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
-        val testFunctionNative = JsValue.fromNativeFunction1(subject) { _: Int -> Unit }
+        val testFunctionNative = JsValue.createJsToNativeFunctionProxy1(subject) { _: Int -> Unit }
 
         // WHEN
         val jsException: JsException = assertFailsWith {
@@ -1053,7 +1053,7 @@ class JsBridgeTest {
             |}
             |return m;
             |""".trimMargin()
-        ).mapToNativeFunction0()
+        ).createNativeToJsFunctionProxy0()
 
         // Native loop, calls JS function
         // -> 22.5s (Duktape, Samsung S5, 100000 iterations, from main thread)
@@ -1065,7 +1065,7 @@ class JsBridgeTest {
             |if (n > 1000000) n = -n;
             |return n;
             |""".trimMargin()
-        ).mapToNativeFunction2()
+        ).createNativeToJsFunctionProxy2()
         val calcMagicCallJsFunctionInsideNativeLoop: suspend () -> Int = {
             var m = 0
             for (i in 0 until ITERATION_COUNT) {
@@ -1094,7 +1094,7 @@ class JsBridgeTest {
         // JS loop, call native functions (191ms for 20000 iterations)
         // -> 3.7s ms (Duktape, Samsung S5, 100000 iterations)
         // -> 5.5s ms (QuickJS, Samsung S5, 100000 iterations)
-        val updateMagicNativeFuncJsValue = JsValue.fromNativeFunction2(subject) { a: Int, i: Int ->
+        val updateMagicNativeFuncJsValue = JsValue.createJsToNativeFunctionProxy2(subject) { a: Int, i: Int ->
             var n = a + i * 2
             if (n > 1000000) n = -n
             n
@@ -1106,7 +1106,7 @@ class JsBridgeTest {
             |}
             |return m;
             |""".trimMargin()
-        ).mapToNativeFunction0()
+        ).createNativeToJsFunctionProxy0()
 
         runBlocking {
             delay(500)
@@ -1183,7 +1183,7 @@ class JsBridgeTest {
         val subject = JsBridge(config, context)
 
         val jsExpectations = JsExpectations()
-        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+        val jsExpectationsJsValue = JsValue.createJsToNativeProxy(subject, jsExpectations)
 
 
         // Native to JS
@@ -1207,7 +1207,7 @@ class JsBridgeTest {
             |    );
             |  }
             |})""".trimMargin()
-        ).mapToNativeObject()
+        ).createNativeToJsProxy()
 
         val nativeCbMock = mockk<(Int) -> Unit>(relaxed = true)
         jsApi.registerCallback(nativeCbMock)
@@ -1246,7 +1246,7 @@ class JsBridgeTest {
             }
         }
 
-        val nativeApiJsValue = JsValue.fromNativeObject(subject, nativeApi)
+        val nativeApiJsValue = JsValue.createJsToNativeProxy(subject, nativeApi)
         subject.evaluateBlocking<Unit>("""
             |function jsCb(i) {
             |  $jsExpectationsJsValue.addExpectation("ex" + i, i);
@@ -1281,22 +1281,22 @@ class JsBridgeTest {
             |})
             |""".trimMargin()
         )
-        val calcSum: suspend (Int, Int) -> Int = calcSumJsValue.mapToNativeFunction2()
-        val calcSumFromAnonymousFunction: suspend (Int, Int) -> Int = calcSumJsValueAnonymousFunction.mapToNativeFunction2()
-        val calcSumBlocking: (Int, Int) -> Int = calcSumJsValue.mapToNativeBlockingFunction2()
-        val calcSumWrongSignature: (Int, String) -> Int = calcSumJsValue.mapToNativeBlockingFunction2()
+        val calcSum: suspend (Int, Int) -> Int = calcSumJsValue.createNativeToJsFunctionProxy2()
+        val calcSumFromAnonymousFunction: suspend (Int, Int) -> Int = calcSumJsValueAnonymousFunction.createNativeToJsFunctionProxy2()
+        val calcSumBlocking: (Int, Int) -> Int = calcSumJsValue.createNativeToJsBlockingFunctionProxy2()
+        val calcSumWrongSignature: (Int, String) -> Int = calcSumJsValue.createNativeToJsBlockingFunctionProxy2()
 
-        val invalidFunction: suspend () -> Unit = JsValue.newFunction(subject, "invalid").mapToNativeFunction0()
+        val invalidFunction: suspend () -> Unit = JsValue.newFunction(subject, "invalid").createNativeToJsFunctionProxy0()
 
         val createJsObject: suspend (Int, String) -> JsonObjectWrapper =
             JsValue.newFunction(subject, "a", "b", "return {key1: a, key2: b};")
-                .mapToNativeFunction2()
+                .createNativeToJsFunctionProxy2()
 
         val createCalcSumFunc: suspend () -> JsValue = JsValue.newFunction(subject, "return $calcSumJsValue;")
-            .mapToNativeFunction0()
+            .createNativeToJsFunctionProxy0()
 
         val throwException: suspend () -> Unit = JsValue.newFunction(subject, "", "throw 'JS exception from function';")
-            .mapToNativeFunction0()
+            .createNativeToJsFunctionProxy0()
 
         val getPromiseJsValue = JsValue.newFunction(subject, "name", """
             |return new Promise(function(resolve) {
@@ -1304,15 +1304,15 @@ class JsBridgeTest {
             |});
             |""".trimMargin()
         )
-        val getPromise: suspend (name: String) -> String = getPromiseJsValue.mapToNativeFunction1()
-        val getPromiseAsync: suspend (name: String) -> Deferred<String> = getPromiseJsValue.mapToNativeFunction1()
+        val getPromise: suspend (name: String) -> String = getPromiseJsValue.createNativeToJsFunctionProxy1()
+        val getPromiseAsync: suspend (name: String) -> Deferred<String> = getPromiseJsValue.createNativeToJsFunctionProxy1()
 
         val getFailedPromise: suspend (name: String) -> String = JsValue.newFunction(subject, """
             |return new Promise(function(resolve, reject) {
             |  reject("Oh no!");
             |});
             |""".trimMargin()
-        ).mapToNativeFunction1()
+        ).createNativeToJsFunctionProxy1()
 
         // THEN
         assertEquals(10, calcSumBlocking(3, 7))
@@ -1320,12 +1320,12 @@ class JsBridgeTest {
         runBlocking {
             // Missing JS function (the evalution of the JS code should throw)
             assertFailsWith<JsException> {
-                JsValue(subject, "non_existing_function").mapToNativeFunction0<Unit>(true)
+                JsValue(subject, "non_existing_function").createNativeToJsFunctionProxy0<Unit>(true)
             }
 
             // Invalid JS function (the registration should throw)
             assertFailsWith<IllegalArgumentException> {
-                JsValue(subject, "123").mapToNativeFunction0<Unit>(true)
+                JsValue(subject, "123").createNativeToJsFunctionProxy0<Unit>(true)
             }
 
             // Call JS function calcSum(3, 4)
@@ -1352,7 +1352,7 @@ class JsBridgeTest {
             assertEquals(PayloadObject.fromValues("key1" to 69, "key2" to "sixty-nine"), jsObject.toPayload())
 
             // Call JS function createCalcSumFunc()(2, 2)
-            val calcSum2: suspend (Int, Int) -> Int = createCalcSumFunc().mapToNativeFunction2()
+            val calcSum2: suspend (Int, Int) -> Int = createCalcSumFunc().createNativeToJsFunctionProxy2()
             val sum2 = calcSum2(2, 2)
             assertEquals(4, sum2)
 
@@ -1389,17 +1389,17 @@ class JsBridgeTest {
 
         runBlocking {
             // WHEN
-            val setFlag = JsValue.fromNativeFunction0(subject) { flag = true }
+            val setFlag = JsValue.createJsToNativeFunctionProxy0(subject) { flag = true }
             val toUpperCaseNative =
-                JsValue.fromNativeFunction1(subject) { s: String -> s.toUpperCase() }
-            val calcSumNative = JsValue.fromNativeFunction2(subject) { a: Int, b: Int -> a + b }
+                JsValue.createJsToNativeFunctionProxy1(subject) { s: String -> s.toUpperCase() }
+            val calcSumNative = JsValue.createJsToNativeFunctionProxy2(subject) { a: Int, b: Int -> a + b }
             val setCustomTimeout: (() -> Unit, Long) -> Unit = { cb, msecs ->
                 GlobalScope.launch(Dispatchers.Main) {
                     delay(msecs)
                     cb()
                 }
             }
-            JsValue.fromNativeFunction2(subject, setCustomTimeout)
+            JsValue.createJsToNativeFunctionProxy2(subject, setCustomTimeout)
                 .assignToGlobal("setCustomTimeout")
 
             subject.evaluateBlocking<Unit>("$setFlag()")
@@ -1452,7 +1452,7 @@ class JsBridgeTest {
             |  })
             |});
             |""".trimMargin()
-        ).mapToNativeFunction1()
+        ).createNativeToJsFunctionProxy1()
 
         val matrix = Array(2) { IntArray(2) { 0 } }
         matrix[0][0] = 1
@@ -1554,10 +1554,10 @@ class JsBridgeTest {
         val subject = JsBridge(config, context)
 
         val jsExpectations = JsExpectations()
-        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+        val jsExpectationsJsValue = JsValue.createJsToNativeProxy(subject, jsExpectations)
 
         // WHEN
-        val testNativeApi = JsValue.fromNativeObject(subject, nativeApi)
+        val testNativeApi = JsValue.createJsToNativeProxy(subject, nativeApi)
         val js = """
             var retBool1 = $testNativeApi.nativeMethodReturningTrue();
             var retBool2 = $testNativeApi.nativeMethodReturningFalse();
@@ -1648,7 +1648,7 @@ class JsBridgeTest {
         val subject = createAndSetUpJsBridge()
 
         val jsExpectations = JsExpectations()
-        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+        val jsExpectationsJsValue = JsValue.createJsToNativeProxy(subject, jsExpectations)
 
         val testJsApi = JsValue(subject, """({
             jsMethodWithString: function(msg) {
@@ -1674,7 +1674,7 @@ class JsBridgeTest {
 
 
         // WHEN
-        val jsApi: TestJsApiInterfaceWithSuspend = testJsApi.mapToNativeObject()
+        val jsApi: TestJsApiInterfaceWithSuspend = testJsApi.createNativeToJsProxy()
         runBlocking {
             jsApi.jsMethodWithString("Hello JS!")
 
@@ -1710,7 +1710,7 @@ class JsBridgeTest {
         val subject = createAndSetUpJsBridge()
 
         val jsExpectations = JsExpectations()
-        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+        val jsExpectationsJsValue = JsValue.createJsToNativeProxy(subject, jsExpectations)
 
         data class CallbackValues(
             val string: String?,
@@ -1775,7 +1775,7 @@ class JsBridgeTest {
         assertNotNull(arr)
 
         // WHEN
-        val jsApi: TestJsApiInterface = testJsApi.mapToNativeObject()
+        val jsApi: TestJsApiInterface = testJsApi.createNativeToJsProxy()
         jsApi.jsMethodWithString("Hello JS!")
         jsApi.jsMethodWithJsonObjects(obj, arr)
         val jsValueParam = JsValue(subject, "\"This is a JS value\"")
@@ -1854,14 +1854,14 @@ class JsBridgeTest {
         // WHEN
         runBlocking {
             assertFailsWith<IllegalArgumentException> {
-                jsApiNoObjectValue.mapToNativeObject<TestJsApiInterface>(false)
+                jsApiNoObjectValue.createNativeToJsProxy<TestJsApiInterface>(false)
             }
             assertFailsWith<IllegalArgumentException> {
-                jsApiNoObjectValue.mapToNativeObject<TestJsApiInterface>(true)
+                jsApiNoObjectValue.createNativeToJsProxy<TestJsApiInterface>(true)
             }
-            jsApiEmptyObjectValue.mapToNativeObject<TestJsApiInterface>(false)  // do not fail
+            jsApiEmptyObjectValue.createNativeToJsProxy<TestJsApiInterface>(false)  // do not fail
             assertFailsWith<IllegalArgumentException> {
-                jsApiEmptyObjectValue.mapToNativeObject<TestJsApiInterface>(true)
+                jsApiEmptyObjectValue.createNativeToJsProxy<TestJsApiInterface>(true)
             }
         }
     }
@@ -1879,9 +1879,9 @@ class JsBridgeTest {
         val jsApiEmptyObjectValue = JsValue(subject, "({})")
 
         // WHEN
-        val jsApi: TestJsApiInterface = jsApiValue.mapToNativeObject()
-        val jsApiNoObject: TestJsApiInterface = jsApiNoObjectValue.mapToNativeObject()
-        val jsApiEmptyObject: TestJsApiInterface = jsApiEmptyObjectValue.mapToNativeObject()
+        val jsApi: TestJsApiInterface = jsApiValue.createNativeToJsProxy()
+        val jsApiNoObject: TestJsApiInterface = jsApiNoObjectValue.createNativeToJsProxy()
+        val jsApiEmptyObject: TestJsApiInterface = jsApiEmptyObjectValue.createNativeToJsProxy()
 
         // THEN
         runBlocking {
@@ -1911,7 +1911,7 @@ class JsBridgeTest {
 
         // WHEN
         runBlocking {
-            val jsApi: TestJsApiInterface = jsApiPromise.await().mapToNativeObject()
+            val jsApi: TestJsApiInterface = jsApiPromise.await().createNativeToJsProxy()
             jsApi.jsMethodWithString("Hello JS!")
         }
 
@@ -1930,7 +1930,7 @@ class JsBridgeTest {
         val testJsApi = JsValue(subject, """({
             jsMethodWithCallback: function(cb) { cb(); }
         })""")
-        val jsApi: TestJsApiInterface = testJsApi.mapToNativeObject()
+        val jsApi: TestJsApiInterface = testJsApi.createNativeToJsProxy()
 
         var callbackCalled = false
 
@@ -1998,7 +1998,7 @@ class JsBridgeTest {
         // GIVEN
         val subject = createAndSetUpJsBridge()
         val jsExpectations = JsExpectations()
-        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+        val jsExpectationsJsValue = JsValue.createJsToNativeProxy(subject, jsExpectations)
 
         // WHEN
         val js = """
@@ -2027,7 +2027,7 @@ class JsBridgeTest {
         // GIVEN
         val subject = createAndSetUpJsBridge()
         val jsExpectations = JsExpectations()
-        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+        val jsExpectationsJsValue = JsValue.createJsToNativeProxy(subject, jsExpectations)
 
         // WHEN
         val js = """
@@ -2056,7 +2056,7 @@ class JsBridgeTest {
         // GIVEN
         val subject = createAndSetUpJsBridge()
         val jsExpectations = JsExpectations()
-        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+        val jsExpectationsJsValue = JsValue.createJsToNativeProxy(subject, jsExpectations)
 
         // WHEN
         val js = """
@@ -2085,7 +2085,7 @@ class JsBridgeTest {
         // GIVEN
         val subject = createAndSetUpJsBridge()
         val jsExpectations = JsExpectations()
-        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+        val jsExpectationsJsValue = JsValue.createJsToNativeProxy(subject, jsExpectations)
 
         // WHEN
         val js = """
@@ -2114,7 +2114,7 @@ class JsBridgeTest {
         // GIVEN
         val subject = createAndSetUpJsBridge()
         val jsExpectations = JsExpectations()
-        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+        val jsExpectationsJsValue = JsValue.createJsToNativeProxy(subject, jsExpectations)
 
         // WHEN
         val js = """
@@ -2812,7 +2812,7 @@ class JsBridgeTest {
             jsBridge.registerErrorListener(createErrorListener())
 
             // Map "jsToNativeFunctionMock" to JS as a global var "NativeFunctionMock"
-            JsValue.fromNativeFunction1(jsBridge, jsToNativeFunctionMock)
+            JsValue.createJsToNativeFunctionProxy1(jsBridge, jsToNativeFunctionMock)
                 .assignToGlobal("nativeFunctionMock")
         }
     }

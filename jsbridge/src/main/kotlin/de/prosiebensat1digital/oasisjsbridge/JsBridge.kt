@@ -22,7 +22,6 @@ import android.app.Activity
 import android.content.Context
 import android.os.Looper
 import androidx.annotation.VisibleForTesting
-import com.android.dx.stock.ProxyBuilder
 import de.prosiebensat1digital.oasisjsbridge.JsBridgeError.*
 import de.prosiebensat1digital.oasisjsbridge.extensions.*
 import java.io.FileNotFoundException
@@ -526,10 +525,10 @@ class JsBridge
     // Note: please be aware that the object instance is strongly referenced by the JS
     // variable with the given name!
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
-    fun registerJsToNativeInterface(kClass: KClass<*>, obj: Any): JsValue {
+    fun <T: JsToNativeInterface> registerJsToNativeInterface(kClass: KClass<*>, obj: T): JsToNativeProxy<T> {
         val suffix = internalCounter.incrementAndGet()
         val jsObjectName = "__jsBridge_${kClass.simpleName ?: "unnamed_class"}$suffix"
-        val jsValue = JsValue(this, null, associatedJsName = jsObjectName)
+        val jsValue = JsToNativeProxy(this, obj, associatedJsName = jsObjectName)
 
         launch {
             val jniJsContext = jniJsContextOrThrow()
@@ -861,7 +860,7 @@ class JsBridge
     @Throws
     private suspend fun <T: Any> registerNativeToJsInterfaceHelper(jsValue: JsValue, type: KClass<T>, check: Boolean, waitForRegistration: Boolean): T {
         if (!type.java.isInterface) {
-            throw NativeToJsRegistrationError(type, customMessage = "$type must be an interface")
+            throw NativeToJsInterfaceRegistrationError(type, customMessage = "$type must be an interface")
         }
 
         // Only allow interface directly implementing JsToNativeInterface (or implementing an interface implementing
@@ -884,7 +883,7 @@ class JsBridge
                 .singleOrNull()
                 .also {
                     it?.java?.isInterface
-                            ?: throw NativeToJsRegistrationError(type, customMessage = "$type and its super interfaces must extend exactly 1 interface")
+                            ?: throw NativeToJsInterfaceRegistrationError(type, customMessage = "$type and its super interfaces must extend exactly 1 interface")
                 }
 
                 // Continue until it is the NativeToJsInterface
@@ -904,7 +903,7 @@ class JsBridge
             // -> Map<methodName, Method>
             .mapValues {  entry ->
                 entry.value.singleOrNull()
-                        ?: throw NativeToJsRegistrationError(type, Throwable("${entry.key} is overloaded in $type"))
+                        ?: throw NativeToJsInterfaceRegistrationError(type, Throwable("${entry.key} is overloaded in $type"))
             }
 
             // => Sequence<Method>
@@ -923,7 +922,7 @@ class JsBridge
                     jsValue.codeEvaluationDeferred?.await()
                     jniRegisterJsObject(jniJsContextOrThrow(), jsValue.associatedJsName, methods.toTypedArray(), check)
                 } catch (t: Throwable) {
-                    throw NativeToJsRegistrationError(type, cause = t)
+                    throw NativeToJsInterfaceRegistrationError(type, cause = t)
                 }
             }
         }
