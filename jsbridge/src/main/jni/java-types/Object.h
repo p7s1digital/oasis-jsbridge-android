@@ -36,12 +36,8 @@ public:
   JSValue fromJava(const JValue &value) const override;
 #endif
 
-  void setInsideAidl(bool b) { m_insideAidl = b; }
-
 private:
   JavaType *newJavaType(const JniLocalRef<jobject> &jobject) const;
-
-  bool m_insideAidl = false;
 };
 
 }  // namespace JavaTypes

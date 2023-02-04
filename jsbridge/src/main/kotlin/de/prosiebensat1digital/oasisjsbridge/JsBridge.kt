@@ -496,8 +496,8 @@ class JsBridge
     // - native methods returning a "Kotlin coroutine" Deferred are mapped to a JS Promise
     // - if the JS value is a promise, you need to resolve it first with jsValue.await() or jsValue.awaitAsync()
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
-    suspend fun <T : NativeToJsInterface> registerNativeToJsInterface(jsValue: JsValue, type: KClass<T>, check: Boolean, isAidl: Boolean): T {
-        return registerNativeToJsInterfaceHelper(jsValue, type, check, true, isAidl)
+    suspend fun <T : NativeToJsInterface> registerNativeToJsInterface(jsValue: JsValue, type: KClass<T>, check: Boolean): T {
+        return registerNativeToJsInterfaceHelper(jsValue, type, check, true)
     }
 
     // Register a "JS" interface called by native (blocking)
@@ -506,10 +506,10 @@ class JsBridge
     // When check = true, the method will block the current thread until the registration has been
     // done and then return the proxy object
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
-    fun <T : NativeToJsInterface> registerNativeToJsInterfaceBlocking(jsValue: JsValue, type: KClass<T>, check: Boolean, context: CoroutineContext?, isAidl: Boolean): T {
+    fun <T : NativeToJsInterface> registerNativeToJsInterfaceBlocking(jsValue: JsValue, type: KClass<T>, check: Boolean, context: CoroutineContext?): T {
 
         return runBlocking(context ?: Dispatchers.Unconfined) {
-            registerNativeToJsInterfaceHelper(jsValue, type, check, waitForRegistration = check, isAidl)
+            registerNativeToJsInterfaceHelper(jsValue, type, check, waitForRegistration = check)
         }
     }
 
@@ -533,21 +533,7 @@ class JsBridge
 
         launch {
             val jniJsContext = jniJsContextOrThrow()
-            registerJsToNativeInterfaceHelper(jniJsContext, jsValue, kClass, obj, false)
-        }
-
-        return jsValue
-    }
-
-    @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
-    fun registerNativeAidlInterface(kClass: KClass<*>, obj: Any): JsValue {
-        val suffix = internalCounter.incrementAndGet()
-        val jsObjectName = "__jsBridge_aidl_${kClass.simpleName ?: "unnamed_class"}$suffix"
-        val jsValue = JsValue(this, null, associatedJsName = jsObjectName)
-
-        launch {
-            val jniJsContext = jniJsContextOrThrow()
-            registerJsToNativeInterfaceHelper(jniJsContext, jsValue, kClass, obj, true)
+            registerJsToNativeInterfaceHelper(jniJsContext, jsValue, kClass, obj)
         }
 
         return jsValue
@@ -814,11 +800,11 @@ class JsBridge
     }
 
     @Throws(JsToNativeRegistrationError::class)
-    private fun registerJsToNativeInterfaceHelper(jniJsContext: Long, jsValue: JsValue, type: KClass<*>, obj: Any, isAidl: Boolean) {
+    private fun registerJsToNativeInterfaceHelper(jniJsContext: Long, jsValue: JsValue, type: KClass<*>, obj: Any) {
         checkJsThread()
 
         // Pick up the most "bottom" interface which implements JsToNativeInterface (or android.os.IInterface)
-        val apiInterface = findApiInterface(obj::class.java, isAidl)
+        val apiInterface = findApiInterface(obj::class.java)
                 ?: throw JsToNativeRegistrationError(this::class, customMessage = "Cannot map native object to JS because it does not implement JsToNativeInterface or android.os.IInterface")
 
         if (!type.isInstance(obj)) {
@@ -831,7 +817,7 @@ class JsBridge
             // Collect class Methods using Kotlin reflection
             for (kFunction in apiInterface.kotlin.declaredMemberFunctions) {
                 // TODO: check that there is no optional!
-                val method = Method(kFunction, false, isAidl, customClassLoader)
+                val method = Method(kFunction, false, customClassLoader)
                 if (methods.put(kFunction.name, method) != null) {
                     throw JsToNativeRegistrationError(type, customMessage = ("${kFunction.name} is overloaded in $type"))
                 }
@@ -845,7 +831,7 @@ class JsBridge
             Timber.w("Cannot reflect object of type $type (exception: $t) using Kotlin reflection! Falling back to Java reflection...")
 
             for (javaMethod in type.java.methods) {
-                val method = Method(javaMethod, isAidl, customClassLoader)
+                val method = Method(javaMethod, customClassLoader)
                 if (methods.put(javaMethod.name, method) != null) {
                     throw JsToNativeRegistrationError(type, Throwable("${method.name} is overloaded in $type"))
                 }
@@ -859,26 +845,12 @@ class JsBridge
         }
     }
 
-    private fun findApiInterface(clazz: Class<*>, isAidl: Boolean): Class<*>? {
-        if (isAidl) {
-            // If it implements android.os.IInterface, return it
-            clazz.interfaces.singleOrNull { it == android.os.IInterface::class.java }?.let { return clazz }
+    private fun findApiInterface(clazz: Class<*>): Class<*>? {
+        // If one of the interfaces implements android.os.IInterface (e.g. Stub), return it
+        clazz.interfaces.firstOrNull { it == JsToNativeInterface::class.java }?.let { return clazz }
 
-            // Otherwise, try with the superclass
-            clazz.superclass?.let { findApiInterface(it, true) }?.let { return it }
-
-            // Or with the implemented interfaces
-            clazz.interfaces.firstNotNullOfOrNull { findApiInterface(it, true) }?.let { return it }
-
-            // Not found
-            return null
-        } else {
-            // If one of the interfaces implements android.os.IInterface (e.g. Stub), return it
-            clazz.interfaces.firstOrNull { it == JsToNativeInterface::class.java }?.let { return clazz }
-
-            // Otherwise, try with the interfaces
-            clazz.interfaces.firstOrNull { findApiInterface(it, false) != null }?.let { return it }
-        }
+        // Otherwise, try with the interfaces
+        clazz.interfaces.firstOrNull { findApiInterface(it) != null }?.let { return it }
 
         return null
     }
@@ -887,7 +859,7 @@ class JsBridge
     // done asynchronously)
     // - If async = false, the proxy object is only returned after a successful registration
     @Throws
-    private suspend fun <T: Any> registerNativeToJsInterfaceHelper(jsValue: JsValue, type: KClass<T>, check: Boolean, waitForRegistration: Boolean, isAidl: Boolean): T {
+    private suspend fun <T: Any> registerNativeToJsInterfaceHelper(jsValue: JsValue, type: KClass<T>, check: Boolean, waitForRegistration: Boolean): T {
         if (!type.java.isInterface) {
             throw NativeToJsRegistrationError(type, customMessage = "$type must be an interface")
         }
@@ -926,7 +898,7 @@ class JsBridge
 
             // Group by name
             // -> Map<methodName, List<Method>>
-            .groupBy({ it.name }, { Method(it, false, isAidl, customClassLoader) })
+            .groupBy({ it.name }, { Method(it, false, customClassLoader) })
 
             // Map to unique value
             // -> Map<methodName, Method>
@@ -1031,43 +1003,6 @@ class JsBridge
                 }
             }
         }
-    }
-
-    // Create a native proxy to a JS function defined by a reflected (lambda) Method. The function
-    // will be called from Java/Kotlin and will trigger execution of the JS lambda.
-    //
-    // This is used for example when a JsToNative interface with a lambda parameter is registered,
-    // e.g.:
-    // interface MyNativeApi {
-    //   fun myNativeMethod(cb: (p: Int) -> Unit)
-    // }
-    //
-    // When JS code calls "myNativeMethod()", the cb parameter will be passed to the native after being
-    // created via createJsLambdaProxy().
-    //
-    // Note: as it triggers a JS function running in the JS thread, the lambda needs to be started
-    // asynchronously and shall not block the current thread. As a result, only JS lambdas without
-    // return value are supported (which is usually fine for callbacks).
-    @Suppress("UNUSED")  // Called from JNI
-    private fun createAidlInterfaceProxy(globalObjectName: String, parameter: Parameter): Any? {
-        checkJsThread()
-
-        // Take over global JS variable with name "globalObjectName" as JsValue
-        val jsValue = JsValue(this, null, globalObjectName)
-
-        // Create proxy listener for the JS object
-        val proxyListener = ProxyListener(jsValue, parameter.javaClass as Class<*>)
-
-        // We use the ProxyBuilder from dexmaker instead of the standard Java Proxy because
-        // it makes it possible to make the proxy extend another class (AIDL Stub)
-        val proxyBuilder = ProxyBuilder
-            .forClass(parameter.aidlInterfaceStub!!.javaClass)
-            .handler(proxyListener)
-        customClassLoader?.let { proxyBuilder.parentClassLoader(it) }
-        val proxy = proxyBuilder.build()
-        Timber.v("Created proxy instance for ${parameter.javaClass.name}, js value name: $jsValue")
-
-        return proxy
     }
 
     @Suppress("UNUSED")  // Called from JNI
@@ -1179,10 +1114,6 @@ class JsBridge
                 method.name == "hashCode" -> jsValue.hashCode()
                 method.name == "equals" -> jsValue.toString() == args.firstOrNull()?.toString()
                 method.name == "toString" -> jsValue.toString()
-
-                // AIDL-specific
-                method.name == "asBinder" -> ProxyBuilder.callSuper(proxy, method, *args)
-                method.name == "onTransact" -> ProxyBuilder.callSuper(proxy, method, *args)
 
                 // Suspending method
                 args.lastOrNull() is Continuation<*> -> {
