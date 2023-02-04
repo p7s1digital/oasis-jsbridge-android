@@ -108,34 +108,6 @@ internal constructor(
             return jsBridge.registerJsToNativeInterface(jsToNativeInterface.kotlin, nativeObject)
         }
 
-        /**
-         * Create a JsValue which is a JS proxy to an AIDL interface instance.
-         *
-         * Note:
-         * - aidl must be an AIDL interface directly implementing android.os.IInterface
-         *   (e.g. your.AidlInterface.Stub.asInterface(...))
-         * - the native methods will be called in the JS thread!
-         */
-        inline fun <reified T> fromAidlInterface(jsBridge: JsBridge, aidl: T): JsValue
-                where T: android.os.IInterface {
-            return jsBridge.registerNativeAidlInterface(T::class, aidl)
-        }
-
-        /**
-         * Create a JsValue which is a JS proxy to an AIDL interface instance.
-         *
-         * Note:
-         * - aidl must be an AIDL interface directly implementing android.os.IInterface
-         *   (e.g. your.AidlInterface.Stub.asInterface(...))
-         * - the native methods will be called in the JS thread!
-         * - from Kotlin, it is recommended to use the method overload with generic parameter,
-         * instead!@JvmStatic
-         */
-        @JvmStatic
-        fun fromAidlInterface(jsBridge: JsBridge, aidl: Any, aidlInterface: Class<*>): JsValue {
-            return jsBridge.registerNativeAidlInterface(aidlInterface.kotlin, aidl)
-        }
-
 
         // Proxy native to JS lambda
         // ---
@@ -354,7 +326,7 @@ internal constructor(
 
         // Note: as check = false, the method will actually directly return without blocking the
         // current thread
-        return jsBridge.registerNativeToJsInterfaceBlocking(this, T::class, false, null, false)
+        return jsBridge.registerNativeToJsInterfaceBlocking(this, T::class, false, null)
     }
 
     /**
@@ -372,7 +344,7 @@ internal constructor(
         val jsBridge = jsBridge
                 ?: throw NativeToJsRegistrationError(T::class, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
 
-        return jsBridge.registerNativeToJsInterface(this, T::class, check, false)
+        return jsBridge.registerNativeToJsInterface(this, T::class, check)
     }
 
     /**
@@ -383,7 +355,7 @@ internal constructor(
         val jsBridge = jsBridge
                 ?: throw NativeToJsRegistrationError(T::class, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
 
-        return jsBridge.registerNativeToJsInterfaceBlocking(this, T::class, check, context, false)
+        return jsBridge.registerNativeToJsInterfaceBlocking(this, T::class, check, context)
     }
 
     /**
@@ -402,7 +374,7 @@ internal constructor(
 
         // Note: as check = false, the method will actually directly return without blocking the
         // current thread
-        return jsBridge.registerNativeToJsInterfaceBlocking(this, nativeToJsInterface.kotlin, false, null, false)
+        return jsBridge.registerNativeToJsInterfaceBlocking(this, nativeToJsInterface.kotlin, false, null)
     }
 
     /**
@@ -424,7 +396,7 @@ internal constructor(
         val jsBridge = jsBridge
                 ?: throw NativeToJsRegistrationError(nativeToJsInterface.kotlin, customMessage = "Cannot map JS value to native object because the JS interpreter has been destroyed")
 
-        return jsBridge.registerNativeToJsInterfaceBlocking(this, nativeToJsInterface.kotlin, check, context, false)
+        return jsBridge.registerNativeToJsInterfaceBlocking(this, nativeToJsInterface.kotlin, check, context)
     }
 
 

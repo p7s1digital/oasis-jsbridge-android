@@ -20,8 +20,6 @@
 #include <exceptions/JniException.h>
 #include "Object.h"
 
-#include "AidlInterface.h"
-#include "AidlParcelable.h"
 #include "BoxedPrimitive.h"
 #include "Boolean.h"
 #include "Double.h"
@@ -73,17 +71,11 @@ JValue Object::pop() const {
       return stringType->pop();
     }
 
-    case DUK_TYPE_OBJECT:
-      if (m_insideAidl) {
-        // Ideally, for AIDL would try to guess if it is a parcelable or an interface by checking if we have at least one
-        // function but it does not help much anyway because the type itself has been erased and cannot be guessed
-        duk_pop(m_ctx);
-        throw std::invalid_argument("Unknown object class cannot be transferred from JS to Java because the type information is missing. Hint: use in AIDL an Array instead of List, e.g. List<MyParcelable> -> MyParcelable[]");
-      } else {
-        alog_warn("Unknown object class cannot be transferred from JS to Java because the type information is missing. Defaulting to JsonObjectWrapper...");
-        auto jsonObjectWrapperType = std::make_unique<JsonObjectWrapper>(m_jsBridgeContext, false /*isNullable*/);
-        return jsonObjectWrapperType->pop();
-      }
+    case DUK_TYPE_OBJECT: {
+      alog_warn("Unknown object class cannot be transferred from JS to Java because the type information is missing. Defaulting to JsonObjectWrapper...");
+      auto jsonObjectWrapperType = std::make_unique<JsonObjectWrapper>(m_jsBridgeContext, false /*isNullable*/);
+      return jsonObjectWrapperType->pop();
+    }
 
     default: {
       const auto message = std::string("Cannot marshal return value ") + duk_safe_to_string(m_ctx, -1) + " to Java";
@@ -117,7 +109,6 @@ duk_ret_t Object::push(const JValue &value) const {
 #elif defined(QUICKJS)
 
 #include "QuickJsUtils.h"
-#include "AidlParcelable.h"
 
 JValue Object::toJava(JSValueConst v) const {
   if (JS_IsUndefined(v) || JS_IsNull(v)) {
@@ -142,15 +133,9 @@ JValue Object::toJava(JSValueConst v) const {
   }
 
   if (JS_IsObject(v)) {
-    if (m_insideAidl) {
-      // Ideally, for AIDL would try to guess if it is a parcelable or an interface by checking if we have at least one
-      // function but it does not help much anyway because the type itself has been erased and cannot be guessed
-      throw std::invalid_argument("Unknown object class cannot be transferred from JS to Java because the type information is missing. Hint: use in AIDL an Array instead of List, e.g. List<MyParcelable> -> MyParcelable[]");
-    } else {
-      alog_warn("Unknown object class cannot be transferred from JS to Java because the type information is missing. Defaulting to JsonObjectWrapper...");
-      auto jsonObjectWrapperType = std::make_unique<JsonObjectWrapper>(m_jsBridgeContext, false /*isNullable*/);
-      return jsonObjectWrapperType->toJava(v);
-    }
+    alog_warn("Unknown object class cannot be transferred from JS to Java because the type information is missing. Defaulting to JsonObjectWrapper...");
+    auto jsonObjectWrapperType = std::make_unique<JsonObjectWrapper>(m_jsBridgeContext, false /*isNullable*/);
+    return jsonObjectWrapperType->toJava(v);
   }
 
   throw std::invalid_argument("Cannot marshal return value to Java");
@@ -218,27 +203,6 @@ JavaType *Object::newJavaType(const JniLocalRef<jobject> &object) const {
     case JavaTypeId::JsonObjectWrapper:
       return new JsonObjectWrapper(m_jsBridgeContext, false /*isNullable*/);
     case JavaTypeId::Unknown:
-      if (m_insideAidl) {
-        // If we don't know the type, it could be an AIDL parcelable or interface element of a List and whose
-        // type has been erased and is not available via reflection
-        // => try to find it out and create the correct type
-
-        JniLocalRef<jsBridgeParameter> jsBridgeParameter = m_jsBridgeContext->getJniCache()->newParameter(javaClassRef);
-        ParameterInterface parameterInterface = m_jsBridgeContext->getJniCache()->getParameterInterface(jsBridgeParameter);
-
-        if (m_jniContext->exceptionCheck()) {
-          throw JniException(m_jniContext);
-        }
-
-        if (parameterInterface.isAidlParcelable()) {
-          return new AidlParcelable(m_jsBridgeContext, jsBridgeParameter, false);
-        }
-        if (parameterInterface.isAidlInterface()) {
-          return new AidlInterface(m_jsBridgeContext, jsBridgeParameter);
-        }
-      }
-
-      return nullptr;
     default:
       return nullptr;
   }

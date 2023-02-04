@@ -96,7 +96,7 @@ internal open class Parameter private constructor(
                 val kotlinClass = kotlinType.classifier as? KClass<*>
                 val kotlinFunction =
                     kotlinClass?.memberFunctions?.firstOrNull { it.name == "invoke" }
-                return@lazy kotlinFunction?.let { Method(it, true, false, customClassLoader) }
+                return@lazy kotlinFunction?.let { Method(it, true, customClassLoader) }
             }
         } catch (t: Throwable) {}
 
@@ -104,7 +104,7 @@ internal open class Parameter private constructor(
 
         if (kotlinType == null) {
             // Java-only reflection
-            return@lazy Method(javaMethod, false, customClassLoader)
+            return@lazy Method(javaMethod, customClassLoader)
         }
 
         // Add the FunctionX generic arguments to create type info for function parameters
@@ -137,52 +137,6 @@ internal open class Parameter private constructor(
                 Parameter(genericParameterType, customClassLoader)
             }
         }
-    }
-    
-
-    // For AIDL
-    // ---
-
-    @Suppress("UNUSED")  // Called from JNI
-    fun isAidlInterface(): Boolean {
-        return javaClass?.interfaces?.singleOrNull { it == android.os.IInterface::class.java } != null
-    }
-
-    @Suppress("UNUSED")  // Called from JNI
-    fun isAidlParcelable(): Boolean {
-        return javaClass?.interfaces?.singleOrNull { it == android.os.Parcelable::class.java } != null
-    }
-
-    // Return the an AIDL interface stub as a Parameter
-    internal val aidlInterfaceStub: Parameter? by lazy {
-        try {
-            if (kotlinType != null) {
-                val kotlinClass = kotlinType.classifier as? KClass<*>
-                val stubKotlinClass = kotlinClass?.nestedClasses?.singleOrNull { it.simpleName == "Stub" }
-                return@lazy stubKotlinClass?.let { Parameter(it.java, customClassLoader) }
-            }
-        } catch (t: Throwable) {}
-
-        // TODO
-        null
-    }
-
-    // Return the methods of an AIDL interface parameter or null if it is not a lambda
-    // (because the lambda parameter is a FunctionX object with an invoke() method)
-    //
-    @Suppress("UNUSED")  // Called from JNI
-    val methods: Array<Method>? by lazy {
-        javaClass?.methods?.filter { it.declaringClass == javaClass }?.map { Method(it, false, customClassLoader) }?.toTypedArray()
-    }
-
-    @Suppress("UNUSED")  // Called from JNI
-    fun newAidlParcelable(jsonString: String): Any? {
-        return Gson().fromJson(jsonString, javaClass)
-    }
-
-    @Suppress("UNUSED")  // Called from JNI
-    fun getAidlParcelableJsonString(parcelable: Any): String {
-        return Gson().toJson(parcelable, javaClass)
     }
 }
 
