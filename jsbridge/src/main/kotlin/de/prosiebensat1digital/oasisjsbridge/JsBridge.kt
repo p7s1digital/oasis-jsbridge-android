@@ -42,15 +42,15 @@ import java.lang.reflect.Proxy
 
 
 /**
- * Execute JS code via Duktape or QuickJS and handle the bi-directional communication between native
+ * Execute JS code via Duktape or QuickJS and handle the bi-directional communication between Java/Kotlin
  * and JS code via interface registration.
  *
- * All the given types are transferred and converted between Native and JS via reflection.
+ * All the given types are transferred and converted between Java and JS via reflection.
  *
  * Most basic types are supported, as well as lambda parameters. More complex objects can be
  * transferred using the JsonObjectWrapper class.
  *
- * JS values which do not need to be converted to native values can be encapsulated into a
+ * JS values which do not need to be converted to Java values can be encapsulated into a
  * JsValue object.
  *
  * Note: all the public methods are asynchronous and will not block the caller threads. They
@@ -480,43 +480,43 @@ class JsBridge
         }
     }
 
-    // Register a "JS" interface called by native.
+    // Register a "JS" interface called by Java.
     //
     // All the methods of the given interface must be implemented in JS as:
     //
     // MyJsApi.myMethod(arg1, arg2, ...)
     //
     // If check is set to true, this method will throw an exception when the JS object is invalid or
-    // does not implement all the methods of the given NativeToJsInterface
+    // does not implement all the methods of the given JavaToJsInterface
     //
     // Notes:
     // - objects and array must be defined wrapped as JsonObjectWrapper
-    // - function parameters are supported (with the same limitations as in registerJsToNativeInterface)
-    // - native methods returning a "Kotlin coroutine" Deferred are mapped to a JS Promise
+    // - function parameters are supported (with the same limitations as in registerJsToJavaInterface)
+    // - Java methods returning a "Kotlin coroutine" Deferred are mapped to a JS Promise
     // - if the JS value is a promise, you need to resolve it first with jsValue.await() or jsValue.awaitAsync()
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
-    suspend fun <T : NativeToJsInterface> registerNativeToJsInterface(jsValue: JsValue, type: KClass<T>, check: Boolean): T {
-        return registerNativeToJsInterfaceHelper(jsValue, type, check, true)
+    suspend fun <T : JavaToJsInterface> registerJavaToJsInterface(jsValue: JsValue, type: KClass<T>, check: Boolean): T {
+        return registerJavaToJsInterfaceHelper(jsValue, type, check, true)
     }
 
-    // Register a "JS" interface called by native (blocking)
+    // Register a "JS" interface called by Java (blocking)
     //
     // When check = false, the proxy object will be directly returned
     // When check = true, the method will block the current thread until the registration has been
     // done and then return the proxy object
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
-    fun <T : NativeToJsInterface> registerNativeToJsInterfaceBlocking(jsValue: JsValue, type: KClass<T>, check: Boolean, context: CoroutineContext?): T {
+    fun <T : JavaToJsInterface> registerJavaToJsInterfaceBlocking(jsValue: JsValue, type: KClass<T>, check: Boolean, context: CoroutineContext?): T {
 
         return runBlocking(context ?: Dispatchers.Unconfined) {
-            registerNativeToJsInterfaceHelper(jsValue, type, check, waitForRegistration = check)
+            registerJavaToJsInterfaceHelper(jsValue, type, check, waitForRegistration = check)
         }
     }
 
-    // Register a "native" interface called by JS.
+    // Register a Java interface called by JS.
     //
-    // All the native methods of the given interface can be called in JS as follows:
+    // All the Java methods of the given interface can be called in JS as follows:
     //
-    // MyNativeApi.myMethod(arg1, arg2, ...)
+    // MyJavaApi.myMethod(arg1, arg2, ...)
     //
     // Notes:
     // - objects and array must be wrapped in JsonObjectWrapper
@@ -525,14 +525,14 @@ class JsBridge
     // Note: please be aware that the object instance is strongly referenced by the JS
     // variable with the given name!
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
-    fun <T: JsToNativeInterface> registerJsToNativeInterface(kClass: KClass<*>, obj: T): JsToNativeProxy<T> {
+    fun <T: JsToJavaInterface> registerJsToJavaInterface(kClass: KClass<*>, obj: T): JsToJavaProxy<T> {
         val suffix = internalCounter.incrementAndGet()
         val jsObjectName = "__jsBridge_${kClass.simpleName ?: "unnamed_class"}$suffix"
-        val jsValue = JsToNativeProxy(this, obj, associatedJsName = jsObjectName)
+        val jsValue = JsToJavaProxy(this, obj, associatedJsName = jsObjectName)
 
         launch {
             val jniJsContext = jniJsContextOrThrow()
-            registerJsToNativeInterfaceHelper(jniJsContext, jsValue, kClass, obj)
+            registerJsToJavaInterfaceHelper(jniJsContext, jsValue, kClass, obj)
         }
 
         return jsValue
@@ -549,7 +549,7 @@ class JsBridge
     // Register a JS lambda from a JsValue (unchecked).
     //
     // Return a new JsValue which can be used for calling the lambda via callJsLambda()
-    // Register a "JS" interface called by native (blocking)
+    // Register a "JS" interface called by Java (blocking)
     @PublishedApi
     internal fun registerJsLambdaAsync(jsValue: JsValue, types: List<KType>): JsValue {
         return runBlocking(Dispatchers.Unconfined) {
@@ -560,7 +560,7 @@ class JsBridge
     // Register a JS lambda from a JsValue (blocking).
     //
     // Return a new JsValue which can be used for calling the lambda via callJsLambda()
-    // Register a "JS" interface called by native (blocking)
+    // Register a "JS" interface called by Java (blocking)
     //
     // When check = false, the proxy function will be directly returned
     // When check = true, the method will block the current thread until the registration has been
@@ -605,7 +605,7 @@ class JsBridge
                     registerBlock()
                 } catch (t: Throwable) {
                     throw t as? JsException
-                            ?: NativeToJsFunctionRegistrationError(jsValue.associatedJsName, t)
+                            ?: JavaToJsFunctionRegistrationError(jsValue.associatedJsName, t)
                 }
             }
         }
@@ -644,9 +644,9 @@ class JsBridge
     }
 
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
-    fun registerJsToNativeFunction(func: Function<*>, types: List<KType>): JsValue {
+    fun registerJsToJavaFunction(func: Function<*>, types: List<KType>): JsValue {
         val suffix = internalCounter.incrementAndGet()
-        val jsFunctionName = "__jsBridge_nativeFunction$suffix"
+        val jsFunctionName = "__jsBridge_javaFunction$suffix"
         val jsFunctionValue = JsValue(this, null, associatedJsName = jsFunctionName)
 
         launch {
@@ -654,7 +654,7 @@ class JsBridge
                 val jniJsContext = jniJsContextOrThrow()
 
                 val invokeJavaMethod = func::class.java.methods.firstOrNull { it.name == "invoke" }
-                        ?: throw JsToNativeRegistrationError(func::class, null, "Cannot map native function to JS: the object does not contain any 'invoke' method!")
+                        ?: throw JsToJavaRegistrationError(func::class, null, "Cannot map Java function to JS: the object does not contain any 'invoke' method!")
 
                 val invokeMethod = Method(invokeJavaMethod, types.mapIndexed { typeIndex, type ->
                     val variance = if (typeIndex == types.count() - 1) KVariance.OUT else KVariance.IN
@@ -663,11 +663,11 @@ class JsBridge
 
                 jniRegisterJavaLambda(jniJsContext, jsFunctionValue.associatedJsName, func, invokeMethod)
                 jsFunctionValue.hold()
-            } catch (e: JsToNativeRegistrationError) {
+            } catch (e: JsToJavaRegistrationError) {
                 throw e
             } catch (t: Throwable) {
                 Timber.e(t)
-                throw JsToNativeRegistrationError(func::class, t)
+                throw JsToJavaRegistrationError(func::class, t)
             }
         }
 
@@ -798,16 +798,16 @@ class JsBridge
         return Pair(context.assets.open(filename), filename.substringAfterLast("/"))
     }
 
-    @Throws(JsToNativeRegistrationError::class)
-    private fun registerJsToNativeInterfaceHelper(jniJsContext: Long, jsValue: JsValue, type: KClass<*>, obj: Any) {
+    @Throws(JsToJavaRegistrationError::class)
+    private fun registerJsToJavaInterfaceHelper(jniJsContext: Long, jsValue: JsValue, type: KClass<*>, obj: Any) {
         checkJsThread()
 
-        // Pick up the most "bottom" interface which implements JsToNativeInterface (or android.os.IInterface)
+        // Pick up the most "bottom" interface which implements JsToJaveInterface (or android.os.IInterface)
         val apiInterface = findApiInterface(obj::class.java)
-                ?: throw JsToNativeRegistrationError(this::class, customMessage = "Cannot map native object to JS because it does not implement JsToNativeInterface or android.os.IInterface")
+                ?: throw JsToJavaRegistrationError(this::class, customMessage = "Cannot map Java object to JS because it does not implement JsToJavaInterface or android.os.IInterface")
 
         if (!type.isInstance(obj)) {
-            throw JsToNativeRegistrationError(type, Throwable("${obj.javaClass.name} is not an instance of $type"))
+            throw JsToJavaRegistrationError(type, Throwable("${obj.javaClass.name} is not an instance of $type"))
         }
 
         val methods = linkedMapOf<String, Method>()
@@ -818,10 +818,10 @@ class JsBridge
                 // TODO: check that there is no optional!
                 val method = Method(kFunction, false, customClassLoader)
                 if (methods.put(kFunction.name, method) != null) {
-                    throw JsToNativeRegistrationError(type, customMessage = ("${kFunction.name} is overloaded in $type"))
+                    throw JsToJavaRegistrationError(type, customMessage = ("${kFunction.name} is overloaded in $type"))
                 }
             }
-        } catch (e: JsToNativeRegistrationError) {
+        } catch (e: JsToJavaRegistrationError) {
             // Re-throw
             throw e
         } catch (t: Throwable) {
@@ -832,7 +832,7 @@ class JsBridge
             for (javaMethod in type.java.methods) {
                 val method = Method(javaMethod, customClassLoader)
                 if (methods.put(javaMethod.name, method) != null) {
-                    throw JsToNativeRegistrationError(type, Throwable("${method.name} is overloaded in $type"))
+                    throw JsToJavaRegistrationError(type, Throwable("${method.name} is overloaded in $type"))
                 }
             }
         }
@@ -840,13 +840,13 @@ class JsBridge
         try {
             jniRegisterJavaObject(jniJsContext, jsValue.associatedJsName, obj, methods.values.toTypedArray())
         } catch (t: Throwable) {
-            throw JsToNativeRegistrationError(type, t)
+            throw JsToJavaRegistrationError(type, t)
         }
     }
 
     private fun findApiInterface(clazz: Class<*>): Class<*>? {
         // If one of the interfaces implements android.os.IInterface (e.g. Stub), return it
-        clazz.interfaces.firstOrNull { it == JsToNativeInterface::class.java }?.let { return clazz }
+        clazz.interfaces.firstOrNull { it == JsToJavaInterface::class.java }?.let { return clazz }
 
         // Otherwise, try with the interfaces
         clazz.interfaces.firstOrNull { findApiInterface(it) != null }?.let { return it }
@@ -858,13 +858,13 @@ class JsBridge
     // done asynchronously)
     // - If async = false, the proxy object is only returned after a successful registration
     @Throws
-    private suspend fun <T: Any> registerNativeToJsInterfaceHelper(jsValue: JsValue, type: KClass<T>, check: Boolean, waitForRegistration: Boolean): T {
+    private suspend fun <T: Any> registerJavaToJsInterfaceHelper(jsValue: JsValue, type: KClass<T>, check: Boolean, waitForRegistration: Boolean): T {
         if (!type.java.isInterface) {
-            throw NativeToJsInterfaceRegistrationError(type, customMessage = "$type must be an interface")
+            throw JavaToJsInterfaceRegistrationError(type, customMessage = "$type must be an interface")
         }
 
-        // Only allow interface directly implementing JsToNativeInterface (or implementing an interface implementing
-        // JsToNativeInterface)
+        // Only allow interface directly implementing JsToJavaInterface (or implementing an interface implementing
+        // JsToJavaInterface)
         // => Sequence<KClass<*>>
         val interfaces = generateSequence(type as KClass<*>) { previousClassifier ->
             // Single parent interface
@@ -883,11 +883,11 @@ class JsBridge
                 .singleOrNull()
                 .also {
                     it?.java?.isInterface
-                            ?: throw NativeToJsInterfaceRegistrationError(type, customMessage = "$type and its super interfaces must extend exactly 1 interface")
+                            ?: throw JavaToJsInterfaceRegistrationError(type, customMessage = "$type and its super interfaces must extend exactly 1 interface")
                 }
 
-                // Continue until it is the NativeToJsInterface
-                .takeIf { it != NativeToJsInterface::class }
+                // Continue until it is the JavaToJsInterface
+                .takeIf { it != JavaToJsInterface::class }
         }
 
         val methods = interfaces
@@ -903,7 +903,7 @@ class JsBridge
             // -> Map<methodName, Method>
             .mapValues {  entry ->
                 entry.value.singleOrNull()
-                        ?: throw NativeToJsInterfaceRegistrationError(type, Throwable("${entry.key} is overloaded in $type"))
+                        ?: throw JavaToJsInterfaceRegistrationError(type, Throwable("${entry.key} is overloaded in $type"))
             }
 
             // => Sequence<Method>
@@ -922,7 +922,7 @@ class JsBridge
                     jsValue.codeEvaluationDeferred?.await()
                     jniRegisterJsObject(jniJsContextOrThrow(), jsValue.associatedJsName, methods.toTypedArray(), check)
                 } catch (t: Throwable) {
-                    throw NativeToJsInterfaceRegistrationError(type, cause = t)
+                    throw JavaToJsInterfaceRegistrationError(type, cause = t)
                 }
             }
         }
@@ -937,7 +937,7 @@ class JsBridge
         return proxy
     }
 
-    // Call a JS method registered via registerNativeToJsInterface()
+    // Call a JS method registered via registerJavaToJsInterface()
     @Throws
     private fun callJsMethod(name: String, method: JavaMethod, args: Array<Any?>, awaitJsPromise: Boolean): Any? {
         checkJsThread()
@@ -963,16 +963,16 @@ class JsBridge
         jsDebuggerExtension?.onDebuggerReady()
     }
 
-    // Create a native proxy to a JS function defined by a reflected (lambda) Method. The function
+    // Create a Java proxy to a JS function defined by a reflected (lambda) Method. The function
     // will be called from Java/Kotlin and will trigger execution of the JS lambda.
     //
-    // This is used for example when a JsToNative interface with a lambda parameter is registered,
+    // This is used for example when a JsToJave interface with a lambda parameter is registered,
     // e.g.:
-    // interface MyNativeApi {
-    //   fun myNativeMethod(cb: (p: Int) -> Unit)
+    // interface MyJavaApi {
+    //   fun myJavaMethod(cb: (p: Int) -> Unit)
     // }
     //
-    // When JS code calls "myNativeMethod()", the cb parameter will be passed to the native after being
+    // When JS code calls "myJavaMethod()", the cb parameter will be passed to the Java after being
     // created via createJsLambdaProxy().
     //
     // Note: as it triggers a JS function running in the JS thread, the lambda needs to be started
@@ -984,7 +984,7 @@ class JsBridge
 
         val returnClass = method.returnParameter.getJava()
         if (returnClass != Unit::class.java) {
-             throw JsToNativeFunctionRegistrationError("JS lambda ($globalObjectName)", customMessage = "Unsupported return ($returnClass). JS lambdas should not return any value!")
+             throw JsToJavaFunctionRegistrationError("JS lambda ($globalObjectName)", customMessage = "Unsupported return ($returnClass). JS lambdas should not return any value!")
         }
 
         // Wrap the JS object within a JsValue which will be deleted when no longer needed
@@ -998,7 +998,7 @@ class JsBridge
                     val jniJsContext = jniJsContextOrThrow()
                     jniCallJsLambda(jniJsContext, jsFunctionObject.associatedJsName, args, false)
                 } catch (t: Throwable) {
-                    throw JsToNativeFunctionCallError("JS lambda($globalObjectName)", t )
+                    throw JsToJavaFunctionCallError("JS lambda($globalObjectName)", t )
                 }
             }
         }
@@ -1143,7 +1143,7 @@ class JsBridge
                     Timber.v("Calling (void) JS method ${type.name}::${method.name}()...")
                     callJsMethod(jsValue.associatedJsName, method, args ?: arrayOf(), false)
                 } catch (t: Throwable) {
-                    throw NativeToJsCallError("${type.name}::${method.name}()", t)
+                    throw JavaToJsCallError("${type.name}::${method.name}()", t)
                 }
             }
         }

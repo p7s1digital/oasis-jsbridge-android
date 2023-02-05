@@ -122,7 +122,7 @@ FunctionX::FunctionX(const JsBridgeContext *jsBridgeContext, const JniRef<jsBrid
 
 #if defined(DUKTAPE)
 
-// Pop a JS function, register and create a native wrapper (JavaScriptLambda)
+// Pop a JS function, register and create a Java wrapper (JavaScriptLambda)
 // - C++ -> Java: call createJsLambdaProxy with <functionId> as argument
 // - Java -> C++: call callJsLambda (with <functionId> + args parameters)
 JValue FunctionX::pop() const {
@@ -141,7 +141,7 @@ JValue FunctionX::pop() const {
   const JniRef<jsBridgeMethod> &javaMethod = getJniJavaMethod();
   const DuktapeUtils *utils = m_jsBridgeContext->getUtils();
 
-  // 1. Get the JS function which needs to be triggered from native
+  // 1. Get the JS function which needs to be triggered from Java
   duk_require_function(m_ctx, -1);
   duk_idx_t jsFuncIdx = duk_normalize_index(m_ctx, -1);
 
@@ -156,7 +156,7 @@ JValue FunctionX::pop() const {
   utils->createMappedCppPtrValue<JavaScriptLambda>(javaScriptLambda, -1, jsFunctionGlobalName.c_str());
   duk_pop(m_ctx);  // JS function
 
-  // 4. Call native createJsLambdaProxy(id, javaMethod)
+  // 4. Call Java createJsLambdaProxy(id, javaMethod)
   JniLocalRef<jobject> javaFunction = getJniCache()->getJsBridgeInterface().createJsLambdaProxy(
       JStringLocalRef(m_jniContext, jsFunctionGlobalName.c_str()),
       javaMethod
@@ -175,7 +175,7 @@ JValue FunctionX::popArray(uint32_t count, bool expanded) const {
   throw std::invalid_argument(message);
 }
 
-// Get a native function, register it and push a JS wrapper
+// Get a Java function, register it and push a JS wrapper
 duk_ret_t FunctionX::push(const JValue &value) const {
 
   // 1. C++: create the JValue object which is a Java FunctionX instance
@@ -207,7 +207,7 @@ duk_ret_t FunctionX::pushArray(const JniLocalRef<jarray> &, bool /*expand*/) con
 
 #elif defined(QUICKJS)
 
-// Get a JS function, register and create a native wrapper (JavaScriptLambda)
+// Get a JS function, register and create a Java wrapper (JavaScriptLambda)
 // - C++ -> Java: call createJsLambdaProxy with <functionId> as argument
 // - Java -> C++: call callJsLambda (with <functionId> + args parameters)
 JValue FunctionX::toJava(JSValueConst v) const {
@@ -234,7 +234,7 @@ JValue FunctionX::toJava(JSValueConst v) const {
   // 3. Wrap it inside the JS function
   utils->createMappedCppPtrValue<JavaScriptLambda>(javaScriptLambda, v, jsFunctionGlobalName.c_str());
 
-  // 4. Call native createJsLambdaProxy(id, javaMethod)
+  // 4. Call Java createJsLambdaProxy(id, javaMethod)
   JniLocalRef<jobject> javaFunction = getJniCache()->getJsBridgeInterface().createJsLambdaProxy(
       JStringLocalRef(m_jniContext, jsFunctionGlobalName.c_str()),
       jniJavaMethod
@@ -250,7 +250,7 @@ JValue FunctionX::toJavaArray(JSValueConst) const {
   throw std::invalid_argument("Cannot transfer from JS to Java an array of functions!");
 }
 
-// Get a native function, register it and return JS wrapper
+// Get a Java function, register it and return JS wrapper
 JSValue FunctionX::fromJava(const JValue &value) const {
   const QuickJsUtils *utils = m_jsBridgeContext->getUtils();
   assert(utils != nullptr);

@@ -1,6 +1,3 @@
-# For more information about using CMake with Android Studio, read the
-# documentation: https://d.android.com/studio/projects/add-native-code.html
-
 cmake_minimum_required(VERSION 3.6.0)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DDEBUGGER_SERVER_PORT=${DEBUGGER_SERVER_PORT}")
@@ -41,11 +38,11 @@ add_library(
     src/main/jni/java-types/FunctionX.cpp
     src/main/jni/java-types/Integer.cpp
     src/main/jni/java-types/JsonObjectWrapper.cpp
-    src/main/jni/java-types/JsToNativeProxy.cpp
+    src/main/jni/java-types/JsToJavaProxy.cpp
     src/main/jni/java-types/JsValue.cpp
     src/main/jni/java-types/List.cpp
     src/main/jni/java-types/Long.cpp
-    src/main/jni/java-types/NativeObjectWrapper.cpp
+    src/main/jni/java-types/JavaObjectWrapper.cpp
     src/main/jni/java-types/Object.cpp
     src/main/jni/java-types/Primitive.cpp
     src/main/jni/java-types/String.cpp

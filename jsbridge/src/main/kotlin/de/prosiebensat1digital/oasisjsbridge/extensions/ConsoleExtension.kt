@@ -20,7 +20,7 @@ import de.prosiebensat1digital.oasisjsbridge.*
 
 // Still missing: trace functionality (currently: alias to debug)
 
-internal interface StringConsole : JsToNativeInterface {
+internal interface StringConsole : JsToJavaInterface {
     fun log(vararg args: DebugString)
     fun debug(vararg args: DebugString)
     fun assert(assertion: Boolean, vararg args: DebugString)
@@ -31,7 +31,7 @@ internal interface StringConsole : JsToNativeInterface {
     fun exception(vararg args: DebugString)
 }
 
-internal interface JsonConsole : JsToNativeInterface {
+internal interface JsonConsole : JsToJavaInterface {
     fun log(vararg args: JsonObjectWrapper)
     fun debug(vararg args: JsonObjectWrapper)
     fun assert(assertion: Boolean, vararg args: JsonObjectWrapper)
@@ -42,7 +42,7 @@ internal interface JsonConsole : JsToNativeInterface {
     fun exception(vararg args: JsonObjectWrapper)
 }
 
-internal interface EmptyConsole : JsToNativeInterface {
+internal interface EmptyConsole : JsToJavaInterface {
     fun log(vararg args: Unit)
     fun debug(vararg args: Unit)
     fun assert(assertion: Boolean, vararg args: Unit)
@@ -70,7 +70,7 @@ internal class ConsoleExtension(
     }
 
     private fun createStringConsole(): JsValue {
-        val consoleNativeObject = object: StringConsole {
+        val consoleJavaObject = object: StringConsole {
             override fun log(vararg args: DebugString) = message(Log.DEBUG, ds2s(args))
             override fun debug(vararg args: DebugString) = message(Log.DEBUG, ds2s(args))
             override fun trace(vararg args: DebugString) = message(Log.DEBUG, ds2s(args))
@@ -86,11 +86,11 @@ internal class ConsoleExtension(
             }
         }
 
-        return JsValue.createJsToNativeProxy(jsBridge, consoleNativeObject)
+        return JsValue.createJsToJavaProxy(jsBridge, consoleJavaObject)
     }
 
     private fun createJsonConsole(): JsValue {
-        val consoleNativeObject = object: JsonConsole {
+        val consoleJavaObject = object: JsonConsole {
             override fun log(vararg args: JsonObjectWrapper) = message(Log.DEBUG, j2s(args))
             override fun debug(vararg args: JsonObjectWrapper) = message(Log.DEBUG, j2s(args))
             override fun trace(vararg args: JsonObjectWrapper) = message(Log.DEBUG, j2s(args))
@@ -106,11 +106,11 @@ internal class ConsoleExtension(
             }
         }
 
-        return JsValue.createJsToNativeProxy(jsBridge, consoleNativeObject)
+        return JsValue.createJsToJavaProxy(jsBridge, consoleJavaObject)
     }
 
     private fun createEmptyConsole(): JsValue {
-        val consoleNativeObject = object: EmptyConsole {
+        val consoleJavaObject = object: EmptyConsole {
             override fun log(vararg args: Unit) = Unit
             override fun debug(vararg args: Unit) = Unit
             override fun trace(vararg args: Unit) = Unit
@@ -121,7 +121,7 @@ internal class ConsoleExtension(
             override fun assert(assertion: Boolean, vararg args: Unit) = Unit
         }
 
-        return JsValue.createJsToNativeProxy(jsBridge, consoleNativeObject)
+        return JsValue.createJsToJavaProxy(jsBridge, consoleJavaObject)
     }
 
     private fun j2s(json: Array<out JsonObjectWrapper>): Array<out String> {

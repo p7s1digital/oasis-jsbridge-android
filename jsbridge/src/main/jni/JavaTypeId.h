@@ -57,8 +57,8 @@ enum class JavaTypeId {
   JsValue = 101,
   JsonObjectWrapper = 102,
   Deferred = 103,
-  NativeObjectWrapper = 104,
-  JsToNativeProxy = 105,
+  JavaObjectWrapper = 104,
+  JsToJavaProxy = 105,
 };
 
 JavaTypeId getJavaTypeIdByJavaName(std::u16string_view javaName);

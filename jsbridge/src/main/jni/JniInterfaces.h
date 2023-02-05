@@ -63,7 +63,7 @@ public:
 
   JniLocalRef<jobject> getJavaMethod() const;
   JStringLocalRef getName() const;
-  JniLocalRef<jobject> callNativeLambda(const JniRef<jobject> &, const JObjectArrayLocalRef &) const;
+  JniLocalRef<jobject> callJavaLambda(const JniRef<jobject> &, const JObjectArrayLocalRef &) const;
   JniLocalRef<jsBridgeParameter> getReturnParameter() const;
   JObjectArrayLocalRef getParameters() const;
   jboolean isVarArgs() const;

@@ -119,9 +119,9 @@ internal class Method {
     }
 
     @Suppress("UNUSED")  // Called from JNI
-    fun callNativeLambda(obj: Any, args_: Array<Any?>): Any? {
+    fun callJavaLambda(obj: Any, args_: Array<Any?>): Any? {
         val func = obj as? Function<*>
-                ?: throw JsBridgeError.InternalError(customMessage = "Cannot call native lambda: the given object is not a Function!")
+                ?: throw JsBridgeError.InternalError(customMessage = "Cannot call Java lambda: the given object is not a Function!")
 
         val args = if (args_.size < parameters.size) {
             args_.copyOf(parameters.size)
@@ -141,7 +141,7 @@ internal class Method {
             7 -> (func as Function7<Any?, Any?, Any?, Any?, Any?, Any?, Any?, *>).invoke(args[0], args[1], args[2], args[3], args[4], args[5], args[6])
             8 -> (func as Function8<Any?, Any?, Any?, Any?, Any?, Any?, Any?, Any?, *>).invoke(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7])
             9 -> (func as Function9<Any?, Any?, Any?, Any?, Any?, Any?, Any?, Any?, Any?, *>).invoke(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8])
-            else -> throw JsBridgeError.InternalError(customMessage = "Cannot call native lambda: only functions with up to 9 arguments are supported!")
+            else -> throw JsBridgeError.InternalError(customMessage = "Cannot call Java lambda: only functions with up to 9 arguments are supported!")
         }
     }
 

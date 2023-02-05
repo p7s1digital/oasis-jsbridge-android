@@ -49,25 +49,25 @@ sealed class JsBridgeError(message: String? = null, cause: Throwable?): Exceptio
     class LoadUrlError(val url: String, cause: Throwable? = null, customMessage: String? = null)
         : JsBridgeError(customMessage ?: "Error while loading URL ($url)", cause)
 
-    class JsToNativeRegistrationError(val type: KClass<*>, cause: Throwable? = null, customMessage: String? = null)
-        : JsBridgeError(customMessage ?: "Error while registering native interface ($type)", cause)
+    class JsToJavaRegistrationError(val type: KClass<*>, cause: Throwable? = null, customMessage: String? = null)
+        : JsBridgeError(customMessage ?: "Error while registering Java interface ($type)", cause)
 
-    class JsToNativeFunctionRegistrationError(val jsFunction: String, cause: Throwable? = null, customMessage: String? = null)
-        : JsBridgeError(customMessage ?: "Error while registering native function ($jsFunction)", cause)
+    class JsToJavaFunctionRegistrationError(val jsFunction: String, cause: Throwable? = null, customMessage: String? = null)
+        : JsBridgeError(customMessage ?: "Error while registering Java function ($jsFunction)", cause)
 
-    class JsToNativeCallError(val nativeCall: String, cause: Throwable? = null, customMessage: String? = null)
-        : JsBridgeError(customMessage ?: "Error while calling native method $nativeCall", cause)
+    class JsToJavaCallError(val javaCall: String, cause: Throwable? = null, customMessage: String? = null)
+        : JsBridgeError(customMessage ?: "Error while calling Java method $javaCall", cause)
 
-    class JsToNativeFunctionCallError(val nativeCall: String, cause: Throwable? = null, customMessage: String? = null)
-        : JsBridgeError(customMessage ?: "Error while calling native function $nativeCall", cause)
+    class JsToJavaFunctionCallError(val javaCall: String, cause: Throwable? = null, customMessage: String? = null)
+        : JsBridgeError(customMessage ?: "Error while calling Java function $javaCall", cause)
 
-    class NativeToJsInterfaceRegistrationError(val type: KClass<*>, cause: Throwable? = null, customMessage: String? = null)
+    class JavaToJsInterfaceRegistrationError(val type: KClass<*>, cause: Throwable? = null, customMessage: String? = null)
         : JsBridgeError(customMessage ?: "Error while registering JS interface ($type)", cause)
 
-    class NativeToJsFunctionRegistrationError(val jsFunction: String, cause: Throwable? = null, customMessage: String? = null)
+    class JavaToJsFunctionRegistrationError(val jsFunction: String, cause: Throwable? = null, customMessage: String? = null)
         : JsBridgeError(customMessage ?: "Error while registering JS function ($jsFunction)", cause)
 
-    class NativeToJsCallError(val jsCall: String, cause: Throwable? = null, customMessage: String? = null)
+    class JavaToJsCallError(val jsCall: String, cause: Throwable? = null, customMessage: String? = null)
         : JsBridgeError(customMessage ?: "Error while calling JS method $jsCall", cause)
 
     class JsCallbackError(cause: Throwable? = null): JsBridgeError(cause = cause)

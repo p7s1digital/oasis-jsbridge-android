@@ -26,12 +26,12 @@
 #include "java-types/Float.h"
 #include "java-types/FunctionX.h"
 #include "java-types/Integer.h"
-#include "java-types/JsToNativeProxy.h"
+#include "java-types/JsToJavaProxy.h"
 #include "java-types/JsValue.h"
 #include "java-types/JsonObjectWrapper.h"
 #include "java-types/List.h"
 #include "java-types/Long.h"
-#include "java-types/NativeObjectWrapper.h"
+#include "java-types/JavaObjectWrapper.h"
 #include "java-types/Object.h"
 #include "java-types/String.h"
 #include "java-types/Void.h"
@@ -134,10 +134,10 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
       return new JsonObjectWrapper(m_jsBridgeContext, isParameterNullable(parameter));
     case JavaTypeId::Deferred:
       return new Deferred(m_jsBridgeContext, getGenericParameterType(parameter));
-    case JavaTypeId::NativeObjectWrapper:
-      return new NativeObjectWrapper(m_jsBridgeContext);
-    case JavaTypeId::JsToNativeProxy:
-      return new JsToNativeProxy(m_jsBridgeContext);
+    case JavaTypeId::JavaObjectWrapper:
+      return new JavaObjectWrapper(m_jsBridgeContext);
+    case JavaTypeId::JsToJavaProxy:
+      return new JsToJavaProxy(m_jsBridgeContext);
 
     case JavaTypeId::Unknown:
       return nullptr;

@@ -34,26 +34,26 @@ internal class XMLHttpRequestExtension(
     private var okHttpClient = config.okHttpClient ?: OkHttpClient.Builder().build()
 
     init {
-        // Register XMLHttpRequestNativeHelper_send()
-        JsValue.createJsToNativeFunctionProxy5(jsBridge, ::nativeSend)
-            .assignToGlobal("XMLHttpRequestExtension_send_native")
+        // Register XMLHttpRequestJavaHelper_send()
+        JsValue.createJsToJavaFunctionProxy5(jsBridge, ::javaSend)
+            .assignToGlobal("XMLHttpRequestExtension_send_java")
 
         // Evaluate JS file
         jsBridge.evaluateUnsync(xhrJsCode)
     }
 
     fun release() {
-        jsBridge.evaluateUnsync("""delete globalThis["XMLHttpRequestExtension_send_native"]""")
+        jsBridge.evaluateUnsync("""delete globalThis["XMLHttpRequestExtension_send_java"]""")
     }
 
-    private fun nativeSend(
+    private fun javaSend(
         httpMethod: String,
         url: String,
         headers: JsonObjectWrapper,
         data: String?,
         cb: (JsonObjectWrapper, String, String) -> Unit
     ) {
-        Timber.v("nativeSend($httpMethod, $url, $headers)")
+        Timber.v("javaSend($httpMethod, $url, $headers)")
 
         jsBridge.launch(Dispatchers.IO) {
             // Load URL and evaluate JS string
@@ -176,7 +176,7 @@ internal class XMLHttpRequestExtension(
  */
 const val xhrJsCode: String = """
 (function() {
-  var sendNative = XMLHttpRequestExtension_send_native;
+  var sendJava = XMLHttpRequestExtension_send_java;
 
 function isListenerWithMatchingName(eventName) {
     return function (listener) {
@@ -287,8 +287,8 @@ XMLHttpRequest.prototype.send = function(data) {
   }
 
   var that = this;
-  sendNative(this._httpMethod, this._url, this._requestHeaders, data || null, function(responseInfo, responseText, error) {
-    that._send_native_callback(responseInfo, responseText, error);
+  sendJava(this._httpMethod, this._url, this._requestHeaders, data || null, function(responseInfo, responseText, error) {
+    that._send_java_callback(responseInfo, responseText, error);
   });
 };
 
@@ -302,14 +302,14 @@ XMLHttpRequest.prototype.abort = function() {
 }
 
 // responseInfo: {statusCode, statusText, responseHeaders}
-XMLHttpRequest.prototype._send_native_callback = function(responseInfo, responseText, error) {
-  //console.log("XMLHttpRequest._send_native_callback");
+XMLHttpRequest.prototype._send_java_callback = function(responseInfo, responseText, error) {
+  //console.log("XMLHttpRequest._send_java_callback");
   //console.log("- responseInfo =", JSON.stringify(responseInfo));
   //console.log("- responseText =", responseText);
   //console.log("- error =", error);
 
   if (this.readyState === XMLHttpRequest.UNSENT) {
-    console.log("XHR native callback ignored because the request has been aborted");
+    console.log("XHR Java callback ignored because the request has been aborted");
     if (typeof this.onabort === "function") {
       //console.log("Calling onabort()...");
       this.onabort();
@@ -320,7 +320,7 @@ XMLHttpRequest.prototype._send_native_callback = function(responseInfo, response
 
   if (this.readyState != XMLHttpRequest.LOADING) {
     // Request was not expected
-    console.log("XHR native callback ignored because the current state is not LOADING");
+    console.log("XHR Java callback ignored because the current state is not LOADING");
     return;
   }
 

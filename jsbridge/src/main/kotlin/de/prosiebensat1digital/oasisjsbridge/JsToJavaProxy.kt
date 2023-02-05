@@ -1,6 +1,6 @@
 package de.prosiebensat1digital.oasisjsbridge
 
-class JsToNativeProxy<T: JsToNativeInterface>
+class JsToJavaProxy<T: JsToJavaInterface>
 @PublishedApi
 internal constructor(jsBridge: JsBridge, val obj: T, associatedJsName: String)
 : JsValue(jsBridge, null, associatedJsName) {

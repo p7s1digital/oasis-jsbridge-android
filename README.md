@@ -56,7 +56,7 @@ implementation "de.prosiebensat1digital.oasis-jsbridge-android:oasis-jsbridge-qu
 1. [Using Kotlin/Java objects from JS](#using-kotlinjava-objects-from-js)
 1. [Calling JS functions from Kotlin](#calling-js-functions-from-kotlin)
 1. [Calling Kotlin/Java functions from JS](#calling-kotlin-functions-from-js)
-1. [Wrap a native object in JS code](#wrap-native-objects-in-js-code)
+1. [Wrap a Java object in JS code](#wrap-java-objects-in-js-code)
 1. [ES6 modules](#es6-modules)
 1. [Extensions](#extensions)
 
@@ -103,7 +103,7 @@ try {
     """.trimMargin())
 } catch (jse: JsException) {
     // jse.message = "wrong"
-    // jse.stackTrace = [JavaScript.buggy(eval:1), JavaScript.<eval>(eval:2), ....JsBridge.jniEvaluateString(Native Method), ...]
+    // jse.stackTrace = [JavaScript.buggy(eval:1), JavaScript.<eval>(eval:2), ....JsBridge.jniEvaluateString(Java Method), ...]
 }
 ```
 
@@ -116,14 +116,14 @@ A JsValue is a reference to any JS value.
 
 ```kotlin
 val jsInt = JsValue(jsBridge, "123")
-val jsInt = JsValue.fromNativeValue(jsBridge, 123)
+val jsInt = JsValue.fromJavaValue(jsBridge, 123)
 val jsString = JsValue(jsBridge, "'hello'.toUpperCase()")
-val jsString = JsValue.fromNativeValue(jsBridge, "HELLO")
+val jsString = JsValue.fromJavaValue(jsBridge, "HELLO")
 val jsObject = JsValue(jsBridge, "({one: 1, two: 'two'})")
-val jsObject = JsValue.fromNativeValue(jsBridge, JsonObjectWrapper("one" to 1, "two" to "two"))
+val jsObject = JsValue.fromJavaValue(jsBridge, JsonObjectWrapper("one" to 1, "two" to "two"))
 val calcSumJs = JsValue(jsBridge, "(function(a, b) { return a + b; })")
 val calcSumJs = JsValue.newFunction(jsBridge, "a", "b", "return a + b;")
-val calcSumJs = JsValue.createJsToNativeFunctionProxy2(jsBridge) { a: Int, b: Int -> a + b }
+val calcSumJs = JsValue.createJsToJavaFunctionProxy2(jsBridge) { a: Int, b: Int -> a + b }
 ```
 
 It has an associated (global) JS variable whose name can be accessed via `toString()` which makes it easy to re-use it from JS code:<br/>
@@ -150,21 +150,21 @@ String s = (String) jsString.evaluateBlocking(String.class);
 ```
 
 Additionally, a JS (proxy) value can be created from:
-- [a JS-to-native proxy object](#using-kotlinjava-objects-from-js) via `JsValue.createJsToNativeProxy()`.
-- [a JS-to-native proxy function](#calling-kotlin-functions-from-js) via `JsValue.createJsToNativeFunctionProxy()`.
+- [a JS-to-Java proxy object](#using-kotlinjava-objects-from-js) via `JsValue.createJsToJavaProxy()`.
+- [a JS-to-Java proxy function](#calling-kotlin-functions-from-js) via `JsValue.createJsToJavaFunctionProxy()`.
 
 And JS objects/functions can be accessed from Java/Kotlin using:
-- [a native-to-JS proxy object](#using-js-objects-from-kotlinjava) via `JsValue.createNativeToJsProxy()`.
-- [a native-to-JS proxy function](#calling-js-functions-from-kotlin) via `JsValue.createNativeToJsFunctionProxyX()`.
+- [a Java-to-JS proxy object](#using-js-objects-from-kotlinjava) via `JsValue.createJavaToJsProxy()`.
+- [a Java-to-JS proxy function](#calling-js-functions-from-kotlin) via `JsValue.createJavaToJsFunctionProxyX()`.
 
 
 ### Using JS objects from Kotlin/Java
 
-An interface extending `NativeToJsInterface` must be defined with the methods of the
+An interface extending `JavaToJsInterface` must be defined with the methods of the
 JS object:
 
 ```kotlin
-interface JsApi : NativeToJsInterface {
+interface JsApi : JavaToJsInterface {
     fun method1(a: Int, b: String)
     suspend fun method2(c: Double): String
 }
@@ -174,12 +174,12 @@ val jsObject = JsValue(jsBridge, """({
   method2: function(c) { return "Value: " + c; }
 })""")
 
-// Create a native proxy to the JS object
-val jsApi: JsApi = jsObject.createNativeToJsProxy()  // no check
-val jsApi: JsApi = jsObject.createNativeToJsProxy(check = true)  // suspending, optionally check that all methods are defined in the JS object
-val jsApi: JsApi = jsObject.createNativeToJsProxy(check = true)  // blocking (with optional check)
+// Create a Java proxy to the JS object
+val jsApi: JsApi = jsObject.createJavaToJsProxy()  // no check
+val jsApi: JsApi = jsObject.createJavaToJsProxy(check = true)  // suspending, optionally check that all methods are defined in the JS object
+val jsApi: JsApi = jsObject.createJavaToJsProxy(check = true)  // blocking (with optional check)
 
-// Call JS methods from native
+// Call JS methods from Java
 jsApi.method1(1, "two")
 val s = jsApi.method2(3.456)  // suspending
 ```
@@ -191,28 +191,28 @@ Note: when calling a non-suspending method with return value, the caller thread 
 
 ### Using Kotlin/Java objects from JS
 
-An interface extending `JsToNativeInterface` must be defined with the methods of the
-native object:
+An interface extending `JsToJavaInterface` must be defined with the methods of the
+Java object:
 
 ```kotlin
-interface NativeApi : JsToNativeInterface {
+interface JavaApi : JsToJavaInterface {
     fun method(a: Int, b: String): Double
 }
 
-val obj = object : NativeApi {
+val obj = object : JavaApi {
     override fun method(a: Int, b: String): Double { ... }
 }
 
-// Create a JS proxy to the native object
-val nativeApi = JsValue.createJsToNativeProxy(jsBridge, obj)
+// Create a JS proxy to the Java object
+val javaApi = JsValue.createJsToJavaProxy(jsBridge, obj)
 
-// Call native method from JS
-jsBridge.evaluate("globalThis.x = $nativeApi.method(1, 'two');")
+// Call Java method from JS
+jsBridge.evaluate("globalThis.x = $javaApi.method(1, 'two');")
 ```
 
 See [Example](#example-consuming-a-js-api-from-kotlin).
 
-Note: the native methods are called from the "JS" thread and must properly
+Note: the Java methods are called from the "JS" thread and must properly
 manage the execution context (e.g.: going to the main thread when calling
 UI methods). To avoid blocking the JS thread for asynchronous operations, it
 is possible to return a Deferred.
@@ -223,37 +223,37 @@ is possible to return a Deferred.
 ```kotlin
 val calcSumJs: suspend (Int, Int) -> Int = JsValue
     .newFunction(jsBridge, "a", "b", "return a + b;")
-    .createNativeToJsFunctionProxy2()
+    .createJavaToJsFunctionProxy2()
 
 println("Sum is $calcSumJs(1, 2)")
 ```
 
 Available methods:
- * `JsValue.createNativeToJsFunctionProxyX()` (where X is the number of arguments)
- * `JsValue.createNativeToJsBlockingFunctionProxyX()`: blocks the current thread until the JS code has been evaluated
+ * `JsValue.createJavaToJsFunctionProxyX()` (where X is the number of arguments)
+ * `JsValue.createJavaToJsBlockingFunctionProxyX()`: blocks the current thread until the JS code has been evaluated
 
 
 ### Calling Kotlin functions from JS
 
 ```kotlin
-val calcSumNative = JsValue.createJsToNativeFunctionProxy2(jsBridge) { a: Int, b: Int -> a + b }
+val calcSumJava = JsValue.createJsToJavaFunctionProxy2(jsBridge) { a: Int, b: Int -> a + b }
 
-jsBridge.evaluate("console.log('Sum is', $calcSumNative(1, 2))");
+jsBridge.evaluate("console.log('Sum is', $calcSumJava(1, 2))");
 ```
 
-Note: the native function is triggered from the "JS" thread
+Note: the Java function is triggered from the "JS" thread
 
 
-### Wrap native objects in JS code
+### Wrap Java objects in JS code
 
-It is possible to wrap a native object in JS code. The native object itself cannot be directly used
+It is possible to wrap a Java object in JS code. The Java object itself cannot be directly used
 from JS but can be passed again to Kotlin/Java when needed.
 
 ```kotlin
-val nativeObject = android.os.Binder("dummy")
-val jsNativeObject = JsValue.fromNativeValue(subject, NativeObjectWrapper(nativeObject))
-val nativeObjectBack: NativeObjectWrapper<android.os.Binder> = jsNativeObject.evaluate()
-assertSame(nativeObjectBack, nativeObject)
+val javaObject = android.os.Binder("dummy")
+val jsJavaObject = JsValue.fromJavaValue(subject, JavaObjectWrapper(javaObject))
+val javaObjectBack: JavaObjectWrapper<android.os.Binder> = jsJavaObject.evaluate()
+assertSame(javaObjectBack, javaObject)
 ```
 
 ### ES6 modules
@@ -329,21 +329,21 @@ Offers the possibility to set a custom class loader which will be used by the Js
 | `Function<R>`         | n.a.                  | `function` | lambda with supported types
 | `Deferred<T>`         | n.a.                  | `Promise`  | T must be a supported type
 | `JsonObjectWrapper`   | `JsonObjectWrapper`   | `object`   | serializes JS objects via JSON
-| `NativeObjectWrapper` | `NativeObjectWrapper` | `object`   | serializes JS objects via JSON
+| `JavaObjectWrapper` | `JavaObjectWrapper` | `object`   | serializes JS objects via JSON
 | `JsValue`             | `JsValue`             | `any       | references any JS value
-| `JsToNativeProxy<T>`  | `JsToNativeProxy`     | `object`   | references a JS object proxy to a native interface
+| `JsToJavaProxy<T>`  | `JsToJavaProxy`     | `object`   | references a JS object proxy to a Java interface
 
 
 ## Example: consuming a JS API from Kotlin
 
  JavaScript <=> Kotlin API:
 ```kotlin
-interface JsApi : NativeToJsInterface {
+interface JsApi : JavaToJsInterface {
     suspend fun createMessage(): String
     suspend fun calcSum(a: Int, b: Int): Int
 }
 
-interface NativeApi : JsToNativeInterface {
+interface JavaApi : JsToJavaInterface {
     fun getPlatformName(): String
     fun getTemperatureCelcius(): Deferred<Float>
 }
@@ -354,11 +354,11 @@ JavaScript API (js/api.js):
     <summary>ES5</summary>
 
 ```js
-globalThis.createApi = function(nativeApi, config) {
+globalThis.createApi = function(javaApi, config) {
   return {
     createMessage: function() {
-      const platformName = nativeApi.getPlatformName();
-      return nativeApi.getTemperatureCelcius().then(function(celcius) {
+      const platformName = javaApi.getPlatformName();
+      return javaApi.getTemperatureCelcius().then(function(celcius) {
         const value = config.useFahrenheit ? celcius * x + c : celcius;
         const unit = config.useFahrenheit ? "degrees F" : "degrees C";
         return "Hello " + platformName + "! The temperature is " + value + " " + unit + ".";
@@ -375,10 +375,10 @@ globalThis.createApi = function(nativeApi, config) {
     <summary>ES6</summary>
 
 ```js
-globalThis.createApi = (nativeApi, config) => {(
+globalThis.createApi = (javaApi, config) => {(
   createMessage: async () => {
-    const platformName = nativeApi.getPlatformName();
-    const celcius = await nativeApi.getTemperatureCelcius();
+    const platformName = javaApi.getPlatformName();
+    const celcius = await javaApi.getTemperatureCelcius();
     const value = config.useFahrenheit ? celcius * x + c : celcius;
     const unit = config.useFahrenheit ? "degrees F" : "degrees C";
     return `Hello ${platformName}! The temperature is ${value} ${unit}.`;
@@ -390,7 +390,7 @@ globalThis.createApi = (nativeApi, config) => {(
 
 Kotlin API:
 ```kotlin
-val nativeApi = object: NativeApi {
+val javaApi = object: JavaApi {
     override fun getPlatformName() = "Android"
     override fun getTemperatureCelcius() = async {
         // Getting current temperature from sensor or via network service
@@ -404,16 +404,16 @@ Bridging JavaScript and Kotlin:
 val jsBridge = JsBridge(JsBridgeConfig.standardConfig())
 jsBridge.evaluateLocalFile(context, "js/api.js")
 
-// JS "proxy" to native API
-val nativeApiJsValue = JsValue.createJsToNativeProxy(jsBridge, nativeApi)
+// JS "proxy" to Java API
+val javaApiJsValue = JsValue.createJsToJavaProxy(jsBridge, javaApi)
 
-// JS function createApi(nativeApi, config)
+// JS function createApi(javaApi, config)
 val config = JsonObjectWrapper("debug" to true, "useFahrenheit" to false)  // {debug: true, useFahrenheit: false}
 val createJsApi: suspend (JsValue, JsonObjectWrapper) -> JsValue
-    = JsValue(jsBridge, "createApi").createNativeToJsFunctionProxy2()
+    = JsValue(jsBridge, "createApi").createJavaToJsFunctionProxy2()
     
-// Create native "proxy" to JS API
-val jsApi: JsApi = createJsApi(nativeApiJsValue, config).createNativeToJsProxy()
+// Create Java "proxy" to JS API
+val jsApi: JsApi = createJsApi(javaApiJsValue, config).createJavaToJsProxy()
 ```
 
 Consume API:
