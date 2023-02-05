@@ -207,7 +207,7 @@ class JsBridge
         GlobalScope.launch(jsDispatcher + coroutineExceptionHandler) {
             try {
                 rootJob.join()
-            } catch (c: CancellationException) {
+            } catch (_: CancellationException) {
             }
 
             try {
@@ -393,17 +393,14 @@ class JsBridge
         evaluate(js, type, false)
     }
 
-    @OptIn(ExperimentalStdlibApi::class)
     inline fun <reified T: Any?> evaluateAsync(js: String): Deferred<T> {
         return evaluateAsync(js, typeOf<T>())
     }
 
-    @OptIn(ExperimentalStdlibApi::class)
     suspend inline fun <reified T: Any?> evaluate(js: String): T {
         return evaluate(js, typeOf<T>(), true)
     }
 
-    @OptIn(ExperimentalStdlibApi::class)
     inline fun <reified T: Any?> evaluateBlocking(js: String, context: CoroutineContext = EmptyCoroutineContext): T {
         return runBlocking(context) {
             if (isMainThread()) {
@@ -474,6 +471,12 @@ class JsBridge
 
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
     fun newJsFunctionAsync(jsValue: JsValue, functionArgs: Array<String>, jsCode: String): Deferred<Unit> {
+        if (isJsThread()) {
+            val jniJsContext = jniJsContextOrThrow()
+            jniNewJsFunction(jniJsContext, jsValue.associatedJsName, functionArgs, jsCode)
+            return CompletableDeferred()
+        }
+
         return async {
             val jniJsContext = jniJsContextOrThrow()
             jniNewJsFunction(jniJsContext, jsValue.associatedJsName, functionArgs, jsCode)
@@ -530,7 +533,7 @@ class JsBridge
         val jsObjectName = "__jsBridge_${kClass.simpleName ?: "unnamed_class"}$suffix"
         val jsValue = JsToJavaProxy(this, obj, associatedJsName = jsObjectName)
 
-        launch {
+        runInJsThread {
             val jniJsContext = jniJsContextOrThrow()
             registerJsToJavaInterfaceHelper(jniJsContext, jsValue, kClass, obj)
         }
@@ -600,7 +603,7 @@ class JsBridge
             }
         } else {
             // Asynchronous registration
-            launch {
+            launchInJsThread {
                 try {
                     registerBlock()
                 } catch (t: Throwable) {
@@ -639,7 +642,6 @@ class JsBridge
         checkJsThread()
 
         val jniJsContext = jniJsContextOrThrow()
-
         return jniCallJsLambda(jniJsContext, lambdaJsValue.associatedJsName, args, awaitJsPromise)
     }
 
@@ -649,7 +651,7 @@ class JsBridge
         val jsFunctionName = "__jsBridge_javaFunction$suffix"
         val jsFunctionValue = JsValue(this, null, associatedJsName = jsFunctionName)
 
-        launch {
+        runInJsThread {
             try {
                 val jniJsContext = jniJsContextOrThrow()
 
@@ -676,23 +678,29 @@ class JsBridge
 
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
     fun assignJsValueAsync(jsValue: JsValue, jsCode: String): Deferred<Unit> {
+        val codeEvaluationDeferred = jsValue.codeEvaluationDeferred
+
         return async {
-            val jniJsContext = jniJsContextOrThrow()
-            jniAssignJsValue(jniJsContext, jsValue.associatedJsName, jsCode)
+            codeEvaluationDeferred?.await()
+            jniJsContext?.let { jniAssignJsValue(it, jsValue.associatedJsName, jsCode) }
         }
     }
 
     internal fun deleteJsValue(jsValue: JsValue) {
         val globalName = jsValue.associatedJsName
+        val codeEvaluationDeferred = jsValue.codeEvaluationDeferred
 
         launch {
+            codeEvaluationDeferred?.await()
             jniJsContext?.let { jniDeleteJsValue(it, globalName) }
         }
     }
 
     internal fun copyJsValue(globalNameTo: String, jsValueFrom: JsValue) {
+        val codeEvaluationDeferred = jsValueFrom.codeEvaluationDeferred
+
         launch {
-            jsValueFrom.codeEvaluationDeferred?.await()
+            codeEvaluationDeferred?.await()
             jniJsContext?.let { jniCopyJsValue(it, globalNameTo, jsValueFrom.associatedJsName) }
         }
     }
@@ -917,7 +925,7 @@ class JsBridge
             }
         } else {
             // Asynchronous registration
-            launch(this@JsBridge.coroutineContext) {
+            launchInJsThread {
                 try {
                     jsValue.codeEvaluationDeferred?.await()
                     jniRegisterJsObject(jniJsContextOrThrow(), jsValue.associatedJsName, methods.toTypedArray(), check)
@@ -1031,6 +1039,11 @@ class JsBridge
 
             val promiseValue = try {
                 val result = deferred.await()
+
+                // Before completing the promise, we want to ensure that pending operations
+                // which has just been triggered (e.g. assigning a JsValue) can be done in the
+                // JS thread before.
+
                 isFulfilled = true
                 result
             } catch (t: Throwable) {
@@ -1043,6 +1056,13 @@ class JsBridge
         }
     }
 
+    private fun launchInJsThread(block: suspend () -> Unit) {
+        launch {
+            block()
+        }
+    }
+
+    // Run the given block in the JS thread or launch it if running from another thread
     internal fun runInJsThread(cb: () -> Unit) {
         if (isJsThread()) {
             cb()
@@ -1066,7 +1086,7 @@ class JsBridge
 
     @PublishedApi
     internal fun isMainThread(): Boolean = (Looper.myLooper() == Looper.getMainLooper())
-    private fun isJsThread(): Boolean = (Thread.currentThread().id == jsThreadId)
+    fun isJsThread(): Boolean = (Thread.currentThread().id == jsThreadId)
 
     private fun jniJsContextOrThrow() = jniJsContext ?: throw InternalError("Missing JNI JS context!")
 
