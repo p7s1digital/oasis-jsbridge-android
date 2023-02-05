@@ -72,6 +72,7 @@ static thread_local std::unordered_map<std::u16string_view, JavaTypeId> sJavaNam
   { u"de.prosiebensat1digital.oasisjsbridge.JsValue", JavaTypeId::JsValue },
   { u"de.prosiebensat1digital.oasisjsbridge.JsonObjectWrapper", JavaTypeId::JsonObjectWrapper },
   { u"de.prosiebensat1digital.oasisjsbridge.NativeObjectWrapper", JavaTypeId::NativeObjectWrapper },
+  { u"de.prosiebensat1digital.oasisjsbridge.JsToNativeProxy", JavaTypeId::JsToNativeProxy },
 
   { u"kotlinx.coroutines.Deferred", JavaTypeId::Deferred }
 };

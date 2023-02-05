@@ -1,6 +1,9 @@
 /*
  * Copyright (C) 2019 ProSiebenSat1.Digital GmbH.
  *
+ * Originally based on Duktape Android:
+ * Copyright (C) 2015 Square, Inc.
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
@@ -13,59 +16,56 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "JsValue.h"
+#include "JsToNativeProxy.h"
 
-#include "JniCache.h"
+#include "JavaObject.h"
 #include "JsBridgeContext.h"
-#include "exceptions/JniException.h"
+#include "JniCache.h"
 #include "jni-helpers/JniContext.h"
-#include "jni-helpers/JStringLocalRef.h"
+
+#include <exceptions/JniException.h>
+#include <log.h>
 
 namespace {
-  const char *JSVALUE_GLOBAL_NAME_PREFIX = "javaTypes_jsValue_";
+    const char *JSTONATIVEPROXY_GLOBAL_NAME_PREFIX = "javaTypes_jsToNativeProxy_";
 }
-
 
 namespace JavaTypes {
 
-JsValue::JsValue(const JsBridgeContext *jsBridgeContext, bool isNullable)
- : JavaType(jsBridgeContext, JavaTypeId::JsValue)
- , m_isNullable(isNullable) {
+JsToNativeProxy::JsToNativeProxy(const JsBridgeContext *jsBridgeContext)
+ : JavaType(jsBridgeContext, JavaTypeId::JsToNativeProxy) {
 }
 
 #if defined(DUKTAPE)
 
 #include "StackChecker.h"
 
-// JS to native JsValue
-JValue JsValue::pop() const {
+JValue JsToNativeProxy::pop() const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
   JNIEnv *env = m_jniContext->getJNIEnv();
   assert(env != nullptr);
 
-  // If the Java JsValue instance is nullable and the JS value is null or undefined, return a null JsValue
-  // (but if the JsValue is not nullable, we still return a new JsValue instance)
-  if (m_isNullable && duk_is_null_or_undefined(m_ctx, -1)) {
+  if (!duk_is_object(m_ctx, -1) && !duk_is_undefined(m_ctx, -1) && !duk_is_null(m_ctx, -1)) {
     duk_pop(m_ctx);
     return JValue();
   }
 
   static int jsValueCount = 0;
-  std::string jsValueGlobalName = JSVALUE_GLOBAL_NAME_PREFIX + std::to_string(++jsValueCount);
+  std::string jsValueGlobalName = JSTONATIVEPROXY_GLOBAL_NAME_PREFIX + std::to_string(++jsValueCount);
 
-  // Create a new JS value with a new global name
+  // Create a new JsToNativeProxy to the native object with a new global name
+  auto javaWrappedObject = JavaObject::getJavaThis(m_jsBridgeContext, -1);
   JStringLocalRef jsValueName(m_jniContext, jsValueGlobalName.c_str());
-  JniLocalRef<jobject> jsValue = getJniCache()->newJsValue(jsValueName);
+  auto jsToNativeProxy = getJniCache()->newJsToNativeProxy(javaWrappedObject, jsValueName);
   jsValueName.release();
 
   // Set value
   duk_put_global_string(m_ctx, jsValueGlobalName.c_str());
-  return JValue(jsValue);
+  return JValue(jsToNativeProxy);
 }
 
-// Native JsValue to JS
-duk_ret_t JsValue::push(const JValue &value) const {
+duk_ret_t JsToNativeProxy::push(const JValue &value) const {
   CHECK_STACK_OFFSET(m_ctx, 1);
 
   const JniLocalRef<jobject> &jValue = value.getLocalRef();
@@ -88,24 +88,25 @@ duk_ret_t JsValue::push(const JValue &value) const {
 
 #elif defined(QUICKJS)
 
-JValue JsValue::toJava(JSValueConst v) const {
+#include "QuickJsUtils.h"
+
+JValue JsToNativeProxy::toJava(JSValueConst v) const {
   JNIEnv *env = m_jniContext->getJNIEnv();
   assert(env != nullptr);
 
-  // If the Java JsValue instance is nullable and the JS value is null or undefined, return a null JsValue
-  // (but if the JsValue is not nullable, we still return a new JsValue instance)
-  if (m_isNullable && (JS_IsNull(v) || JS_IsUndefined(v))) {
+  if (!JS_IsObject(v) && !JS_IsNull(v) && !JS_IsUndefined(v)) {
     return JValue();
   }
 
   static int jsValueCount = 0;
-  std::string jsValueGlobalName = JSVALUE_GLOBAL_NAME_PREFIX + std::to_string(++jsValueCount);
+  std::string jsValueGlobalName = JSTONATIVEPROXY_GLOBAL_NAME_PREFIX + std::to_string(++jsValueCount);
 
   JniLocalRef<jclass> javaClass = getJavaClass();
 
-  // Create a new JS value with a new global name
+  // Create a new JsToNativeProxy instance for the Java object with a new global name
+  auto javaWrappedObject = JavaObject::getJavaThis(m_jsBridgeContext, v);
   JStringLocalRef jsValueName(m_jniContext, jsValueGlobalName.c_str());
-  JniLocalRef<jobject> jsValue = getJniCache()->newJsValue(jsValueName);
+  auto jsToNativeProxy = getJniCache()->newJsToNativeProxy(javaWrappedObject, jsValueName);
   jsValueName.release();
 
   // Set value
@@ -113,10 +114,10 @@ JValue JsValue::toJava(JSValueConst v) const {
   JS_SetPropertyStr(m_ctx, globalObj, jsValueGlobalName.c_str(), JS_DupValue(m_ctx, v));
   JS_FreeValue(m_ctx, globalObj);
 
-  return JValue(jsValue);
+  return JValue(jsToNativeProxy);
 }
 
-JSValue JsValue::fromJava(const JValue &value) const {
+JSValue JsToNativeProxy::fromJava(const JValue &value) const {
   const JniLocalRef<jobject> &jValue = value.getLocalRef();
 
   if (jValue.isNull()) {
@@ -139,4 +140,3 @@ JSValue JsValue::fromJava(const JValue &value) const {
 #endif
 
 }  // namespace JavaTypes
-

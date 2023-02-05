@@ -35,6 +35,7 @@ JniCache::JniCache(const JsBridgeContext *jsBridgeContext, const JniLocalRef<job
  , m_jsBridgeJsValueClass(getJavaClass(JavaTypeId::JsValue))
  , m_jsonObjectWrapperClass(getJavaClass(JavaTypeId::JsonObjectWrapper))
  , m_nativeObjectWrapperClass(getJavaClass(JavaTypeId::NativeObjectWrapper))
+ , m_jsToNativeProxyClass(getJavaClass(JavaTypeId::JsToNativeProxy))
  , m_jsBridgeInterface(this, jsBridgeJavaObject) {
 }
 
@@ -124,7 +125,7 @@ JStringLocalRef JniCache::getJsonObjectWrapperString(const JniRef<jobject> &json
 }
 
 
-// JsonObjectWrapper
+// NativeObjectWrapper
 // ---
 
 JniLocalRef<jobject> JniCache::nativeObjectWrapperFromJavaObject(const JniRef<jobject> &javaObject) const {
@@ -135,6 +136,15 @@ JniLocalRef<jobject> JniCache::nativeObjectWrapperFromJavaObject(const JniRef<jo
 JniLocalRef<jobject> JniCache::getNativeObjectWrapperJavaObject(const JniRef<jobject> &nativeObjectWrapper) const {
   static thread_local jmethodID getJavaObject = m_jniContext->getMethodID(m_nativeObjectWrapperClass, "extractJavaObject", "()Ljava/lang/Object;");
   return m_jniContext->callObjectMethod(nativeObjectWrapper, getJavaObject);
+}
+
+
+// JsToNativeProxy
+// ---
+
+JniLocalRef<jobject> JniCache::newJsToNativeProxy(const JniRef<jobject> &javaObject, const JStringLocalRef &name) const {
+  static thread_local jmethodID ctorId = m_jniContext->getMethodID(m_jsToNativeProxyClass, "<init>", "(L" JSBRIDGE_PKG_PATH "/JsBridge;L" JSBRIDGE_PKG_PATH "/JsToNativeInterface;Ljava/lang/String;)V");
+  return m_jniContext->newObject<jobject>(m_jsToNativeProxyClass,ctorId, m_jsBridgeInterface.object(), javaObject, name);
 }
 
 
