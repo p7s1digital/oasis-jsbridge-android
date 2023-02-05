@@ -35,7 +35,7 @@ internal class XMLHttpRequestExtension(
 
     init {
         // Register XMLHttpRequestJavaHelper_send()
-        JsValue.createJsToJavaFunctionProxy5(jsBridge, ::javaSend)
+        JsValue.createJsToJavaProxyFunction5(jsBridge, ::javaSend)
             .assignToGlobal("XMLHttpRequestExtension_send_java")
 
         // Evaluate JS file

@@ -113,57 +113,57 @@ internal constructor(
         // ---
 
         // Note: as reflection is still not well supported for lambdas, we cannot use typeOf<F>()
-        //inline fun <reified F: Function<*>> createJsToJavaFunctionProxy(func: F): JsValue {
+        //inline fun <reified F: Function<*>> createJsToJavaProxyFunction(func: F): JsValue {
         //    return jsBridge.registerJsToJavaFunction(func, typeOf<F>())
         //}
 
         @OptIn(ExperimentalStdlibApi::class)
-        inline fun <reified R> createJsToJavaFunctionProxy0(jsBridge: JsBridge, noinline func: () -> R): JsValue {
+        inline fun <reified R> createJsToJavaProxyFunction0(jsBridge: JsBridge, noinline func: () -> R): JsValue {
             return jsBridge.registerJsToJavaFunction(func, listOf(typeOf<R>()))
         }
 
         @OptIn(ExperimentalStdlibApi::class)
-        inline fun <reified P1, reified R> createJsToJavaFunctionProxy1(jsBridge: JsBridge, noinline func: (p1: P1) -> R): JsValue {
+        inline fun <reified P1, reified R> createJsToJavaProxyFunction1(jsBridge: JsBridge, noinline func: (p1: P1) -> R): JsValue {
             return jsBridge.registerJsToJavaFunction(func, listOf(typeOf<P1>(), typeOf<R>()))
         }
 
         @OptIn(ExperimentalStdlibApi::class)
-        inline fun <reified P1, reified P2, reified R> createJsToJavaFunctionProxy2(jsBridge: JsBridge, noinline func: (p1: P1, p2: P2) -> R): JsValue {
+        inline fun <reified P1, reified P2, reified R> createJsToJavaProxyFunction2(jsBridge: JsBridge, noinline func: (p1: P1, p2: P2) -> R): JsValue {
             return jsBridge.registerJsToJavaFunction(func, listOf(typeOf<P1>(), typeOf<P2>(), typeOf<R>()))
         }
 
         @OptIn(ExperimentalStdlibApi::class)
-        inline fun <reified P1, reified P2, reified P3, reified R> createJsToJavaFunctionProxy3(jsBridge: JsBridge, noinline func: (p1: P1, p2: P2, p3: P3) -> R): JsValue {
+        inline fun <reified P1, reified P2, reified P3, reified R> createJsToJavaProxyFunction3(jsBridge: JsBridge, noinline func: (p1: P1, p2: P2, p3: P3) -> R): JsValue {
             return jsBridge.registerJsToJavaFunction(func, listOf(typeOf<P1>(), typeOf<P2>(), typeOf<P3>(), typeOf<R>()))
         }
 
         @OptIn(ExperimentalStdlibApi::class)
-        inline fun <reified P1, reified P2, reified P3, reified P4, reified R> createJsToJavaFunctionProxy4(jsBridge: JsBridge, noinline func: (p1: P1, p2: P2, p3: P3, p4: P4) -> R): JsValue {
+        inline fun <reified P1, reified P2, reified P3, reified P4, reified R> createJsToJavaProxyFunction4(jsBridge: JsBridge, noinline func: (p1: P1, p2: P2, p3: P3, p4: P4) -> R): JsValue {
             return jsBridge.registerJsToJavaFunction(func, listOf(typeOf<P1>(), typeOf<P2>(), typeOf<P3>(), typeOf<P4>(), typeOf<R>()))
         }
 
         @OptIn(ExperimentalStdlibApi::class)
-        inline fun <reified P1, reified P2, reified P3, reified P4, reified P5, reified R> createJsToJavaFunctionProxy5(jsBridge: JsBridge, noinline func: (p1: P1, p2: P2, p3: P3, p4: P4, p5: P5) -> R): JsValue {
+        inline fun <reified P1, reified P2, reified P3, reified P4, reified P5, reified R> createJsToJavaProxyFunction5(jsBridge: JsBridge, noinline func: (p1: P1, p2: P2, p3: P3, p4: P4, p5: P5) -> R): JsValue {
             return jsBridge.registerJsToJavaFunction(func, listOf(typeOf<P1>(), typeOf<P2>(), typeOf<P3>(), typeOf<P4>(), typeOf<P5>(), typeOf<R>()))
         }
 
         @OptIn(ExperimentalStdlibApi::class)
-        inline fun <reified P1, reified P2, reified P3, reified P4, reified P5, reified P6, reified R> createJsToJavaFunctionProxy6(jsBridge: JsBridge, noinline func: (p1: P1, p2: P2, p3: P3, p4: P4, p5: P5, p6: P6) -> R): JsValue {
+        inline fun <reified P1, reified P2, reified P3, reified P4, reified P5, reified P6, reified R> createJsToJavaProxyFunction6(jsBridge: JsBridge, noinline func: (p1: P1, p2: P2, p3: P3, p4: P4, p5: P5, p6: P6) -> R): JsValue {
             return jsBridge.registerJsToJavaFunction(func, listOf(typeOf<P1>(), typeOf<P2>(), typeOf<P3>(), typeOf<P4>(), typeOf<P5>(), typeOf<P6>(), typeOf<R>()))
         }
 
         @OptIn(ExperimentalStdlibApi::class)
-        inline fun <reified P1, reified P2, reified P3, reified P4, reified P5, reified P6, reified P7, reified R> createJsToJavaFunctionProxy7(jsBridge: JsBridge, noinline func: (p1: P1, p2: P2, p3: P3, p4: P4, p5: P5, p6: P6, p7: P7) -> R): JsValue {
+        inline fun <reified P1, reified P2, reified P3, reified P4, reified P5, reified P6, reified P7, reified R> createJsToJavaProxyFunction7(jsBridge: JsBridge, noinline func: (p1: P1, p2: P2, p3: P3, p4: P4, p5: P5, p6: P6, p7: P7) -> R): JsValue {
             return jsBridge.registerJsToJavaFunction(func, listOf(typeOf<P1>(), typeOf<P2>(), typeOf<P3>(), typeOf<P4>(), typeOf<P5>(), typeOf<P6>(), typeOf<P7>(), typeOf<R>()))
         }
 
         @OptIn(ExperimentalStdlibApi::class)
-        inline fun <reified P1, reified P2, reified P3, reified P4, reified P5, reified P6, reified P7, reified P8, reified R> createJsToJavaFunctionProxy8(jsBridge: JsBridge, noinline func: (p1: P1, p2: P2, p3: P3, p4: P4, p5: P5, p6: P6, p7: P7, p8: P8) -> R): JsValue {
+        inline fun <reified P1, reified P2, reified P3, reified P4, reified P5, reified P6, reified P7, reified P8, reified R> createJsToJavaProxyFunction8(jsBridge: JsBridge, noinline func: (p1: P1, p2: P2, p3: P3, p4: P4, p5: P5, p6: P6, p7: P7, p8: P8) -> R): JsValue {
             return jsBridge.registerJsToJavaFunction(func, listOf(typeOf<P1>(), typeOf<P2>(), typeOf<P3>(), typeOf<P4>(), typeOf<P5>(), typeOf<P6>(), typeOf<P7>(), typeOf<P8>(), typeOf<R>()))
         }
 
         @OptIn(ExperimentalStdlibApi::class)
-        inline fun <reified P1, reified P2, reified P3, reified P4, reified P5, reified P6, reified P7, reified P8, reified P9, reified R> createJsToJavaFunctionProxy9(jsBridge: JsBridge, noinline func: (p1: P1, p2: P2, p3: P3, p4: P4, p5: P5, p6: P6, p7: P7, p8: P8, p9: P9) -> R): JsValue {
+        inline fun <reified P1, reified P2, reified P3, reified P4, reified P5, reified P6, reified P7, reified P8, reified P9, reified R> createJsToJavaProxyFunction9(jsBridge: JsBridge, noinline func: (p1: P1, p2: P2, p3: P3, p4: P4, p5: P5, p6: P6, p7: P7, p8: P8, p9: P9) -> R): JsValue {
             return jsBridge.registerJsToJavaFunction(func, listOf(typeOf<P1>(), typeOf<P2>(), typeOf<P3>(), typeOf<P4>(), typeOf<P5>(), typeOf<P6>(), typeOf<P7>(), typeOf<P8>(), typeOf<P9>(), typeOf<R>()))
         }
 
@@ -407,7 +407,7 @@ internal constructor(
     // Unfortunately crashes with latest Kotlin (1.3.40) because typeOf<>() does not work yet for suspending functions,
     // that's why we have to use the registerJsFunctionX() methods below (X = parameter count)
     //
-    //inline fun <reified F: Function<*>> createJavaToJsFunctionProxy(kFunction = typeOf<F>()): F {
+    //inline fun <reified F: Function<*>> createJavaToJsProxyFunction(kFunction = typeOf<F>()): F {
     //  ...
     //}
 
@@ -416,25 +416,25 @@ internal constructor(
     // ---
 
     @OptIn(ExperimentalStdlibApi::class)
-    suspend inline fun <reified R> createJavaToJsFunctionProxy0(waitForRegistration: Boolean): suspend () -> R {
-        val functionWithParamArray = createJavaToJsFunctionProxyHelper<R>(listOf(typeOf<R>()), waitForRegistration)
+    suspend inline fun <reified R> createJavaToJsProxyFunction0(waitForRegistration: Boolean): suspend () -> R {
+        val functionWithParamArray = createJavaToJsProxyFunctionHelper<R>(listOf(typeOf<R>()), waitForRegistration)
         return {
             functionWithParamArray(arrayOf())
         }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    inline fun <reified R> createJavaToJsFunctionProxy0(): suspend () -> R {
-        val functionWithParamArray = createJavaToJsFunctionProxyAsyncHelper<R>(listOf(typeOf<R>()))
+    inline fun <reified R> createJavaToJsProxyFunction0(): suspend () -> R {
+        val functionWithParamArray = createJavaToJsProxyFunctionAsyncHelper<R>(listOf(typeOf<R>()))
         return {
             functionWithParamArray(arrayOf())
         }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    inline fun <reified R> createJavaToJsBlockingFunctionProxy0(context: CoroutineContext? = null): () -> R {
+    inline fun <reified R> createJavaToJsBlockingProxyFunction0(context: CoroutineContext? = null): () -> R {
         val types = listOf(typeOf<R>())
-        val functionWithParamArray = createJavaToJsBlockingFunctionProxyHelper<R>(types, context)
+        val functionWithParamArray = createJavaToJsBlockingProxyFunctionHelper<R>(types, context)
         return {
             functionWithParamArray(arrayOf())
         }
@@ -445,27 +445,27 @@ internal constructor(
     // ---
 
     @OptIn(ExperimentalStdlibApi::class)
-    suspend inline fun <reified T1, reified R> createJavaToJsFunctionProxy1(waitForRegistration: Boolean): suspend (T1) -> R {
+    suspend inline fun <reified T1, reified R> createJavaToJsProxyFunction1(waitForRegistration: Boolean): suspend (T1) -> R {
         val types = listOf(typeOf<T1>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsFunctionProxyHelper<R>(types, waitForRegistration)
+        val functionWithParamArray = createJavaToJsProxyFunctionHelper<R>(types, waitForRegistration)
         return { p1 ->
             functionWithParamArray(arrayOf(p1))
         }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified R> createJavaToJsFunctionProxy1(): suspend (T1) -> R {
+    inline fun <reified T1, reified R> createJavaToJsProxyFunction1(): suspend (T1) -> R {
         val types = listOf(typeOf<T1>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsFunctionProxyAsyncHelper<R>(types)
+        val functionWithParamArray = createJavaToJsProxyFunctionAsyncHelper<R>(types)
         return { p1 ->
             functionWithParamArray(arrayOf(p1))
         }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified R> createJavaToJsBlockingFunctionProxy1(context: CoroutineContext? = null): (T1) -> R {
+    inline fun <reified T1, reified R> createJavaToJsBlockingProxyFunction1(context: CoroutineContext? = null): (T1) -> R {
         val types = listOf(typeOf<T1>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsBlockingFunctionProxyHelper<R>(types, context)
+        val functionWithParamArray = createJavaToJsBlockingProxyFunctionHelper<R>(types, context)
         return { p1 ->
             functionWithParamArray(arrayOf(p1))
         }
@@ -476,27 +476,27 @@ internal constructor(
     // ---
 
     @OptIn(ExperimentalStdlibApi::class)
-    suspend inline fun <reified T1, reified T2, reified R> createJavaToJsFunctionProxy2(waitForRegistration: Boolean): suspend (T1, T2) -> R {
+    suspend inline fun <reified T1, reified T2, reified R> createJavaToJsProxyFunction2(waitForRegistration: Boolean): suspend (T1, T2) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsFunctionProxyHelper<R>(types, waitForRegistration)
+        val functionWithParamArray = createJavaToJsProxyFunctionHelper<R>(types, waitForRegistration)
         return { p1, p2 ->
             functionWithParamArray(arrayOf(p1, p2))
         }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified T2, reified R> createJavaToJsFunctionProxy2(): suspend (T1, T2) -> R {
+    inline fun <reified T1, reified T2, reified R> createJavaToJsProxyFunction2(): suspend (T1, T2) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsFunctionProxyAsyncHelper<R>(types)
+        val functionWithParamArray = createJavaToJsProxyFunctionAsyncHelper<R>(types)
         return { p1, p2 ->
             functionWithParamArray(arrayOf(p1, p2))
         }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified T2, reified R> createJavaToJsBlockingFunctionProxy2(context: CoroutineContext? = null): (T1, T2) -> R {
+    inline fun <reified T1, reified T2, reified R> createJavaToJsBlockingProxyFunction2(context: CoroutineContext? = null): (T1, T2) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsBlockingFunctionProxyHelper<R>(types, context)
+        val functionWithParamArray = createJavaToJsBlockingProxyFunctionHelper<R>(types, context)
         return { p1, p2 ->
             functionWithParamArray(arrayOf(p1, p2))
         }
@@ -507,27 +507,27 @@ internal constructor(
     // ---
 
     @OptIn(ExperimentalStdlibApi::class)
-    suspend inline fun <reified T1, reified T2, reified T3, reified R> createJavaToJsFunctionProxy3(waitForRegistration: Boolean): suspend (T1, T2, T3) -> R {
+    suspend inline fun <reified T1, reified T2, reified T3, reified R> createJavaToJsProxyFunction3(waitForRegistration: Boolean): suspend (T1, T2, T3) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsFunctionProxyHelper<R>(types, waitForRegistration)
+        val functionWithParamArray = createJavaToJsProxyFunctionHelper<R>(types, waitForRegistration)
         return { p1, p2, p3 ->
             functionWithParamArray(arrayOf(p1, p2, p3))
         }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified T2, reified T3, reified R> createJavaToJsFunctionProxy3(): suspend (T1, T2, T3) -> R {
+    inline fun <reified T1, reified T2, reified T3, reified R> createJavaToJsProxyFunction3(): suspend (T1, T2, T3) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsFunctionProxyAsyncHelper<R>(types)
+        val functionWithParamArray = createJavaToJsProxyFunctionAsyncHelper<R>(types)
         return { p1, p2, p3 ->
             functionWithParamArray(arrayOf(p1, p2, p3))
         }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified T2, reified T3, reified R> createJavaToJsBlockingFunctionProxy3(context: CoroutineContext? = null): (T1, T2, T3) -> R {
+    inline fun <reified T1, reified T2, reified T3, reified R> createJavaToJsBlockingProxyFunction3(context: CoroutineContext? = null): (T1, T2, T3) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsBlockingFunctionProxyHelper<R>(types, context)
+        val functionWithParamArray = createJavaToJsBlockingProxyFunctionHelper<R>(types, context)
         return { p1, p2, p3 ->
             functionWithParamArray(arrayOf(p1, p2, p3))
         }
@@ -538,27 +538,27 @@ internal constructor(
     // ---
 
     @OptIn(ExperimentalStdlibApi::class)
-    suspend inline fun <reified T1, reified T2, reified T3, reified T4, reified R> createJavaToJsFunctionProxy4(waitForRegistration: Boolean): suspend (T1, T2, T3, T4) -> R {
+    suspend inline fun <reified T1, reified T2, reified T3, reified T4, reified R> createJavaToJsProxyFunction4(waitForRegistration: Boolean): suspend (T1, T2, T3, T4) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsFunctionProxyHelper<R>(types, waitForRegistration)
+        val functionWithParamArray = createJavaToJsProxyFunctionHelper<R>(types, waitForRegistration)
         return { p1, p2, p3, p4 ->
             functionWithParamArray(arrayOf(p1, p2, p3, p4))
         }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified T2, reified T3, reified T4, reified R> createJavaToJsFunctionProxy4(): suspend (T1, T2, T3, T4) -> R {
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified R> createJavaToJsProxyFunction4(): suspend (T1, T2, T3, T4) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsFunctionProxyAsyncHelper<R>(types)
+        val functionWithParamArray = createJavaToJsProxyFunctionAsyncHelper<R>(types)
         return { p1, p2, p3, p4 ->
             functionWithParamArray(arrayOf(p1, p2, p3, p4))
         }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified T2, reified T3, reified T4, reified R> createJavaToJsBlockingFunctionProxy4(context: CoroutineContext? = null): (T1, T2, T3, T4) -> R {
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified R> createJavaToJsBlockingProxyFunction4(context: CoroutineContext? = null): (T1, T2, T3, T4) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsBlockingFunctionProxyHelper<R>(types, context)
+        val functionWithParamArray = createJavaToJsBlockingProxyFunctionHelper<R>(types, context)
         return { p1, p2, p3, p4 ->
             functionWithParamArray(arrayOf(p1, p2, p3, p4))
         }
@@ -569,27 +569,27 @@ internal constructor(
     // ---
 
     @OptIn(ExperimentalStdlibApi::class)
-    suspend inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified R> createJavaToJsFunctionProxy5(waitForRegistration: Boolean): suspend (T1, T2, T3, T4, T5) -> R {
+    suspend inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified R> createJavaToJsProxyFunction5(waitForRegistration: Boolean): suspend (T1, T2, T3, T4, T5) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsFunctionProxyHelper<R>(types, waitForRegistration)
+        val functionWithParamArray = createJavaToJsProxyFunctionHelper<R>(types, waitForRegistration)
         return { p1, p2, p3, p4, p5 ->
             functionWithParamArray(arrayOf(p1, p2, p3, p4, p5))
         }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified R> createJavaToJsFunctionProxy5(): suspend (T1, T2, T3, T4, T5) -> R {
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified R> createJavaToJsProxyFunction5(): suspend (T1, T2, T3, T4, T5) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsFunctionProxyAsyncHelper<R>(types)
+        val functionWithParamArray = createJavaToJsProxyFunctionAsyncHelper<R>(types)
         return { p1, p2, p3, p4, p5 ->
             functionWithParamArray(arrayOf(p1, p2, p3, p4, p5))
         }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified R> createJavaToJsBlockingFunctionProxy5(context: CoroutineContext? = null): (T1, T2, T3, T4, T5) -> R {
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified R> createJavaToJsBlockingProxyFunction5(context: CoroutineContext? = null): (T1, T2, T3, T4, T5) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsBlockingFunctionProxyHelper<R>(types, context)
+        val functionWithParamArray = createJavaToJsBlockingProxyFunctionHelper<R>(types, context)
         return { p1, p2, p3, p4, p5 ->
             functionWithParamArray(arrayOf(p1, p2, p3, p4, p5))
         }
@@ -600,27 +600,27 @@ internal constructor(
     // ---
 
     @OptIn(ExperimentalStdlibApi::class)
-    suspend inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified R> createJavaToJsFunctionProxy6(waitForRegistration: Boolean): suspend (T1, T2, T3, T4, T5, T6) -> R {
+    suspend inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified R> createJavaToJsProxyFunction6(waitForRegistration: Boolean): suspend (T1, T2, T3, T4, T5, T6) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsFunctionProxyHelper<R>(types, waitForRegistration)
+        val functionWithParamArray = createJavaToJsProxyFunctionHelper<R>(types, waitForRegistration)
         return { p1, p2, p3, p4, p5, p6 ->
             functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6))
         }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified R> createJavaToJsFunctionProxy6(): suspend (T1, T2, T3, T4, T5, T6) -> R {
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified R> createJavaToJsProxyFunction6(): suspend (T1, T2, T3, T4, T5, T6) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsFunctionProxyAsyncHelper<R>(types)
+        val functionWithParamArray = createJavaToJsProxyFunctionAsyncHelper<R>(types)
         return { p1, p2, p3, p4, p5, p6 ->
             functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6))
         }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified R> createJavaToJsBlockingFunctionProxy6(context: CoroutineContext? = null): (T1, T2, T3, T4, T5, T6) -> R {
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified R> createJavaToJsBlockingProxyFunction6(context: CoroutineContext? = null): (T1, T2, T3, T4, T5, T6) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsBlockingFunctionProxyHelper<R>(types, context)
+        val functionWithParamArray = createJavaToJsBlockingProxyFunctionHelper<R>(types, context)
         return { p1, p2, p3, p4, p5, p6 ->
             functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6))
         }
@@ -631,27 +631,27 @@ internal constructor(
     // ---
 
     @OptIn(ExperimentalStdlibApi::class)
-    suspend inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified R> createJavaToJsFunctionProxy7(waitForRegistration: Boolean): suspend (T1, T2, T3, T4, T5, T6, T7) -> R {
+    suspend inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified R> createJavaToJsProxyFunction7(waitForRegistration: Boolean): suspend (T1, T2, T3, T4, T5, T6, T7) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<T7>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsFunctionProxyHelper<R>(types, waitForRegistration)
+        val functionWithParamArray = createJavaToJsProxyFunctionHelper<R>(types, waitForRegistration)
         return { p1, p2, p3, p4, p5, p6, p7 ->
             functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6, p7))
         }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified R> createJavaToJsFunctionProxy7(): suspend (T1, T2, T3, T4, T5, T6, T7) -> R {
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified R> createJavaToJsProxyFunction7(): suspend (T1, T2, T3, T4, T5, T6, T7) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<T7>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsFunctionProxyAsyncHelper<R>(types)
+        val functionWithParamArray = createJavaToJsProxyFunctionAsyncHelper<R>(types)
         return { p1, p2, p3, p4, p5, p6, p7 ->
             functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6, p7))
         }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified R> createJavaToJsBlockingFunctionProxy7(context: CoroutineContext? = null): (T1, T2, T3, T4, T5, T6, T7) -> R {
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified R> createJavaToJsBlockingProxyFunction7(context: CoroutineContext? = null): (T1, T2, T3, T4, T5, T6, T7) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<T7>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsBlockingFunctionProxyHelper<R>(types, context)
+        val functionWithParamArray = createJavaToJsBlockingProxyFunctionHelper<R>(types, context)
         return { p1, p2, p3, p4, p5, p6, p7 ->
             functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6, p7))
         }
@@ -662,27 +662,27 @@ internal constructor(
     // ---
 
     @OptIn(ExperimentalStdlibApi::class)
-    suspend inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified T8, reified R> createJavaToJsFunctionProxy8(waitForRegistration: Boolean): suspend (T1, T2, T3, T4, T5, T6, T7, T8) -> R {
+    suspend inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified T8, reified R> createJavaToJsProxyFunction8(waitForRegistration: Boolean): suspend (T1, T2, T3, T4, T5, T6, T7, T8) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<T7>(), typeOf<T8>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsFunctionProxyHelper<R>(types, waitForRegistration)
+        val functionWithParamArray = createJavaToJsProxyFunctionHelper<R>(types, waitForRegistration)
         return { p1, p2, p3, p4, p5, p6, p7, p8 ->
             functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6, p7, p8))
         }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified T8, reified R> createJavaToJsFunctionProxy8(): suspend (T1, T2, T3, T4, T5, T6, T7, T8) -> R {
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified T8, reified R> createJavaToJsProxyFunction8(): suspend (T1, T2, T3, T4, T5, T6, T7, T8) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<T7>(), typeOf<T8>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsFunctionProxyAsyncHelper<R>(types)
+        val functionWithParamArray = createJavaToJsProxyFunctionAsyncHelper<R>(types)
         return { p1, p2, p3, p4, p5, p6, p7, p8 ->
             functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6, p7, p8))
         }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified T8, reified R> createJavaToJsBlockingFunctionProxy8(context: CoroutineContext? = null): (T1, T2, T3, T4, T5, T6, T7, T8) -> R {
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified T8, reified R> createJavaToJsBlockingProxyFunction8(context: CoroutineContext? = null): (T1, T2, T3, T4, T5, T6, T7, T8) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<T7>(), typeOf<T8>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsBlockingFunctionProxyHelper<R>(types, context)
+        val functionWithParamArray = createJavaToJsBlockingProxyFunctionHelper<R>(types, context)
         return { p1, p2, p3, p4, p5, p6, p7, p8 ->
             functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6, p7, p8))
         }
@@ -693,27 +693,27 @@ internal constructor(
     // ---
 
     @OptIn(ExperimentalStdlibApi::class)
-    suspend inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified T8, reified T9, reified R> createJavaToJsFunctionProxy9(waitForRegistration: Boolean): suspend (T1, T2, T3, T4, T5, T6, T7, T8, T9) -> R {
+    suspend inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified T8, reified T9, reified R> createJavaToJsProxyFunction9(waitForRegistration: Boolean): suspend (T1, T2, T3, T4, T5, T6, T7, T8, T9) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<T7>(), typeOf<T8>(), typeOf<T9>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsFunctionProxyHelper<R>(types, waitForRegistration)
+        val functionWithParamArray = createJavaToJsProxyFunctionHelper<R>(types, waitForRegistration)
         return { p1, p2, p3, p4, p5, p6, p7, p8, p9 ->
             functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6, p7, p8, p9))
         }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified T8, reified T9, reified R> createJavaToJsFunctionProxy9(): suspend (T1, T2, T3, T4, T5, T6, T7, T8, T9) -> R {
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified T8, reified T9, reified R> createJavaToJsProxyFunction9(): suspend (T1, T2, T3, T4, T5, T6, T7, T8, T9) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<T7>(), typeOf<T8>(), typeOf<T9>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsFunctionProxyAsyncHelper<R>(types)
+        val functionWithParamArray = createJavaToJsProxyFunctionAsyncHelper<R>(types)
         return { p1, p2, p3, p4, p5, p6, p7, p8, p9 ->
             functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6, p7, p8, p9))
         }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified T8, reified T9, reified R> createJavaToJsBlockingFunctionProxy9(context: CoroutineContext? = null): (T1, T2, T3, T4, T5, T6, T7, T8, T9) -> R {
+    inline fun <reified T1, reified T2, reified T3, reified T4, reified T5, reified T6, reified T7, reified T8, reified T9, reified R> createJavaToJsBlockingProxyFunction9(context: CoroutineContext? = null): (T1, T2, T3, T4, T5, T6, T7, T8, T9) -> R {
         val types = listOf(typeOf<T1>(), typeOf<T2>(), typeOf<T3>(), typeOf<T4>(), typeOf<T5>(), typeOf<T6>(), typeOf<T7>(), typeOf<T8>(), typeOf<T9>(), typeOf<R>())
-        val functionWithParamArray = createJavaToJsBlockingFunctionProxyHelper<R>(types, context)
+        val functionWithParamArray = createJavaToJsBlockingProxyFunctionHelper<R>(types, context)
         return { p1, p2, p3, p4, p5, p6, p7, p8, p9 ->
             functionWithParamArray(arrayOf(p1, p2, p3, p4, p5, p6, p7, p8, p9))
         }
@@ -725,7 +725,7 @@ internal constructor(
 
     @OptIn(ExperimentalStdlibApi::class)
     @PublishedApi
-    internal suspend inline fun <reified R> createJavaToJsFunctionProxyHelper(types: List<KType>, waitForRegistration: Boolean): suspend (Array<Any?>) -> R {
+    internal suspend inline fun <reified R> createJavaToJsProxyFunctionHelper(types: List<KType>, waitForRegistration: Boolean): suspend (Array<Any?>) -> R {
         val awaitJsPromise = types.lastOrNull()?.classifier != Deferred::class
         val lambdaJsValue = jsBridge?.registerJsLambda(this, types, waitForRegistration)
                 ?: throw JavaToJsFunctionRegistrationError("<lambda>", customMessage = "Cannot create a Java-to-JS function proxy because the JS interpreter has been destroyed")
@@ -743,7 +743,7 @@ internal constructor(
 
     @OptIn(ExperimentalStdlibApi::class)
     @PublishedApi
-    internal inline fun <reified R> createJavaToJsFunctionProxyAsyncHelper(types: List<KType>): suspend (Array<Any?>) -> R {
+    internal inline fun <reified R> createJavaToJsProxyFunctionAsyncHelper(types: List<KType>): suspend (Array<Any?>) -> R {
         val awaitJsPromise = types.lastOrNull()?.classifier != Deferred::class
         val lambdaJsValue = jsBridge?.registerJsLambdaAsync(this, types)
                 ?: throw JavaToJsFunctionRegistrationError("<lambda>", customMessage = "Cannot create a Java-to-JS function proxy because the JS interpreter has been destroyed")
@@ -761,7 +761,7 @@ internal constructor(
 
     @OptIn(ExperimentalStdlibApi::class)
     @PublishedApi
-    internal inline fun <reified R> createJavaToJsBlockingFunctionProxyHelper(types: List<KType>, context: CoroutineContext?): (Array<Any?>) -> R {
+    internal inline fun <reified R> createJavaToJsBlockingProxyFunctionHelper(types: List<KType>, context: CoroutineContext?): (Array<Any?>) -> R {
         val awaitJsPromise = types.lastOrNull()?.classifier != Deferred::class
         val lambdaJsValue = jsBridge?.registerJsLambdaBlocking(this, types, context)
                 ?: throw JavaToJsFunctionRegistrationError("<lambda>", customMessage = "Cannot create a Java-to-JS function proxy because the JS interpreter has been destroyed")

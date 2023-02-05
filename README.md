@@ -123,7 +123,7 @@ val jsObject = JsValue(jsBridge, "({one: 1, two: 'two'})")
 val jsObject = JsValue.fromJavaValue(jsBridge, JsonObjectWrapper("one" to 1, "two" to "two"))
 val calcSumJs = JsValue(jsBridge, "(function(a, b) { return a + b; })")
 val calcSumJs = JsValue.newFunction(jsBridge, "a", "b", "return a + b;")
-val calcSumJs = JsValue.createJsToJavaFunctionProxy2(jsBridge) { a: Int, b: Int -> a + b }
+val calcSumJs = JsValue.createJsToJavaProxyFunction2(jsBridge) { a: Int, b: Int -> a + b }
 ```
 
 It has an associated (global) JS variable whose name can be accessed via `toString()` which makes it easy to re-use it from JS code:<br/>
@@ -151,11 +151,11 @@ String s = (String) jsString.evaluateBlocking(String.class);
 
 Additionally, a JS (proxy) value can be created from:
 - [a JS-to-Java proxy object](#using-kotlinjava-objects-from-js) via `JsValue.createJsToJavaProxy()`.
-- [a JS-to-Java proxy function](#calling-kotlin-functions-from-js) via `JsValue.createJsToJavaFunctionProxy()`.
+- [a JS-to-Java proxy function](#calling-kotlin-functions-from-js) via `JsValue.createJsToJavaProxyFunction()`.
 
 And JS objects/functions can be accessed from Java/Kotlin using:
 - [a Java-to-JS proxy object](#using-js-objects-from-kotlinjava) via `JsValue.createJavaToJsProxy()`.
-- [a Java-to-JS proxy function](#calling-js-functions-from-kotlin) via `JsValue.createJavaToJsFunctionProxyX()`.
+- [a Java-to-JS proxy function](#calling-js-functions-from-kotlin) via `JsValue.createJavaToJsProxyFunctionX()`.
 
 
 ### Using JS objects from Kotlin/Java
@@ -223,20 +223,20 @@ is possible to return a Deferred.
 ```kotlin
 val calcSumJs: suspend (Int, Int) -> Int = JsValue
     .newFunction(jsBridge, "a", "b", "return a + b;")
-    .createJavaToJsFunctionProxy2()
+    .createJavaToJsProxyFunction2()
 
 println("Sum is $calcSumJs(1, 2)")
 ```
 
 Available methods:
- * `JsValue.createJavaToJsFunctionProxyX()` (where X is the number of arguments)
- * `JsValue.createJavaToJsBlockingFunctionProxyX()`: blocks the current thread until the JS code has been evaluated
+ * `JsValue.createJavaToJsProxyFunctionX()` (where X is the number of arguments)
+ * `JsValue.createJavaToJsBlockingProxyFunctionX()`: blocks the current thread until the JS code has been evaluated
 
 
 ### Calling Kotlin functions from JS
 
 ```kotlin
-val calcSumJava = JsValue.createJsToJavaFunctionProxy2(jsBridge) { a: Int, b: Int -> a + b }
+val calcSumJava = JsValue.createJsToJavaProxyFunction2(jsBridge) { a: Int, b: Int -> a + b }
 
 jsBridge.evaluate("console.log('Sum is', $calcSumJava(1, 2))");
 ```
@@ -410,7 +410,7 @@ val javaApiJsValue = JsValue.createJsToJavaProxy(jsBridge, javaApi)
 // JS function createApi(javaApi, config)
 val config = JsonObjectWrapper("debug" to true, "useFahrenheit" to false)  // {debug: true, useFahrenheit: false}
 val createJsApi: suspend (JsValue, JsonObjectWrapper) -> JsValue
-    = JsValue(jsBridge, "createApi").createJavaToJsFunctionProxy2()
+    = JsValue(jsBridge, "createApi").createJavaToJsProxyFunction2()
     
 // Create Java "proxy" to JS API
 val jsApi: JsApi = createJsApi(javaApiJsValue, config).createJavaToJsProxy()

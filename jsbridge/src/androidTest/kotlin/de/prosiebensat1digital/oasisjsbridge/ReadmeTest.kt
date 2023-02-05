@@ -106,7 +106,7 @@ class ReadmeTest {
             val jsObject2 = JsValue.fromJavaValue(jsBridge, JsonObjectWrapper("one" to 1, "two" to "two"))
             val calcSumJs1 = JsValue(jsBridge, "(function(a, b) { return a + b; })")
             val calcSumJs2 = JsValue.newFunction(jsBridge, "a", "b", "return a + b;")
-            val calcSumJs3 = JsValue.createJsToJavaFunctionProxy2(jsBridge) { a: Int, b: Int -> a + b }
+            val calcSumJs3 = JsValue.createJsToJavaProxyFunction2(jsBridge) { a: Int, b: Int -> a + b }
 
             val sum: Int = jsBridge.evaluate("$calcSumJs1(2, 3)")
 
@@ -160,14 +160,14 @@ class ReadmeTest {
         val calcSumJs: suspend (Int, Int) -> Int = JsValue.newFunction(jsBridge, "a", "b", """
           return a + b;
           """.trimIndent()
-        ).createJavaToJsFunctionProxy2()
+        ).createJavaToJsProxyFunction2()
 
         println("Sum is $calcSumJs(1, 2)")
     }
 
     @Test
     fun testKotlinFunctionFromJs() {
-        val calcSumJava = JsValue.createJsToJavaFunctionProxy2(jsBridge) { a: Int, b: Int -> a + b }
+        val calcSumJava = JsValue.createJsToJavaProxyFunction2(jsBridge) { a: Int, b: Int -> a + b }
 
         jsBridge.evaluateUnsync("""
           console.log("Sum is", $calcSumJava(1, 2));
@@ -202,7 +202,7 @@ class ReadmeTest {
         val config = JsonObjectWrapper("debug" to true, "useFahrenheit" to false)  // {debug: true, useFahrenheit: false}
         runBlocking {
             val createJsApi: suspend (JsValue, JsonObjectWrapper) -> JsValue
-                    = JsValue(jsBridge, "createApi").createJavaToJsFunctionProxy2()  // JS: global.createApi(javaApi, config)
+                    = JsValue(jsBridge, "createApi").createJavaToJsProxyFunction2()  // JS: global.createApi(javaApi, config)
             val jsApi: JsApi = createJsApi(javaApiJsValue, config).createJavaToJsProxy()
 
             // Call JS API methods

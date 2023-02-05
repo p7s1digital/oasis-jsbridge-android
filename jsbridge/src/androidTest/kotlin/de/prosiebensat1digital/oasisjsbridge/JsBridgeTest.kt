@@ -796,7 +796,7 @@ class JsBridgeTest {
     fun testJavaExceptionInJs() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
-        val createExceptionJava = JsValue.createJsToJavaFunctionProxy0<Unit>(subject) { throw Exception("Kotlin exception") }
+        val createExceptionJava = JsValue.createJsToJavaProxyFunction0<Unit>(subject) { throw Exception("Kotlin exception") }
 
         // WHEN
         val jsException: JsException = assertFailsWith {
@@ -848,7 +848,7 @@ class JsBridgeTest {
     fun testNullPointerException() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
-        val testFunctionJava = JsValue.createJsToJavaFunctionProxy1(subject) { _: Int -> Unit }
+        val testFunctionJava = JsValue.createJsToJavaProxyFunction1(subject) { _: Int -> Unit }
 
         // WHEN
         val jsException: JsException = assertFailsWith {
@@ -1053,7 +1053,7 @@ class JsBridgeTest {
             |}
             |return m;
             |""".trimMargin()
-        ).createJavaToJsFunctionProxy0()
+        ).createJavaToJsProxyFunction0()
 
         // Java loop, calls JS function
         // -> 22.5s (Duktape, Samsung S5, 100000 iterations, from main thread)
@@ -1065,7 +1065,7 @@ class JsBridgeTest {
             |if (n > 1000000) n = -n;
             |return n;
             |""".trimMargin()
-        ).createJavaToJsFunctionProxy2()
+        ).createJavaToJsProxyFunction2()
         val calcMagicCallJsFunctionInsideJavaLoop: suspend () -> Int = {
             var m = 0
             for (i in 0 until ITERATION_COUNT) {
@@ -1094,7 +1094,7 @@ class JsBridgeTest {
         // JS loop, call Java functions (191ms for 20000 iterations)
         // -> 3.7s ms (Duktape, Samsung S5, 100000 iterations)
         // -> 5.5s ms (QuickJS, Samsung S5, 100000 iterations)
-        val updateMagicJavaFuncJsValue = JsValue.createJsToJavaFunctionProxy2(subject) { a: Int, i: Int ->
+        val updateMagicJavaFuncJsValue = JsValue.createJsToJavaProxyFunction2(subject) { a: Int, i: Int ->
             var n = a + i * 2
             if (n > 1000000) n = -n
             n
@@ -1106,7 +1106,7 @@ class JsBridgeTest {
             |}
             |return m;
             |""".trimMargin()
-        ).createJavaToJsFunctionProxy0()
+        ).createJavaToJsProxyFunction0()
 
         runBlocking {
             delay(500)
@@ -1281,22 +1281,22 @@ class JsBridgeTest {
             |})
             |""".trimMargin()
         )
-        val calcSum: suspend (Int, Int) -> Int = calcSumJsValue.createJavaToJsFunctionProxy2()
-        val calcSumFromAnonymousFunction: suspend (Int, Int) -> Int = calcSumJsValueAnonymousFunction.createJavaToJsFunctionProxy2()
-        val calcSumBlocking: (Int, Int) -> Int = calcSumJsValue.createJavaToJsBlockingFunctionProxy2()
-        val calcSumWrongSignature: (Int, String) -> Int = calcSumJsValue.createJavaToJsBlockingFunctionProxy2()
+        val calcSum: suspend (Int, Int) -> Int = calcSumJsValue.createJavaToJsProxyFunction2()
+        val calcSumFromAnonymousFunction: suspend (Int, Int) -> Int = calcSumJsValueAnonymousFunction.createJavaToJsProxyFunction2()
+        val calcSumBlocking: (Int, Int) -> Int = calcSumJsValue.createJavaToJsBlockingProxyFunction2()
+        val calcSumWrongSignature: (Int, String) -> Int = calcSumJsValue.createJavaToJsBlockingProxyFunction2()
 
-        val invalidFunction: suspend () -> Unit = JsValue.newFunction(subject, "invalid").createJavaToJsFunctionProxy0()
+        val invalidFunction: suspend () -> Unit = JsValue.newFunction(subject, "invalid").createJavaToJsProxyFunction0()
 
         val createJsObject: suspend (Int, String) -> JsonObjectWrapper =
             JsValue.newFunction(subject, "a", "b", "return {key1: a, key2: b};")
-                .createJavaToJsFunctionProxy2()
+                .createJavaToJsProxyFunction2()
 
         val createCalcSumFunc: suspend () -> JsValue = JsValue.newFunction(subject, "return $calcSumJsValue;")
-            .createJavaToJsFunctionProxy0()
+            .createJavaToJsProxyFunction0()
 
         val throwException: suspend () -> Unit = JsValue.newFunction(subject, "", "throw 'JS exception from function';")
-            .createJavaToJsFunctionProxy0()
+            .createJavaToJsProxyFunction0()
 
         val getPromiseJsValue = JsValue.newFunction(subject, "name", """
             |return new Promise(function(resolve) {
@@ -1304,15 +1304,15 @@ class JsBridgeTest {
             |});
             |""".trimMargin()
         )
-        val getPromise: suspend (name: String) -> String = getPromiseJsValue.createJavaToJsFunctionProxy1()
-        val getPromiseAsync: suspend (name: String) -> Deferred<String> = getPromiseJsValue.createJavaToJsFunctionProxy1()
+        val getPromise: suspend (name: String) -> String = getPromiseJsValue.createJavaToJsProxyFunction1()
+        val getPromiseAsync: suspend (name: String) -> Deferred<String> = getPromiseJsValue.createJavaToJsProxyFunction1()
 
         val getFailedPromise: suspend (name: String) -> String = JsValue.newFunction(subject, """
             |return new Promise(function(resolve, reject) {
             |  reject("Oh no!");
             |});
             |""".trimMargin()
-        ).createJavaToJsFunctionProxy1()
+        ).createJavaToJsProxyFunction1()
 
         // THEN
         assertEquals(10, calcSumBlocking(3, 7))
@@ -1320,12 +1320,12 @@ class JsBridgeTest {
         runBlocking {
             // Missing JS function (the evalution of the JS code should throw)
             assertFailsWith<JsException> {
-                JsValue(subject, "non_existing_function").createJavaToJsFunctionProxy0<Unit>(true)
+                JsValue(subject, "non_existing_function").createJavaToJsProxyFunction0<Unit>(true)
             }
 
             // Invalid JS function (the registration should throw)
             assertFailsWith<IllegalArgumentException> {
-                JsValue(subject, "123").createJavaToJsFunctionProxy0<Unit>(true)
+                JsValue(subject, "123").createJavaToJsProxyFunction0<Unit>(true)
             }
 
             // Call JS function calcSum(3, 4)
@@ -1352,7 +1352,7 @@ class JsBridgeTest {
             assertEquals(PayloadObject.fromValues("key1" to 69, "key2" to "sixty-nine"), jsObject.toPayload())
 
             // Call JS function createCalcSumFunc()(2, 2)
-            val calcSum2: suspend (Int, Int) -> Int = createCalcSumFunc().createJavaToJsFunctionProxy2()
+            val calcSum2: suspend (Int, Int) -> Int = createCalcSumFunc().createJavaToJsProxyFunction2()
             val sum2 = calcSum2(2, 2)
             assertEquals(4, sum2)
 
@@ -1389,17 +1389,17 @@ class JsBridgeTest {
 
         runBlocking {
             // WHEN
-            val setFlag = JsValue.createJsToJavaFunctionProxy0(subject) { flag = true }
+            val setFlag = JsValue.createJsToJavaProxyFunction0(subject) { flag = true }
             val toUpperCaseJava =
-                JsValue.createJsToJavaFunctionProxy1(subject) { s: String -> s.toUpperCase() }
-            val calcSumJava = JsValue.createJsToJavaFunctionProxy2(subject) { a: Int, b: Int -> a + b }
+                JsValue.createJsToJavaProxyFunction1(subject) { s: String -> s.toUpperCase() }
+            val calcSumJava = JsValue.createJsToJavaProxyFunction2(subject) { a: Int, b: Int -> a + b }
             val setCustomTimeout: (() -> Unit, Long) -> Unit = { cb, msecs ->
                 GlobalScope.launch(Dispatchers.Main) {
                     delay(msecs)
                     cb()
                 }
             }
-            JsValue.createJsToJavaFunctionProxy2(subject, setCustomTimeout)
+            JsValue.createJsToJavaProxyFunction2(subject, setCustomTimeout)
                 .assignToGlobal("setCustomTimeout")
 
             subject.evaluateBlocking<Unit>("$setFlag()")
@@ -1452,7 +1452,7 @@ class JsBridgeTest {
             |  })
             |});
             |""".trimMargin()
-        ).createJavaToJsFunctionProxy1()
+        ).createJavaToJsProxyFunction1()
 
         val matrix = Array(2) { IntArray(2) { 0 } }
         matrix[0][0] = 1
@@ -2812,7 +2812,7 @@ class JsBridgeTest {
             jsBridge.registerErrorListener(createErrorListener())
 
             // Map "jsToJavaFunctionMock" to JS as a global var "JavaFunctionMock"
-            JsValue.createJsToJavaFunctionProxy1(jsBridge, jsToJavaFunctionMock)
+            JsValue.createJsToJavaProxyFunction1(jsBridge, jsToJavaFunctionMock)
                 .assignToGlobal("javaFunctionMock")
         }
     }
