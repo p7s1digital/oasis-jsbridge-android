@@ -207,7 +207,7 @@ class JsBridge
         GlobalScope.launch(jsDispatcher + coroutineExceptionHandler) {
             try {
                 rootJob.join()
-            } catch (c: CancellationException) {
+            } catch (_: CancellationException) {
             }
 
             try {
@@ -393,17 +393,14 @@ class JsBridge
         evaluate(js, type, false)
     }
 
-    @OptIn(ExperimentalStdlibApi::class)
     inline fun <reified T: Any?> evaluateAsync(js: String): Deferred<T> {
         return evaluateAsync(js, typeOf<T>())
     }
 
-    @OptIn(ExperimentalStdlibApi::class)
     suspend inline fun <reified T: Any?> evaluate(js: String): T {
         return evaluate(js, typeOf<T>(), true)
     }
 
-    @OptIn(ExperimentalStdlibApi::class)
     inline fun <reified T: Any?> evaluateBlocking(js: String, context: CoroutineContext = EmptyCoroutineContext): T {
         return runBlocking(context) {
             if (isMainThread()) {
@@ -606,7 +603,7 @@ class JsBridge
             }
         } else {
             // Asynchronous registration
-            launch {
+            launchInJsThread {
                 try {
                     registerBlock()
                 } catch (t: Throwable) {
@@ -928,7 +925,7 @@ class JsBridge
             }
         } else {
             // Asynchronous registration
-            launch(this@JsBridge.coroutineContext) {
+            launchInJsThread {
                 try {
                     jsValue.codeEvaluationDeferred?.await()
                     jniRegisterJsObject(jniJsContextOrThrow(), jsValue.associatedJsName, methods.toTypedArray(), check)
@@ -1059,6 +1056,13 @@ class JsBridge
         }
     }
 
+    private fun launchInJsThread(block: suspend () -> Unit) {
+        launch {
+            block()
+        }
+    }
+
+    // Run the given block in the JS thread or launch it if running from another thread
     internal fun runInJsThread(cb: () -> Unit) {
         if (isJsThread()) {
             cb()
@@ -1082,7 +1086,7 @@ class JsBridge
 
     @PublishedApi
     internal fun isMainThread(): Boolean = (Looper.myLooper() == Looper.getMainLooper())
-    internal fun isJsThread(): Boolean = (Thread.currentThread().id == jsThreadId)
+    fun isJsThread(): Boolean = (Thread.currentThread().id == jsThreadId)
 
     private fun jniJsContextOrThrow() = jniJsContext ?: throw InternalError("Missing JNI JS context!")
 
