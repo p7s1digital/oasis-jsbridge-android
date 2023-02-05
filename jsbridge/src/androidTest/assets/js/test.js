@@ -1,1 +1,1 @@
-nativeFunctionMock("localFileString");
+javaFunctionMock("localFileString");

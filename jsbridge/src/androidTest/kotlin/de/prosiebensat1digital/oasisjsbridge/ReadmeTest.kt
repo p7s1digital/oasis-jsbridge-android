@@ -90,7 +90,7 @@ class ReadmeTest {
                 """.trimMargin())
             } catch (jse: JsException) {
                 // jse.message = "wrong"
-                // jse.stackTrace = [JavaScript.buggy(eval:1), JavaScript.<eval>(eval:2), ....JsBridge.jniEvaluateString(Native Method), ...]
+                // jse.stackTrace = [JavaScript.buggy(eval:1), JavaScript.<eval>(eval:2), ....JsBridge.jniEvaluateString(Java Method), ...]
             }
         }
     }
@@ -99,14 +99,14 @@ class ReadmeTest {
     fun testJsValue() {
         runBlocking {
             val jsInt1 = JsValue(jsBridge, "123")
-            val jsInt2 = JsValue.fromNativeValue(jsBridge, 123)
+            val jsInt2 = JsValue.fromJavaValue(jsBridge, 123)
             val jsString1 = JsValue(jsBridge, "'hello'.toUpperCase()")
-            val jsString2 = JsValue.fromNativeValue(jsBridge, "HELLO")
+            val jsString2 = JsValue.fromJavaValue(jsBridge, "HELLO")
             val jsObject1 = JsValue(jsBridge, "({one: 1, two: 'two'})")
-            val jsObject2 = JsValue.fromNativeValue(jsBridge, JsonObjectWrapper("one" to 1, "two" to "two"))
+            val jsObject2 = JsValue.fromJavaValue(jsBridge, JsonObjectWrapper("one" to 1, "two" to "two"))
             val calcSumJs1 = JsValue(jsBridge, "(function(a, b) { return a + b; })")
             val calcSumJs2 = JsValue.newFunction(jsBridge, "a", "b", "return a + b;")
-            val calcSumJs3 = JsValue.fromNativeFunction2(jsBridge) { a: Int, b: Int -> a + b }
+            val calcSumJs3 = JsValue.createJsToJavaProxyFunction2(jsBridge) { a: Int, b: Int -> a + b }
 
             val sum: Int = jsBridge.evaluate("$calcSumJs1(2, 3)")
 
@@ -116,7 +116,7 @@ class ReadmeTest {
         }
     }
 
-    interface JsApi1 : NativeToJsInterface {
+    interface JsApi1 : JavaToJsInterface {
         fun method1(a: Int, b: String)
         suspend fun method2(c: Double): String
     }
@@ -128,11 +128,11 @@ class ReadmeTest {
           method2: function(c) { return "Value: " + c; }
         })""")
 
-        val jsApi1: JsApi1 = jsObject.mapToNativeObject()  // no check
+        val jsApi1: JsApi1 = jsObject.createJavaToJsProxy()  // no check
         runBlocking {
-            val jsApi2: JsApi1 = jsObject.mapToNativeObject(check = true)  // suspending, optionally check that all methods are defined in the JS object
+            val jsApi2: JsApi1 = jsObject.createJavaToJsProxy(check = true)  // suspending, optionally check that all methods are defined in the JS object
         }
-        val jsApi3: JsApi1 = jsObject.mapToNativeObjectBlocking(check = true)  // blocking (with optional check)
+        val jsApi3: JsApi1 = jsObject.createJavaToJsProxyBlocking(check = true)  // blocking (with optional check)
 
         jsApi1.method1(1, "two")
         runBlocking {
@@ -140,19 +140,19 @@ class ReadmeTest {
         }
     }
 
-    interface NativeApi1 : JsToNativeInterface {
+    interface JavaApi1 : JsToJavaInterface {
         fun method(a: Int, b: String): Double
     }
 
     @Test
     fun testKotlinObjectsFromJs() {
-        val obj = object : NativeApi1 {
+        val obj = object : JavaApi1 {
             override fun method(a: Int, b: String): Double { return 123.456 }
         }
 
-        val nativeApi: JsValue = JsValue.fromNativeObject(jsBridge, obj)
+        val javaApi: JsValue = JsValue.createJsToJavaProxy(jsBridge, obj)
 
-        jsBridge.evaluateUnsync("globalThis.x = $nativeApi.method(1, 'two');")
+        jsBridge.evaluateUnsync("globalThis.x = $javaApi.method(1, 'two');")
     }
 
     @Test
@@ -160,26 +160,26 @@ class ReadmeTest {
         val calcSumJs: suspend (Int, Int) -> Int = JsValue.newFunction(jsBridge, "a", "b", """
           return a + b;
           """.trimIndent()
-        ).mapToNativeFunction2()
+        ).createJavaToJsProxyFunction2()
 
         println("Sum is $calcSumJs(1, 2)")
     }
 
     @Test
     fun testKotlinFunctionFromJs() {
-        val calcSumNative = JsValue.fromNativeFunction2(jsBridge) { a: Int, b: Int -> a + b }
+        val calcSumJava = JsValue.createJsToJavaProxyFunction2(jsBridge) { a: Int, b: Int -> a + b }
 
         jsBridge.evaluateUnsync("""
-          console.log("Sum is", $calcSumNative(1, 2));
+          console.log("Sum is", $calcSumJava(1, 2));
           """.trimIndent())
     }
 
-    interface JsApi : NativeToJsInterface {
+    interface JsApi : JavaToJsInterface {
         suspend fun createMessage(): String
         suspend fun calcSum(a: Int, b: Int): Int
     }
 
-    interface NativeApi : JsToNativeInterface {
+    interface JavaApi : JsToJavaInterface {
         fun getPlatformName(): String
         fun getTemperatureCelcius(): Deferred<Float>
     }
@@ -188,22 +188,22 @@ class ReadmeTest {
     fun testUsageAdvanced() {
         jsBridge.evaluateLocalFileUnsync(InstrumentationRegistry.getInstrumentation().context, "js/api.js")
 
-        // Implement native API
-        val nativeApi = object: NativeApi {
+        // Implement Java API
+        val javaApi = object: JavaApi {
             override fun getPlatformName() = "Android"
             override fun getTemperatureCelcius() = GlobalScope.async {
                 // Getting current temperature from sensor or via network service
                 37.2f
             }
         }
-        val nativeApiJsValue = JsValue.fromNativeObject(jsBridge, nativeApi)
+        val javaApiJsValue = JsValue.createJsToJavaProxy(jsBridge, javaApi)
 
         // Create JS API
         val config = JsonObjectWrapper("debug" to true, "useFahrenheit" to false)  // {debug: true, useFahrenheit: false}
         runBlocking {
             val createJsApi: suspend (JsValue, JsonObjectWrapper) -> JsValue
-                    = JsValue(jsBridge, "createApi").mapToNativeFunction2()  // JS: global.createApi(nativeApi, config)
-            val jsApi: JsApi = createJsApi(nativeApiJsValue, config).mapToNativeObject()
+                    = JsValue(jsBridge, "createApi").createJavaToJsProxyFunction2()  // JS: global.createApi(javaApi, config)
+            val jsApi: JsApi = createJsApi(javaApiJsValue, config).createJavaToJsProxy()
 
             // Call JS API methods
             val msg = jsApi.createMessage()  // (suspending) "Hello Android, the temperature is 37.2 degrees C."

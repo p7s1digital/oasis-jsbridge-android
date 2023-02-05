@@ -33,25 +33,25 @@ import org.junit.Test
 import timber.log.Timber
 import kotlin.test.*
 
-interface TestNativeApiInterface : JsToNativeInterface {
-    fun nativeMethodReturningTrue(): Boolean
-    fun nativeMethodReturningFalse(): Boolean
-    fun nativeMethodReturningString(): String
-    fun nativeMethodReturningJsonObject(): JsonObjectWrapper
-    fun nativeMethodReturningResolvedJsonObjectDeferred(): Deferred<JsonObjectWrapper>
-    fun nativeMethodReturningRejectedJsonObjectDeferred(): Deferred<JsonObjectWrapper>
-    fun nativeMethodReturningResolvedStringDeferred(): Deferred<String>
-    fun nativeMethodReturningRejectedStringDeferred(): Deferred<String>
-    fun nativeMethodWithBool(b: Boolean?)
-    fun nativeMethodWithString(msg: String?)
-    fun nativeMethodWithJsonObjects(jsonObject1: JsonObjectWrapper?, jsonObject2: JsonObjectWrapper?)
-    fun nativeMethodWithIntVarArg(b: Boolean, vararg ints: Int)
-    fun nativeMethodWithStringVarArg(b: Boolean, vararg strings: String)
-    fun nativeMethodWithCallback(cb: (string: String, obj: JsonObjectWrapper, bool1: Boolean, bool2: Boolean, int: Int, double: Double, optionalInt1: Int?, optionalInt2: Int?) -> Unit)
-    fun nativeMethodThrowingException()
+interface TestJavaApiInterface : JsToJavaInterface {
+    fun javaMethodReturningTrue(): Boolean
+    fun javaMethodReturningFalse(): Boolean
+    fun javaMethodReturningString(): String
+    fun javaMethodReturningJsonObject(): JsonObjectWrapper
+    fun javaMethodReturningResolvedJsonObjectDeferred(): Deferred<JsonObjectWrapper>
+    fun javaMethodReturningRejectedJsonObjectDeferred(): Deferred<JsonObjectWrapper>
+    fun javaMethodReturningResolvedStringDeferred(): Deferred<String>
+    fun javaMethodReturningRejectedStringDeferred(): Deferred<String>
+    fun javaMethodWithBool(b: Boolean?)
+    fun javaMethodWithString(msg: String?)
+    fun javaMethodWithJsonObjects(jsonObject1: JsonObjectWrapper?, jsonObject2: JsonObjectWrapper?)
+    fun javaMethodWithIntVarArg(b: Boolean, vararg ints: Int)
+    fun javaMethodWithStringVarArg(b: Boolean, vararg strings: String)
+    fun javaMethodWithCallback(cb: (string: String, obj: JsonObjectWrapper, bool1: Boolean, bool2: Boolean, int: Int, double: Double, optionalInt1: Int?, optionalInt2: Int?) -> Unit)
+    fun javaMethodThrowingException()
 }
 
-interface TestJsApiInterface : NativeToJsInterface {
+interface TestJsApiInterface : JavaToJsInterface {
     fun jsMethodWithString(msg: String)
     fun jsMethodWithJsonObjects(jsonObject1: JsonObjectWrapper, jsonObject2: JsonObjectWrapper)
     fun jsMethodWithJsValue(jsValue: JsValue)
@@ -64,7 +64,7 @@ interface TestJsApiInterface : NativeToJsInterface {
     fun jsMethodReturningJsValue(str: String): Deferred<JsValue>
 }
 
-interface TestJsApiInterfaceWithSuspend : NativeToJsInterface {
+interface TestJsApiInterfaceWithSuspend : JavaToJsInterface {
     suspend fun jsMethodWithString(msg: String)
     suspend fun jsMethodReturningJsonObject(): JsonObjectWrapper
     suspend fun jsMethodThrowingException(): String
@@ -72,7 +72,7 @@ interface TestJsApiInterfaceWithSuspend : NativeToJsInterface {
     suspend fun jsMethodReturningRejectedPromise(): String
 }
 
-interface JsExpectationsNativeApi : JsToNativeInterface {
+interface JsExpectationsJavaApi : JsToJavaInterface {
     fun addExpectation(name: String, value: JsValue)
 }
 
@@ -81,7 +81,7 @@ class JsBridgeTest {
     private val context: Context = InstrumentationRegistry.getInstrumentation().context
     private val httpInterceptor = TestHttpInterceptor()
     private val okHttpClient = OkHttpClient.Builder().addInterceptor(httpInterceptor).build()
-    private val jsToNativeFunctionMock = mockk<(p: Any) -> Unit>(relaxed = true)
+    private val jsToJavaFunctionMock = mockk<(p: Any) -> Unit>(relaxed = true)
     private lateinit var errors: MutableList<JsBridgeError>
     private lateinit var unhandledPromiseErrors: MutableList<JsBridgeError.UnhandledJsPromiseError>
 
@@ -120,14 +120,14 @@ class JsBridgeTest {
         val subject = createAndSetUpJsBridge()
 
         // WHEN
-        val js = """nativeFunctionMock("testString");"""
+        val js = """javaFunctionMock("testString");"""
         subject.evaluateUnsync(js)
 
         runBlocking { waitForDone(subject) }
 
         // THEN
         assertTrue(errors.isEmpty())
-        verify { jsToNativeFunctionMock(eq("testString")) }
+        verify { jsToJavaFunctionMock(eq("testString")) }
     }
 
     @Test
@@ -155,12 +155,12 @@ class JsBridgeTest {
         val subject = createAndSetUpJsBridge()
 
         // WHEN
-        val js = """nativeFunctionMock("testString");"""
+        val js = """javaFunctionMock("testString");"""
         subject.evaluateBlocking<Unit>(js)
 
         // THEN
         assertTrue(errors.isEmpty())
-        verify { jsToNativeFunctionMock(eq("testString")) }
+        verify { jsToJavaFunctionMock(eq("testString")) }
     }
 
     @Test
@@ -294,13 +294,13 @@ class JsBridgeTest {
         runBlocking {
             // androidTestDuktape asset file "test.js"
             // - content:
-            // nativeFunctionMock("localFileString");
+            // javaFunctionMock("localFileString");
             subject.evaluateLocalFile(context, "js/test.js")
         }
 
         // THEN
         assertTrue(errors.isEmpty())
-        verify { jsToNativeFunctionMock(eq("localFileString")) }
+        verify { jsToJavaFunctionMock(eq("localFileString")) }
     }
 
     @Test
@@ -397,7 +397,7 @@ class JsBridgeTest {
         val subject = createAndSetUpJsBridge()
 
         // WHEN
-        val content = """nativeFunctionMock("fileContentString");"""
+        val content = """javaFunctionMock("fileContentString");"""
 
         runBlocking {
             subject.evaluateFileContent(content, "file.js")
@@ -405,7 +405,7 @@ class JsBridgeTest {
 
         // THEN
         assertTrue(errors.isEmpty())
-        verify { jsToNativeFunctionMock(eq("fileContentString")) }
+        verify { jsToJavaFunctionMock(eq("fileContentString")) }
     }
 
     @Test
@@ -446,7 +446,7 @@ class JsBridgeTest {
         val subject = createAndSetUpJsBridge()
 
         // WHEN
-        val content = """nativeFunctionMock("fileContentString");"""
+        val content = """javaFunctionMock("fileContentString");"""
         subject.evaluateFileContentUnsync(content, "file.js")
 
         runBlocking {
@@ -455,7 +455,7 @@ class JsBridgeTest {
 
         // THEN
         assertTrue(errors.isEmpty())
-        verify { jsToNativeFunctionMock(eq("fileContentString")) }
+        verify { jsToJavaFunctionMock(eq("fileContentString")) }
     }
 
     @Test
@@ -796,19 +796,19 @@ class JsBridgeTest {
     fun testJavaExceptionInJs() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
-        val createExceptionNative = JsValue.fromNativeFunction0<Unit>(subject) { throw Exception("Kotlin exception") }
+        val createExceptionJava = JsValue.createJsToJavaProxyFunction0<Unit>(subject) { throw Exception("Kotlin exception") }
 
         // WHEN
         val jsException: JsException = assertFailsWith {
             subject.evaluateBlocking<Unit>("""
                 function testFunction() {
-                  $createExceptionNative();
+                  $createExceptionJava();
                 }
                 
                 testFunction();
             """.trimIndent())
         }
-        createExceptionNative.hold()
+        createExceptionJava.hold()
 
         // THEN
         assertNotNull(jsException)
@@ -848,13 +848,13 @@ class JsBridgeTest {
     fun testNullPointerException() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
-        val testFunctionNative = JsValue.fromNativeFunction1(subject) { _: Int -> Unit }
+        val testFunctionJava = JsValue.createJsToJavaProxyFunction1(subject) { _: Int -> Unit }
 
         // WHEN
         val jsException: JsException = assertFailsWith {
-            subject.evaluateBlocking<Unit>("$testFunctionNative(null);")
+            subject.evaluateBlocking<Unit>("$testFunctionJava(null);")
         }
-        testFunctionNative.hold()
+        testFunctionJava.hold()
 
         // THEN
         assertNotNull(jsException.cause is NullPointerException)
@@ -891,90 +891,90 @@ class JsBridgeTest {
     }
 
     @Test
-    fun testFromNativeValueAndBack() {
+    fun testFromJavaValueAndBack() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
 
         // THEN
         runBlocking {
-            val jsTrue = JsValue.fromNativeValue(subject, true)
-            val jsFalse = JsValue.fromNativeValue(subject, false)
+            val jsTrue = JsValue.fromJavaValue(subject, true)
+            val jsFalse = JsValue.fromJavaValue(subject, false)
             assertEquals(true, jsTrue.evaluate())
             assertEquals(false, jsFalse.evaluate())
 
-            val jsString = JsValue.fromNativeValue(subject, "nativeString")
-            assertEquals("nativeString", jsString.evaluate())
+            val jsString = JsValue.fromJavaValue(subject, "javaString")
+            assertEquals("javaString", jsString.evaluate())
 
-            val jsByte = JsValue.fromNativeValue(subject, 5.toByte())
-            val jsNullableByte = JsValue.fromNativeValue<Byte?>(subject, 5)
-            val jsNullByte = JsValue.fromNativeValue<Byte?>(subject, null)
+            val jsByte = JsValue.fromJavaValue(subject, 5.toByte())
+            val jsNullableByte = JsValue.fromJavaValue<Byte?>(subject, 5)
+            val jsNullByte = JsValue.fromJavaValue<Byte?>(subject, null)
             assertEquals(5.toByte(), jsByte.evaluate())
             assertEquals(5.toByte(), jsNullableByte.evaluate())
             assertEquals(null, jsNullByte.evaluate<Byte?>())
 
-            val jsInt = JsValue.fromNativeValue(subject, 123)
-            val jsNullableInt = JsValue.fromNativeValue<Int?>(subject, 123)
-            val jsNullInt = JsValue.fromNativeValue<Int?>(subject, null)
+            val jsInt = JsValue.fromJavaValue(subject, 123)
+            val jsNullableInt = JsValue.fromJavaValue<Int?>(subject, 123)
+            val jsNullInt = JsValue.fromJavaValue<Int?>(subject, null)
             assertEquals(123, jsInt.evaluate())
             assertEquals(123, jsNullableInt.evaluate())
             assertEquals(null, jsNullInt.evaluate<Int?>())
 
-            val jsFloat = JsValue.fromNativeValue(subject, 123.456f)
-            val jsNullableFloat = JsValue.fromNativeValue<Float?>(subject, 123.456f)
-            val jsNullFloat = JsValue.fromNativeValue<Float?>(subject, null)
+            val jsFloat = JsValue.fromJavaValue(subject, 123.456f)
+            val jsNullableFloat = JsValue.fromJavaValue<Float?>(subject, 123.456f)
+            val jsNullFloat = JsValue.fromJavaValue<Float?>(subject, null)
             assertEquals(123.456f, jsFloat.evaluate())
             assertEquals(123.456f, jsNullableFloat.evaluate())
             assertEquals(null, jsNullFloat.evaluate<Float?>())
 
-            val jsDouble = JsValue.fromNativeValue(subject, 123.456)
-            val jsNullableDouble = JsValue.fromNativeValue<Double?>(subject, 123.456)
-            val jsNullDouble = JsValue.fromNativeValue<Double?>(subject, null)
+            val jsDouble = JsValue.fromJavaValue(subject, 123.456)
+            val jsNullableDouble = JsValue.fromJavaValue<Double?>(subject, 123.456)
+            val jsNullDouble = JsValue.fromJavaValue<Double?>(subject, null)
             assertEquals(123.456, jsDouble.evaluate())
             assertEquals(123.456, jsNullableDouble.evaluate())
             assertEquals(null, jsNullDouble.evaluate<Double?>())
 
-            val jsArrayBoolean = JsValue.fromNativeValue(subject, booleanArrayOf(true, true, false))
-            val jsArrayNullableBoolean = JsValue.fromNativeValue(subject, arrayOf(true, null, false))
+            val jsArrayBoolean = JsValue.fromJavaValue(subject, booleanArrayOf(true, true, false))
+            val jsArrayNullableBoolean = JsValue.fromJavaValue(subject, arrayOf(true, null, false))
             assertArrayEquals(booleanArrayOf(true, true, false), jsArrayBoolean.evaluate())
             assertArrayEquals(arrayOf(true, null, false), jsArrayNullableBoolean.evaluate())
 
-            val jsArrayByte = JsValue.fromNativeValue(subject, byteArrayOf(1, 2, 3))
-            val jsArrayNullableByte = JsValue.fromNativeValue(subject, arrayOf(1.toByte(), null, 3.toByte()))
+            val jsArrayByte = JsValue.fromJavaValue(subject, byteArrayOf(1, 2, 3))
+            val jsArrayNullableByte = JsValue.fromJavaValue(subject, arrayOf(1.toByte(), null, 3.toByte()))
             assertArrayEquals(byteArrayOf(1, 2, 3), jsArrayByte.evaluate())
             assertArrayEquals(arrayOf(1.toByte(), null, 3.toByte()), jsArrayNullableByte.evaluate<Array<Byte?>>())
 
-            val jsArrayInt = JsValue.fromNativeValue(subject, intArrayOf(1, 2, 3))
-            val jsArrayNullableInt = JsValue.fromNativeValue(subject, arrayOf(1, null, 3))
+            val jsArrayInt = JsValue.fromJavaValue(subject, intArrayOf(1, 2, 3))
+            val jsArrayNullableInt = JsValue.fromJavaValue(subject, arrayOf(1, null, 3))
             assertArrayEquals(intArrayOf(1, 2, 3), jsArrayInt.evaluate())
             assertArrayEquals(arrayOf(1, null, 3), jsArrayNullableInt.evaluate<Array<Int?>>())
 
-            val jsArrayLong = JsValue.fromNativeValue(subject, longArrayOf(1L, 2L, 3L))
-            val jsArrayNullableLong = JsValue.fromNativeValue(subject, arrayOf(1L, null, 3L))
+            val jsArrayLong = JsValue.fromJavaValue(subject, longArrayOf(1L, 2L, 3L))
+            val jsArrayNullableLong = JsValue.fromJavaValue(subject, arrayOf(1L, null, 3L))
             assertArrayEquals(longArrayOf(1L, 2L, 3L), jsArrayLong.evaluate())
             assertArrayEquals(arrayOf(1L, null, 3L), jsArrayNullableLong.evaluate<Array<Long?>>())
 
-            val jsArrayFloat = JsValue.fromNativeValue(subject, floatArrayOf(1f, 2f, 3f))
-            val jsArrayNullableFloat = JsValue.fromNativeValue(subject, arrayOf(1f, null, 3f))
+            val jsArrayFloat = JsValue.fromJavaValue(subject, floatArrayOf(1f, 2f, 3f))
+            val jsArrayNullableFloat = JsValue.fromJavaValue(subject, arrayOf(1f, null, 3f))
             assertTrue(jsArrayFloat.evaluate<FloatArray>().contentEquals(floatArrayOf(1f, 2f, 3f)))
             assertArrayEquals(arrayOf(1f, null, 3f), jsArrayNullableFloat.evaluate<Array<Float?>>())
 
-            val jsArrayDouble = JsValue.fromNativeValue(subject, doubleArrayOf(1.0, 2.0, 3.0))
-            val jsArrayNullableDouble = JsValue.fromNativeValue(subject, arrayOf(1.0, null, 3.0))
+            val jsArrayDouble = JsValue.fromJavaValue(subject, doubleArrayOf(1.0, 2.0, 3.0))
+            val jsArrayNullableDouble = JsValue.fromJavaValue(subject, arrayOf(1.0, null, 3.0))
             assertTrue(jsArrayDouble.evaluate<DoubleArray>().contentEquals(doubleArrayOf(1.0, 2.0, 3.0)))
             assertArrayEquals(arrayOf(1.0, null, 3.0), jsArrayNullableDouble.evaluate<Array<Double?>>())
 
-            val jsArrayString = JsValue.fromNativeValue(subject, arrayOf("a", "b", "c"))
-            val jsArrayNullableString = JsValue.fromNativeValue(subject, arrayOf("a", null, "c"))
+            val jsArrayString = JsValue.fromJavaValue(subject, arrayOf("a", "b", "c"))
+            val jsArrayNullableString = JsValue.fromJavaValue(subject, arrayOf("a", null, "c"))
             assertArrayEquals(arrayOf("a", "b", "c"), jsArrayString.evaluate())
             assertArrayEquals(arrayOf("a", null, "c"), jsArrayNullableString.evaluate())
 
-            val jsListString = JsValue.fromNativeValue(subject, listOf("a", "b", "c"))
+            val jsListString = JsValue.fromJavaValue(subject, listOf("a", "b", "c"))
             assertEquals(listOf("a", "b", "c"), jsListString.evaluate())
 
             val payloadObject = payloadObjectOf("key1" to "value1", "key2" to "value2")
             val listObject = JsonObjectWrapper(payloadObject.toJsonString(false))
 
-            val jsListObject = JsValue.fromNativeValue(subject, listOf(listObject, null, listObject))
+            val jsListObject = JsValue.fromJavaValue(subject, listOf(listObject, null, listObject))
             val javaListObject: List<JsonObjectWrapper> = jsListObject.evaluate()
             assertEquals(3, javaListObject.size)
             assertEquals(payloadObject, javaListObject[0].toPayloadObject())
@@ -1029,9 +1029,9 @@ class JsBridgeTest {
         // GIVEN
         val subject = createAndSetUpJsBridge()
 
-        // Pure native
+        // Pure Java
         // -> 11ms (Samsung S5, 100000 iterations)
-        val calcMagicNativeFunc: suspend () -> Int = {
+        val calcMagicJavaFunc: suspend () -> Int = {
             withContext(Dispatchers.Default) {
                 var m = 0
                 for (i in 0 until ITERATION_COUNT) {
@@ -1053,9 +1053,9 @@ class JsBridgeTest {
             |}
             |return m;
             |""".trimMargin()
-        ).mapToNativeFunction0()
+        ).createJavaToJsProxyFunction0()
 
-        // Native loop, calls JS function
+        // Java loop, calls JS function
         // -> 22.5s (Duktape, Samsung S5, 100000 iterations, from main thread)
         // -> 10.5s (Duktape, Samsung S5, 100000 iterations, from JS thread)
         // -> 17s (QuickJS, Samsung S5, 100000 iterations, from main thread)
@@ -1065,8 +1065,8 @@ class JsBridgeTest {
             |if (n > 1000000) n = -n;
             |return n;
             |""".trimMargin()
-        ).mapToNativeFunction2()
-        val calcMagicCallJsFunctionInsideNativeLoop: suspend () -> Int = {
+        ).createJavaToJsProxyFunction2()
+        val calcMagicCallJsFunctionInsideJavaLoop: suspend () -> Int = {
             var m = 0
             for (i in 0 until ITERATION_COUNT) {
                 m = updateMagicJsFunc(m, i)
@@ -1074,12 +1074,12 @@ class JsBridgeTest {
             m
         }
 
-        // Native loop, evaluate JS string
+        // Java loop, evaluate JS string
         // -> 78s (Duktape, Samsung S5, 100000 iterations, from main thread)
         // -> 53s (Duktape, Samsung S5, 100000 iterations, from JS thread)
         // -> 216s (QuickJS, Samsung S5, 100000 iterations, from main thread)
         // -> 54s (QuickJS, Samsung S5, 100000 iterations, from JS thread)
-        val calcMagicEvaluateJsInsideNativeLoop: suspend () -> Int = {
+        val calcMagicEvaluateJsInsideJavaLoop: suspend () -> Int = {
             var m = 0
             for (i in 0 until ITERATION_COUNT) {
                 m = subject.evaluate("""
@@ -1091,28 +1091,28 @@ class JsBridgeTest {
             m
         }
 
-        // JS loop, call native functions (191ms for 20000 iterations)
+        // JS loop, call Java functions (191ms for 20000 iterations)
         // -> 3.7s ms (Duktape, Samsung S5, 100000 iterations)
         // -> 5.5s ms (QuickJS, Samsung S5, 100000 iterations)
-        val updateMagicNativeFuncJsValue = JsValue.fromNativeFunction2(subject) { a: Int, i: Int ->
+        val updateMagicJavaFuncJsValue = JsValue.createJsToJavaProxyFunction2(subject) { a: Int, i: Int ->
             var n = a + i * 2
             if (n > 1000000) n = -n
             n
         }
-        val calcMagicCallNativeFunctionInsideJsLoop: suspend () -> Int = JsValue.newFunction(subject, """
+        val calcMagicCallJavaFunctionInsideJsLoop: suspend () -> Int = JsValue.newFunction(subject, """
             |var m = 0
             |for (var i = 0; i < $ITERATION_COUNT; ++i) {
-            |  m = $updateMagicNativeFuncJsValue(m, i)
+            |  m = $updateMagicJavaFuncJsValue(m, i)
             |}
             |return m;
             |""".trimMargin()
-        ).mapToNativeFunction0()
+        ).createJavaToJsProxyFunction0()
 
         runBlocking {
             delay(500)
 
-            Timber.i("Executing calcMagicNativeFunc()...")
-            val expectedResult = calcMagicNativeFunc()
+            Timber.i("Executing calcMagicJavaFunc()...")
+            val expectedResult = calcMagicJavaFunc()
             Timber.i("-> result is $expectedResult")
 
             Timber.i("Executing calcMagicJsFunc()...")
@@ -1120,48 +1120,48 @@ class JsBridgeTest {
             Timber.i("-> result is $result")
             assertEquals(expectedResult, result)
 
-            Timber.i("Executing calcMagicCallJsFunctionInsideNativeLoop()...")
-            result = calcMagicCallJsFunctionInsideNativeLoop()
+            Timber.i("Executing calcMagicCallJsFunctionInsideJavaLoop()...")
+            result = calcMagicCallJsFunctionInsideJavaLoop()
             Timber.i("-> result is $result")
             assertEquals(expectedResult, result)
 
-            Timber.i("Executing calcMagicCallJsFunctionInsideNativeLoop() in JS thread...")
+            Timber.i("Executing calcMagicCallJsFunctionInsideJavaLoop() in JS thread...")
             withContext(subject.coroutineContext) {
-                result = calcMagicCallJsFunctionInsideNativeLoop()
+                result = calcMagicCallJsFunctionInsideJavaLoop()
                 Timber.i("-> result is $result")
                 assertEquals(expectedResult, result)
             }
 
-            Timber.i("Executing calcMagicEvaluateJsInsideNativeLoop()...")
-            result = calcMagicEvaluateJsInsideNativeLoop()
+            Timber.i("Executing calcMagicEvaluateJsInsideJavaLoop()...")
+            result = calcMagicEvaluateJsInsideJavaLoop()
             Timber.i("-> result is $result")
             assertEquals(expectedResult, result)
 
-            Timber.i("Executing calcMagicEvaluateJsInsideNativeLoop() in JS thread...")
+            Timber.i("Executing calcMagicEvaluateJsInsideJavaLoop() in JS thread...")
             withContext(subject.coroutineContext) {
-                result = calcMagicEvaluateJsInsideNativeLoop()
+                result = calcMagicEvaluateJsInsideJavaLoop()
                 Timber.i("-> result is $result")
                 assertEquals(expectedResult, result)
             }
 
-            Timber.i("Executing calcMagicCallNativeFunctionInsideJsLoop()...")
-            result = calcMagicCallNativeFunctionInsideJsLoop()
+            Timber.i("Executing calcMagicCallJavaFunctionInsideJsLoop()...")
+            result = calcMagicCallJavaFunctionInsideJsLoop()
             Timber.i("-> result is $result")
             assertEquals(expectedResult, result)
 
             // Make sure that the JS value does not create garbage-collected as calcMagicMixed3Func()
             // access the value by its name!
-            updateMagicNativeFuncJsValue.hold()
+            updateMagicJavaFuncJsValue.hold()
         }
     }
 
-    interface StressJsApi: NativeToJsInterface {
+    interface StressJsApi: JavaToJsInterface {
         fun registerCallback(cb: (Int) -> Unit)
         fun start()
         fun helloAsync(): Deferred<String>
     }
 
-    interface StressNativeApi: JsToNativeInterface {
+    interface StressJavaApi: JsToJavaInterface {
         fun registerCallback(cb: (Int) -> Unit)
         fun start()
         fun helloAsync(): Deferred<String>
@@ -1183,10 +1183,10 @@ class JsBridgeTest {
         val subject = JsBridge(config, context)
 
         val jsExpectations = JsExpectations()
-        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+        val jsExpectationsJsValue = JsValue.createJsToJavaProxy(subject, jsExpectations)
 
 
-        // Native to JS
+        // Java to JS
         // ---
 
         val jsApi: StressJsApi = JsValue(subject, """({
@@ -1207,10 +1207,10 @@ class JsBridgeTest {
             |    );
             |  }
             |})""".trimMargin()
-        ).mapToNativeObject()
+        ).createJavaToJsProxy()
 
-        val nativeCbMock = mockk<(Int) -> Unit>(relaxed = true)
-        jsApi.registerCallback(nativeCbMock)
+        val javaCbMock = mockk<(Int) -> Unit>(relaxed = true)
+        jsApi.registerCallback(javaCbMock)
         jsApi.start()
 
         runBlocking {
@@ -1220,15 +1220,15 @@ class JsBridgeTest {
         runBlocking {
             // Note: mockk verify with timeout has some issues on API < 24
             if (android.os.Build.VERSION.SDK_INT >= 24) {
-                verify(exactly = 100, timeout = 15000L) { nativeCbMock(any()) }
+                verify(exactly = 100, timeout = 15000L) { javaCbMock(any()) }
             }
         }
 
 
-        // JS to native
+        // JS to Java
         // ---
 
-        val nativeApi = object: StressNativeApi {
+        val javaApi = object: StressJavaApi {
             private var cb: ((Int) -> Unit)? = null
 
             override fun registerCallback(cb: (Int) -> Unit) {
@@ -1246,15 +1246,15 @@ class JsBridgeTest {
             }
         }
 
-        val nativeApiJsValue = JsValue.fromNativeObject(subject, nativeApi)
+        val javaApiJsValue = JsValue.createJsToJavaProxy(subject, javaApi)
         subject.evaluateBlocking<Unit>("""
             |function jsCb(i) {
             |  $jsExpectationsJsValue.addExpectation("ex" + i, i);
             |}
-            |$nativeApiJsValue.registerCallback(jsCb);
-            |$nativeApiJsValue.start();""".trimMargin())
+            |$javaApiJsValue.registerCallback(jsCb);
+            |$javaApiJsValue.start();""".trimMargin())
 
-        assertEquals("ok", subject.evaluateBlocking("$nativeApiJsValue.helloAsync()"))
+        assertEquals("ok", subject.evaluateBlocking("$javaApiJsValue.helloAsync()"))
 
         for (i in 0 until 100) {
             jsExpectations.checkEquals("ex$i", i)
@@ -1262,14 +1262,14 @@ class JsBridgeTest {
 
         // Hold the JS values whose associated JS name is used in string evaluation
         jsExpectationsJsValue.hold()
-        nativeApiJsValue.hold()
+        javaApiJsValue.hold()
 
         assertTrue(jsExpectations.isEmpty)
         subject.release()
     }
 
     @Test
-    fun testMapJsFunctionToNative() {
+    fun testMapJsFunctionToJava() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
 
@@ -1281,22 +1281,22 @@ class JsBridgeTest {
             |})
             |""".trimMargin()
         )
-        val calcSum: suspend (Int, Int) -> Int = calcSumJsValue.mapToNativeFunction2()
-        val calcSumFromAnonymousFunction: suspend (Int, Int) -> Int = calcSumJsValueAnonymousFunction.mapToNativeFunction2()
-        val calcSumBlocking: (Int, Int) -> Int = calcSumJsValue.mapToNativeBlockingFunction2()
-        val calcSumWrongSignature: (Int, String) -> Int = calcSumJsValue.mapToNativeBlockingFunction2()
+        val calcSum: suspend (Int, Int) -> Int = calcSumJsValue.createJavaToJsProxyFunction2()
+        val calcSumFromAnonymousFunction: suspend (Int, Int) -> Int = calcSumJsValueAnonymousFunction.createJavaToJsProxyFunction2()
+        val calcSumBlocking: (Int, Int) -> Int = calcSumJsValue.createJavaToJsBlockingProxyFunction2()
+        val calcSumWrongSignature: (Int, String) -> Int = calcSumJsValue.createJavaToJsBlockingProxyFunction2()
 
-        val invalidFunction: suspend () -> Unit = JsValue.newFunction(subject, "invalid").mapToNativeFunction0()
+        val invalidFunction: suspend () -> Unit = JsValue.newFunction(subject, "invalid").createJavaToJsProxyFunction0()
 
         val createJsObject: suspend (Int, String) -> JsonObjectWrapper =
             JsValue.newFunction(subject, "a", "b", "return {key1: a, key2: b};")
-                .mapToNativeFunction2()
+                .createJavaToJsProxyFunction2()
 
         val createCalcSumFunc: suspend () -> JsValue = JsValue.newFunction(subject, "return $calcSumJsValue;")
-            .mapToNativeFunction0()
+            .createJavaToJsProxyFunction0()
 
         val throwException: suspend () -> Unit = JsValue.newFunction(subject, "", "throw 'JS exception from function';")
-            .mapToNativeFunction0()
+            .createJavaToJsProxyFunction0()
 
         val getPromiseJsValue = JsValue.newFunction(subject, "name", """
             |return new Promise(function(resolve) {
@@ -1304,15 +1304,15 @@ class JsBridgeTest {
             |});
             |""".trimMargin()
         )
-        val getPromise: suspend (name: String) -> String = getPromiseJsValue.mapToNativeFunction1()
-        val getPromiseAsync: suspend (name: String) -> Deferred<String> = getPromiseJsValue.mapToNativeFunction1()
+        val getPromise: suspend (name: String) -> String = getPromiseJsValue.createJavaToJsProxyFunction1()
+        val getPromiseAsync: suspend (name: String) -> Deferred<String> = getPromiseJsValue.createJavaToJsProxyFunction1()
 
         val getFailedPromise: suspend (name: String) -> String = JsValue.newFunction(subject, """
             |return new Promise(function(resolve, reject) {
             |  reject("Oh no!");
             |});
             |""".trimMargin()
-        ).mapToNativeFunction1()
+        ).createJavaToJsProxyFunction1()
 
         // THEN
         assertEquals(10, calcSumBlocking(3, 7))
@@ -1320,12 +1320,12 @@ class JsBridgeTest {
         runBlocking {
             // Missing JS function (the evalution of the JS code should throw)
             assertFailsWith<JsException> {
-                JsValue(subject, "non_existing_function").mapToNativeFunction0<Unit>(true)
+                JsValue(subject, "non_existing_function").createJavaToJsProxyFunction0<Unit>(true)
             }
 
             // Invalid JS function (the registration should throw)
             assertFailsWith<IllegalArgumentException> {
-                JsValue(subject, "123").mapToNativeFunction0<Unit>(true)
+                JsValue(subject, "123").createJavaToJsProxyFunction0<Unit>(true)
             }
 
             // Call JS function calcSum(3, 4)
@@ -1352,7 +1352,7 @@ class JsBridgeTest {
             assertEquals(PayloadObject.fromValues("key1" to 69, "key2" to "sixty-nine"), jsObject.toPayload())
 
             // Call JS function createCalcSumFunc()(2, 2)
-            val calcSum2: suspend (Int, Int) -> Int = createCalcSumFunc().mapToNativeFunction2()
+            val calcSum2: suspend (Int, Int) -> Int = createCalcSumFunc().createJavaToJsProxyFunction2()
             val sum2 = calcSum2(2, 2)
             assertEquals(4, sum2)
 
@@ -1382,24 +1382,24 @@ class JsBridgeTest {
     }
 
     @Test
-    fun testMapNativeFunctionToJs() {
+    fun testMapJavaFunctionToJs() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
         var flag = false
 
         runBlocking {
             // WHEN
-            val setFlag = JsValue.fromNativeFunction0(subject) { flag = true }
-            val toUpperCaseNative =
-                JsValue.fromNativeFunction1(subject) { s: String -> s.toUpperCase() }
-            val calcSumNative = JsValue.fromNativeFunction2(subject) { a: Int, b: Int -> a + b }
+            val setFlag = JsValue.createJsToJavaProxyFunction0(subject) { flag = true }
+            val toUpperCaseJava =
+                JsValue.createJsToJavaProxyFunction1(subject) { s: String -> s.toUpperCase() }
+            val calcSumJava = JsValue.createJsToJavaProxyFunction2(subject) { a: Int, b: Int -> a + b }
             val setCustomTimeout: (() -> Unit, Long) -> Unit = { cb, msecs ->
                 GlobalScope.launch(Dispatchers.Main) {
                     delay(msecs)
                     cb()
                 }
             }
-            JsValue.fromNativeFunction2(subject, setCustomTimeout)
+            JsValue.createJsToJavaProxyFunction2(subject, setCustomTimeout)
                 .assignToGlobal("setCustomTimeout")
 
             subject.evaluateBlocking<Unit>("$setFlag()")
@@ -1407,35 +1407,35 @@ class JsBridgeTest {
 
             assertEquals(
                 "TEST STRING",
-                subject.evaluateBlocking("""$toUpperCaseNative("test string")""")
+                subject.evaluateBlocking("""$toUpperCaseJava("test string")""")
             )
-            assertEquals(15, subject.evaluateBlocking("$calcSumNative(7, 8)"))
+            assertEquals(15, subject.evaluateBlocking("$calcSumJava(7, 8)"))
 
             subject.evaluate<Unit>(
                 """
                 |setCustomTimeout(function() {
-                |  nativeFunctionMock(true);
+                |  javaFunctionMock(true);
                 |}, 200);
             """.trimMargin()
             )
             // Note: mockk verify with timeout has some issues on API < 24
             if (android.os.Build.VERSION.SDK_INT >= 24) {
-                verify(timeout = 3000L) { jsToNativeFunctionMock(eq(true)) }
+                verify(timeout = 3000L) { jsToJavaFunctionMock(eq(true)) }
             }
 
             // AND WHEN
             // Missing parameter (replaced with null)
             val missingParameterException = assertFailsWith<JsException> {
-                subject.evaluate<Unit>("$calcSumNative(2)")
+                subject.evaluate<Unit>("$calcSumJava(2)")
             }
             assertTrue(missingParameterException.cause is NullPointerException)
 
             // Too many parameters
             assertFailsWith<JsException> {
-                subject.evaluate<Unit>("$calcSumNative(2, 3, 4)")
+                subject.evaluate<Unit>("$calcSumJava(2, 3, 4)")
             }
 
-            calcSumNative.hold()
+            calcSumJava.hold()
         }
     }
 
@@ -1452,7 +1452,7 @@ class JsBridgeTest {
             |  })
             |});
             |""".trimMargin()
-        ).mapToNativeFunction1()
+        ).createJavaToJsProxyFunction1()
 
         val matrix = Array(2) { IntArray(2) { 0 } }
         matrix[0][0] = 1
@@ -1476,7 +1476,7 @@ class JsBridgeTest {
     }
 
     @Test
-    fun testRegisterJsToNativeInterface() {
+    fun testRegisterJsToJavaInterface() {
         // GIVEN
         var receivedBool1: Boolean? = null
         var receivedBool2: Boolean? = null
@@ -1486,35 +1486,35 @@ class JsBridgeTest {
         var receivedIntVarArg: IntArray? = null
         var receivedStringVarArg: Array<out String>? = null
 
-        val nativeApi = object : TestNativeApiInterface {
-            override fun nativeMethodReturningTrue() = true
-            override fun nativeMethodReturningFalse() = false
-            override fun nativeMethodReturningString() = "Hello JsBridgeTest!"
+        val javaApi = object : TestJavaApiInterface {
+            override fun javaMethodReturningTrue() = true
+            override fun javaMethodReturningFalse() = false
+            override fun javaMethodReturningString() = "Hello JsBridgeTest!"
 
-            override fun nativeMethodReturningJsonObject() = JsonObjectWrapper("""
+            override fun javaMethodReturningJsonObject() = JsonObjectWrapper("""
                 {"returnKey1": 1, "returnKey2": "returnValue2"}
             """)
 
-            override fun nativeMethodReturningResolvedJsonObjectDeferred() = GlobalScope.async {
+            override fun javaMethodReturningResolvedJsonObjectDeferred() = GlobalScope.async {
                 JsonObjectWrapper("""
                     {"returnKey1": 1, "returnKey2": "returnValue2"}
                 """
                 )
             }
 
-            override fun nativeMethodReturningRejectedJsonObjectDeferred() = GlobalScope.async {
+            override fun javaMethodReturningRejectedJsonObjectDeferred() = GlobalScope.async {
                 throw Exception("returned deferred object error")
             }
 
-            override fun nativeMethodReturningResolvedStringDeferred(): Deferred<String> = GlobalScope.async {
+            override fun javaMethodReturningResolvedStringDeferred(): Deferred<String> = GlobalScope.async {
                 "returned deferred string"
             }
 
-            override fun nativeMethodReturningRejectedStringDeferred(): Deferred<String> = GlobalScope.async {
+            override fun javaMethodReturningRejectedStringDeferred(): Deferred<String> = GlobalScope.async {
                 throw Exception("returned deferred string error")
             }
 
-            override fun nativeMethodWithBool(b: Boolean?) {
+            override fun javaMethodWithBool(b: Boolean?) {
                 when {
                     receivedBool1 == null -> receivedBool1 = b
                     receivedBool2 == null -> receivedBool2 = b
@@ -1522,29 +1522,29 @@ class JsBridgeTest {
                 }
             }
 
-            override fun nativeMethodWithString(msg: String?) {
+            override fun javaMethodWithString(msg: String?) {
                 receivedString = msg
             }
 
-            override fun nativeMethodWithJsonObjects(jsonObject1: JsonObjectWrapper?, jsonObject2: JsonObjectWrapper?) {
+            override fun javaMethodWithJsonObjects(jsonObject1: JsonObjectWrapper?, jsonObject2: JsonObjectWrapper?) {
                 receivedJsonObject1 = jsonObject1
                 receivedJsonObject2 = jsonObject2
             }
 
-            override fun nativeMethodWithIntVarArg(b: Boolean, vararg ints: Int) {
+            override fun javaMethodWithIntVarArg(b: Boolean, vararg ints: Int) {
                 receivedIntVarArg = ints
             }
 
-            override fun nativeMethodWithStringVarArg(b: Boolean, vararg strings: String) {
+            override fun javaMethodWithStringVarArg(b: Boolean, vararg strings: String) {
                 receivedStringVarArg = strings.clone()
             }
 
-            override fun nativeMethodWithCallback(cb: (string: String, obj: JsonObjectWrapper, bool1: Boolean, bool2: Boolean, int: Int, double: Double, optionalInt1: Int?, optionalInt2: Int?) -> Unit) {
+            override fun javaMethodWithCallback(cb: (string: String, obj: JsonObjectWrapper, bool1: Boolean, bool2: Boolean, int: Int, double: Double, optionalInt1: Int?, optionalInt2: Int?) -> Unit) {
                 cb("cbString", JsonObjectWrapper("""{"cbKey1": 1, "cbKey2": "cbValue2"}"""), true, false, 69, 16.64, 123, null)
             }
 
-            override fun nativeMethodThrowingException() {
-                throw Exception("Test native exception")
+            override fun javaMethodThrowingException() {
+                throw Exception("Test Java exception")
             }
         }
 
@@ -1554,46 +1554,46 @@ class JsBridgeTest {
         val subject = JsBridge(config, context)
 
         val jsExpectations = JsExpectations()
-        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+        val jsExpectationsJsValue = JsValue.createJsToJavaProxy(subject, jsExpectations)
 
         // WHEN
-        val testNativeApi = JsValue.fromNativeObject(subject, nativeApi)
+        val testJavaApi = JsValue.createJsToJavaProxy(subject, javaApi)
         val js = """
-            var retBool1 = $testNativeApi.nativeMethodReturningTrue();
-            var retBool2 = $testNativeApi.nativeMethodReturningFalse();
-            var retString = $testNativeApi.nativeMethodReturningString();
-            var retObject = $testNativeApi.nativeMethodReturningJsonObject();
-            var retObjectPromise = $testNativeApi.nativeMethodReturningResolvedJsonObjectDeferred();
+            var retBool1 = $testJavaApi.javaMethodReturningTrue();
+            var retBool2 = $testJavaApi.javaMethodReturningFalse();
+            var retString = $testJavaApi.javaMethodReturningString();
+            var retObject = $testJavaApi.javaMethodReturningJsonObject();
+            var retObjectPromise = $testJavaApi.javaMethodReturningResolvedJsonObjectDeferred();
             retObjectPromise.then(function(deferredValue) {
               $jsExpectationsJsValue.addExpectation("resolvedDeferredJson", JSON.stringify(deferredValue));
             }).catch(function(e) {
               $jsExpectationsJsValue.addExpectation("unexpected", true);
             });
-            retObjectPromise = $testNativeApi.nativeMethodReturningRejectedJsonObjectDeferred();
+            retObjectPromise = $testJavaApi.javaMethodReturningRejectedJsonObjectDeferred();
             retObjectPromise.then(function(deferredValue) {
               $jsExpectationsJsValue.addExpectation("unexpected", true);
             }).catch(function(e) {
               $jsExpectationsJsValue.addExpectation("rejectedDeferredJsonError", e.message);
             });
-            var retStringPromise = $testNativeApi.nativeMethodReturningResolvedStringDeferred();
+            var retStringPromise = $testJavaApi.javaMethodReturningResolvedStringDeferred();
             retStringPromise.then(function(deferredValue) {
               $jsExpectationsJsValue.addExpectation("resolvedDeferredString", deferredValue);
             }).catch(function(e) {
               $jsExpectationsJsValue.addExpectation("unexpected", true);
             });
-            retStringPromise = $testNativeApi.nativeMethodReturningRejectedStringDeferred();
+            retStringPromise = $testJavaApi.javaMethodReturningRejectedStringDeferred();
             retStringPromise.then(function(deferredValue) {
               $jsExpectationsJsValue.addExpectation("unexpected", true);
             }).catch(function(e) {
               $jsExpectationsJsValue.addExpectation("rejectedDeferredStringError", e.message);
             });
-            $testNativeApi.nativeMethodWithBool(retBool1);
-            $testNativeApi.nativeMethodWithBool(retBool2);
-            $testNativeApi.nativeMethodWithString(retString);
-            $testNativeApi.nativeMethodWithJsonObjects(retObject, [1, "two", 3]);
-            $testNativeApi.nativeMethodWithIntVarArg(false, 1, 2, 3, 4, 5);
-            $testNativeApi.nativeMethodWithStringVarArg(true, "vararg1", "vararg2", "vararg3");
-            $testNativeApi.nativeMethodWithCallback(function(string, obj, bool1, bool2, int, double, optionalInt1, optionalInt2) {
+            $testJavaApi.javaMethodWithBool(retBool1);
+            $testJavaApi.javaMethodWithBool(retBool2);
+            $testJavaApi.javaMethodWithString(retString);
+            $testJavaApi.javaMethodWithJsonObjects(retObject, [1, "two", 3]);
+            $testJavaApi.javaMethodWithIntVarArg(false, 1, 2, 3, 4, 5);
+            $testJavaApi.javaMethodWithStringVarArg(true, "vararg1", "vararg2", "vararg3");
+            $testJavaApi.javaMethodWithCallback(function(string, obj, bool1, bool2, int, double, optionalInt1, optionalInt2) {
               $jsExpectationsJsValue.addExpectation("cbString", string);
               $jsExpectationsJsValue.addExpectation("cbObj", obj);
               $jsExpectationsJsValue.addExpectation("cbBool1", bool1);
@@ -1604,9 +1604,9 @@ class JsBridgeTest {
               $jsExpectationsJsValue.addExpectation("cbOptionalInt2", null);
             });
             try {
-              $testNativeApi.nativeMethodThrowingException();
+              $testJavaApi.javaMethodThrowingException();
             } catch(e) {
-              $jsExpectationsJsValue.addExpectation("nativeException", e);
+              $jsExpectationsJsValue.addExpectation("javaException", e);
             }
             """
         subject.evaluateUnsync(js)
@@ -1637,18 +1637,18 @@ class JsBridgeTest {
         jsExpectations.checkEquals("cbBool2", false)
         jsExpectations.checkEquals("cbInt", 69)
         jsExpectations.checkEquals("cbDouble", 16.64)
-        assertNotNull(jsExpectations.takeExpectation<Any>("nativeException"))
+        assertNotNull(jsExpectations.takeExpectation<Any>("javaException"))
         assertTrue(jsExpectations.isEmpty)
         assertTrue(errors.isEmpty())
     }
 
     @Test
-    fun testRegisterNativeToJsInterfaceWithSuspendMethods() {
+    fun testRegisterJavaToJsInterfaceWithSuspendMethods() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
 
         val jsExpectations = JsExpectations()
-        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+        val jsExpectationsJsValue = JsValue.createJsToJavaProxy(subject, jsExpectations)
 
         val testJsApi = JsValue(subject, """({
             jsMethodWithString: function(msg) {
@@ -1674,7 +1674,7 @@ class JsBridgeTest {
 
 
         // WHEN
-        val jsApi: TestJsApiInterfaceWithSuspend = testJsApi.mapToNativeObject()
+        val jsApi: TestJsApiInterfaceWithSuspend = testJsApi.createJavaToJsProxy()
         runBlocking {
             jsApi.jsMethodWithString("Hello JS!")
 
@@ -1705,12 +1705,12 @@ class JsBridgeTest {
     }
 
     @Test
-    fun testRegisterNativeToJsInterface() {
+    fun testRegisterJavaToJsInterface() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
 
         val jsExpectations = JsExpectations()
-        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+        val jsExpectationsJsValue = JsValue.createJsToJavaProxy(subject, jsExpectations)
 
         data class CallbackValues(
             val string: String?,
@@ -1775,7 +1775,7 @@ class JsBridgeTest {
         assertNotNull(arr)
 
         // WHEN
-        val jsApi: TestJsApiInterface = testJsApi.mapToNativeObject()
+        val jsApi: TestJsApiInterface = testJsApi.createJavaToJsProxy()
         jsApi.jsMethodWithString("Hello JS!")
         jsApi.jsMethodWithJsonObjects(obj, arr)
         val jsValueParam = JsValue(subject, "\"This is a JS value\"")
@@ -1845,7 +1845,7 @@ class JsBridgeTest {
     }
 
     @Test
-    fun testRegisterNativeToJsInterfaceSuspend() {
+    fun testRegisterJavaToJsInterfaceSuspend() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
         val jsApiNoObjectValue = JsValue(subject, "undefined")
@@ -1854,20 +1854,20 @@ class JsBridgeTest {
         // WHEN
         runBlocking {
             assertFailsWith<IllegalArgumentException> {
-                jsApiNoObjectValue.mapToNativeObject<TestJsApiInterface>(false)
+                jsApiNoObjectValue.createJavaToJsProxy<TestJsApiInterface>(false)
             }
             assertFailsWith<IllegalArgumentException> {
-                jsApiNoObjectValue.mapToNativeObject<TestJsApiInterface>(true)
+                jsApiNoObjectValue.createJavaToJsProxy<TestJsApiInterface>(true)
             }
-            jsApiEmptyObjectValue.mapToNativeObject<TestJsApiInterface>(false)  // do not fail
+            jsApiEmptyObjectValue.createJavaToJsProxy<TestJsApiInterface>(false)  // do not fail
             assertFailsWith<IllegalArgumentException> {
-                jsApiEmptyObjectValue.mapToNativeObject<TestJsApiInterface>(true)
+                jsApiEmptyObjectValue.createJavaToJsProxy<TestJsApiInterface>(true)
             }
         }
     }
 
     @Test
-    fun testRegisterNativeToJsInterfaceUnchecked() {
+    fun testRegisterJavaToJsInterfaceUnchecked() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
         val jsApiValue = JsValue(subject, """({
@@ -1879,9 +1879,9 @@ class JsBridgeTest {
         val jsApiEmptyObjectValue = JsValue(subject, "({})")
 
         // WHEN
-        val jsApi: TestJsApiInterface = jsApiValue.mapToNativeObject()
-        val jsApiNoObject: TestJsApiInterface = jsApiNoObjectValue.mapToNativeObject()
-        val jsApiEmptyObject: TestJsApiInterface = jsApiEmptyObjectValue.mapToNativeObject()
+        val jsApi: TestJsApiInterface = jsApiValue.createJavaToJsProxy()
+        val jsApiNoObject: TestJsApiInterface = jsApiNoObjectValue.createJavaToJsProxy()
+        val jsApiEmptyObject: TestJsApiInterface = jsApiEmptyObjectValue.createJavaToJsProxy()
 
         // THEN
         runBlocking {
@@ -1896,14 +1896,14 @@ class JsBridgeTest {
     }
 
     @Test
-    fun testRegisterNativeToJsInterfaceFromPromise() {
+    fun testRegisterJavaToJsInterfaceFromPromise() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
         val jsApiPromise = JsValue(subject, """
             new Promise(function(resolve) {
               resolve({
                 jsMethodWithString: function(msg) {
-                  nativeFunctionMock(msg);
+                  javaFunctionMock(msg);
                 }
               });
             });"""
@@ -1911,14 +1911,14 @@ class JsBridgeTest {
 
         // WHEN
         runBlocking {
-            val jsApi: TestJsApiInterface = jsApiPromise.await().mapToNativeObject()
+            val jsApi: TestJsApiInterface = jsApiPromise.await().createJavaToJsProxy()
             jsApi.jsMethodWithString("Hello JS!")
         }
 
         // THEN
         // Note: mockk verify with timeout has some issues on API < 24
         if (android.os.Build.VERSION.SDK_INT >= 24) {
-            verify(timeout = 1000) { jsToNativeFunctionMock(eq("Hello JS!")) }
+            verify(timeout = 1000) { jsToJavaFunctionMock(eq("Hello JS!")) }
         }
         assertTrue(errors.isEmpty())
     }
@@ -1930,26 +1930,26 @@ class JsBridgeTest {
         val testJsApi = JsValue(subject, """({
             jsMethodWithCallback: function(cb) { cb(); }
         })""")
-        val jsApi: TestJsApiInterface = testJsApi.mapToNativeObject()
+        val jsApi: TestJsApiInterface = testJsApi.createJavaToJsProxy()
 
         var callbackCalled = false
 
         // WHEN
         subject.release()
-        subject.evaluateUnsync("""nativeFunctionMock("Should not be called.");""")
+        subject.evaluateUnsync("""javaFunctionMock("Should not be called.");""")
         jsApi.jsMethodWithCallback { _, _, _, _, _, _, _, _, _ ->
             callbackCalled = true
             "CallbackRetVal"
         }
 
         // THEN
-        // The JS callback and the native method should not have been triggered because we have
+        // The JS callback and the Java method should not have been triggered because we have
         // destroyed the interpreter
         // (and the app should not crash ;))
         runBlocking {
             waitForDone(subject)
             assertFalse(callbackCalled)
-            verify(inverse = true) { jsToNativeFunctionMock(any()) }
+            verify(inverse = true) { jsToJavaFunctionMock(any()) }
         }
         assertTrue(errors.isEmpty())
 
@@ -1967,7 +1967,7 @@ class JsBridgeTest {
         // WHEN
         var js = ""
         for (i in 1..timeoutCount) {
-            js += """setTimeout(function() { nativeFunctionMock("timeout$i"); }, ${initialDelay + i * 10L});""" + "\n"
+            js += """setTimeout(function() { javaFunctionMock("timeout$i"); }, ${initialDelay + i * 10L});""" + "\n"
         }
 
         subject.evaluateUnsync(js)
@@ -1976,7 +1976,7 @@ class JsBridgeTest {
 
         // THEN
         // no event is sent immediately
-        verify(inverse = true) { jsToNativeFunctionMock(any()) }
+        verify(inverse = true) { jsToJavaFunctionMock(any()) }
 
         // AND THEN
         // events are sent in the right order
@@ -1984,7 +1984,7 @@ class JsBridgeTest {
         if (android.os.Build.VERSION.SDK_INT >= 24) {
             verify(ordering = Ordering.SEQUENCE, timeout = initialDelay + timeoutCount * 10L * 2) {
                 for (i in 1..timeoutCount) {
-                    jsToNativeFunctionMock("timeout$i")
+                    jsToJavaFunctionMock("timeout$i")
                 }
             }
         }
@@ -1998,7 +1998,7 @@ class JsBridgeTest {
         // GIVEN
         val subject = createAndSetUpJsBridge()
         val jsExpectations = JsExpectations()
-        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+        val jsExpectationsJsValue = JsValue.createJsToJavaProxy(subject, jsExpectations)
 
         // WHEN
         val js = """
@@ -2027,7 +2027,7 @@ class JsBridgeTest {
         // GIVEN
         val subject = createAndSetUpJsBridge()
         val jsExpectations = JsExpectations()
-        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+        val jsExpectationsJsValue = JsValue.createJsToJavaProxy(subject, jsExpectations)
 
         // WHEN
         val js = """
@@ -2056,7 +2056,7 @@ class JsBridgeTest {
         // GIVEN
         val subject = createAndSetUpJsBridge()
         val jsExpectations = JsExpectations()
-        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+        val jsExpectationsJsValue = JsValue.createJsToJavaProxy(subject, jsExpectations)
 
         // WHEN
         val js = """
@@ -2085,7 +2085,7 @@ class JsBridgeTest {
         // GIVEN
         val subject = createAndSetUpJsBridge()
         val jsExpectations = JsExpectations()
-        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+        val jsExpectationsJsValue = JsValue.createJsToJavaProxy(subject, jsExpectations)
 
         // WHEN
         val js = """
@@ -2114,7 +2114,7 @@ class JsBridgeTest {
         // GIVEN
         val subject = createAndSetUpJsBridge()
         val jsExpectations = JsExpectations()
-        val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
+        val jsExpectationsJsValue = JsValue.createJsToJavaProxy(subject, jsExpectations)
 
         // WHEN
         val js = """
@@ -2142,7 +2142,7 @@ class JsBridgeTest {
     fun testClearTimeout() {
         val events = mutableListOf<String>()
 
-        every { jsToNativeFunctionMock(any()) } answers {
+        every { jsToJavaFunctionMock(any()) } answers {
             events.add(args[0] as String)
         }
 
@@ -2152,14 +2152,14 @@ class JsBridgeTest {
         val js = """
             |var timeout2Id = null;
             |setTimeout(function() {
-            |  nativeFunctionMock("timeout1");
+            |  javaFunctionMock("timeout1");
             |  clearTimeout(timeout2Id);
             |}, 0);
             |timeout2Id = setTimeout(function() {
-            |  nativeFunctionMock("timeout2");
+            |  javaFunctionMock("timeout2");
             |}, 100);
             |setTimeout(function() {
-            |  nativeFunctionMock("timeout3");
+            |  javaFunctionMock("timeout3");
             |}, 100);
         """.trimMargin()
 
@@ -2170,7 +2170,7 @@ class JsBridgeTest {
             waitForDone(subject)
             delay(500)
         }
-        verify(exactly = 2) { jsToNativeFunctionMock(neq("timeout2")) }
+        verify(exactly = 2) { jsToJavaFunctionMock(neq("timeout2")) }
 
         // timeout1 should be skipped!
         assertEquals(2, events.size)
@@ -2190,7 +2190,7 @@ class JsBridgeTest {
             var timeoutId = null;
             timeoutId = setInterval(function() {
               console.log("Inside interval");
-              nativeFunctionMock("interval" + i);
+              javaFunctionMock("interval" + i);
               if (i == 3) {
                 clearInterval(timeoutId);
               }
@@ -2206,16 +2206,16 @@ class JsBridgeTest {
         // Note: mockk verify with ordering currently has some issues on API < 24
         if (android.os.Build.VERSION.SDK_INT >= 24) {
             verify(ordering = Ordering.SEQUENCE, timeout = 1000) {
-                jsToNativeFunctionMock(eq("interval1"))
-                jsToNativeFunctionMock(eq("interval2"))
-                jsToNativeFunctionMock(eq("interval3"))
+                jsToJavaFunctionMock(eq("interval1"))
+                jsToJavaFunctionMock(eq("interval2"))
+                jsToJavaFunctionMock(eq("interval3"))
             }
         }
 
         // Stop *after* interval3
         // Note: mockk verify with timeout has some issues on API < 24
         if (android.os.Build.VERSION.SDK_INT >= 24) {
-            verify(inverse = true, timeout = 1000) { jsToNativeFunctionMock(eq("interval4")) }
+            verify(inverse = true, timeout = 1000) { jsToJavaFunctionMock(eq("interval4")) }
         }
 
         assertTrue(errors.isEmpty())
@@ -2232,7 +2232,7 @@ class JsBridgeTest {
             var timeoutId = null;
             timeoutId = setInterval(function() {
               console.log("Inside interval");
-              nativeFunctionMock("interval" + i);
+              javaFunctionMock("interval" + i);
               if (i == 3) {
                 clearInterval(timeoutId);
               }
@@ -2248,16 +2248,16 @@ class JsBridgeTest {
         // Note: mockk verify with ordering currently has some issues on API < 24
         if (android.os.Build.VERSION.SDK_INT >= 24) {
             verify(ordering = Ordering.SEQUENCE, timeout = 1000) {
-                jsToNativeFunctionMock(eq("interval1"))
-                jsToNativeFunctionMock(eq("interval2"))
-                jsToNativeFunctionMock(eq("interval3"))
+                jsToJavaFunctionMock(eq("interval1"))
+                jsToJavaFunctionMock(eq("interval2"))
+                jsToJavaFunctionMock(eq("interval3"))
             }
         }
 
         // Stop *after* interval3
         // Note: mockk verify with timeout has some issues on API < 24
         if (android.os.Build.VERSION.SDK_INT >= 24) {
-            verify(inverse = true, timeout = 1000) { jsToNativeFunctionMock(eq("interval4")) }
+            verify(inverse = true, timeout = 1000) { jsToJavaFunctionMock(eq("interval4")) }
         }
 
         assertTrue(errors.isEmpty())
@@ -2274,7 +2274,7 @@ class JsBridgeTest {
             var timeoutId = null;
             timeoutId = setInterval(function() {
               console.log("Inside interval");
-              nativeFunctionMock("interval" + i);
+              javaFunctionMock("interval" + i);
               if (i == 3) {
                 clearInterval(timeoutId);
               }
@@ -2290,16 +2290,16 @@ class JsBridgeTest {
         // Note: mockk verify with ordering currently has some issues on API < 24
         if (android.os.Build.VERSION.SDK_INT >= 24) {
             verify(ordering = Ordering.SEQUENCE, timeout = 1000) {
-                jsToNativeFunctionMock(eq("interval1"))
-                jsToNativeFunctionMock(eq("interval2"))
-                jsToNativeFunctionMock(eq("interval3"))
+                jsToJavaFunctionMock(eq("interval1"))
+                jsToJavaFunctionMock(eq("interval2"))
+                jsToJavaFunctionMock(eq("interval3"))
             }
         }
 
         // Stop *after* interval3
         // Note: mockk verify with timeout has some issues on API < 24
         if (android.os.Build.VERSION.SDK_INT >= 24) {
-            verify(inverse = true, timeout = 1000) { jsToNativeFunctionMock(eq("interval4")) }
+            verify(inverse = true, timeout = 1000) { jsToJavaFunctionMock(eq("interval4")) }
         }
 
         assertTrue(errors.isEmpty())
@@ -2316,7 +2316,7 @@ class JsBridgeTest {
             var timeoutId = null;
             timeoutId = setInterval(function() {
               console.log("Inside interval");
-              nativeFunctionMock("interval" + i);
+              javaFunctionMock("interval" + i);
               if (i == 3) {
                 clearInterval(timeoutId);
               }
@@ -2332,16 +2332,16 @@ class JsBridgeTest {
         // Note: mockk verify with ordering currently has some issues on API < 24
         if (android.os.Build.VERSION.SDK_INT >= 24) {
             verify(ordering = Ordering.SEQUENCE, timeout = 1000) {
-                jsToNativeFunctionMock(eq("interval1"))
-                jsToNativeFunctionMock(eq("interval2"))
-                jsToNativeFunctionMock(eq("interval3"))
+                jsToJavaFunctionMock(eq("interval1"))
+                jsToJavaFunctionMock(eq("interval2"))
+                jsToJavaFunctionMock(eq("interval3"))
             }
         }
 
         // Stop *after* interval3
         // Note: mockk verify with timeout has some issues on API < 24
         if (android.os.Build.VERSION.SDK_INT >= 24) {
-            verify(inverse = true, timeout = 1000) { jsToNativeFunctionMock(eq("interval4")) }
+            verify(inverse = true, timeout = 1000) { jsToJavaFunctionMock(eq("interval4")) }
         }
 
         assertTrue(errors.isEmpty())
@@ -2358,7 +2358,7 @@ class JsBridgeTest {
             var timeoutId = null;
             timeoutId = setInterval(function() {
               console.log("Inside interval");
-              nativeFunctionMock("interval" + i);
+              javaFunctionMock("interval" + i);
               if (i == 3) {
                 clearInterval(timeoutId);
               }
@@ -2374,16 +2374,16 @@ class JsBridgeTest {
         // Note: mockk verify with ordering currently has some issues on API < 24
         if (android.os.Build.VERSION.SDK_INT >= 24) {
             verify(ordering = Ordering.SEQUENCE, timeout = 1000) {
-                jsToNativeFunctionMock(eq("interval1"))
-                jsToNativeFunctionMock(eq("interval2"))
-                jsToNativeFunctionMock(eq("interval3"))
+                jsToJavaFunctionMock(eq("interval1"))
+                jsToJavaFunctionMock(eq("interval2"))
+                jsToJavaFunctionMock(eq("interval3"))
             }
         }
 
         // Stop *after* interval3
         // Note: mockk verify with timeout has some issues on API < 24
         if (android.os.Build.VERSION.SDK_INT >= 24) {
-            verify(inverse = true, timeout = 1000) { jsToNativeFunctionMock(eq("interval4")) }
+            verify(inverse = true, timeout = 1000) { jsToJavaFunctionMock(eq("interval4")) }
         }
 
         assertTrue(errors.isEmpty())
@@ -2416,8 +2416,8 @@ class JsBridgeTest {
             |    if (parts.length === 2) acc[parts[0]] = parts[1];
             |    return acc;
             |  }, {});
-            |  nativeFunctionMock(JSON.stringify(xhr.response));
-            |  nativeFunctionMock(JSON.stringify(headers));
+            |  javaFunctionMock(JSON.stringify(xhr.response));
+            |  javaFunctionMock(JSON.stringify(headers));
             |}""".trimMargin()
         subject.evaluateUnsync(js)
 
@@ -2425,7 +2425,7 @@ class JsBridgeTest {
         // Note: mock verify with ordering currently has some issues on API < 24
         if (android.os.Build.VERSION.SDK_INT >= 24) {
             verify(timeout = 2000, ordering = Ordering.SEQUENCE) {
-                jsToNativeFunctionMock(match { responseJson ->
+                jsToJavaFunctionMock(match { responseJson ->
                     assertNotNull(responseJson)
                     val responseObject = PayloadObject.fromJsonString(responseJson as String)
                     assertNotNull(responseObject)
@@ -2435,7 +2435,7 @@ class JsBridgeTest {
                     true
                 })
 
-                jsToNativeFunctionMock(match { headersJson ->
+                jsToJavaFunctionMock(match { headersJson ->
                     val responseHeadersObject = PayloadObject.fromJsonString(headersJson as String)
                     assertNotNull(responseHeadersObject)
                     assertEquals(2, responseHeadersObject.keyCount)
@@ -2481,8 +2481,8 @@ class JsBridgeTest {
             |    if (parts.length === 2) acc[parts[0]] = parts[1];
             |    return acc;
             |  }, {});
-            |  nativeFunctionMock(JSON.stringify(xhr.response));
-            |  nativeFunctionMock(JSON.stringify(headers));
+            |  javaFunctionMock(JSON.stringify(xhr.response));
+            |  javaFunctionMock(JSON.stringify(headers));
             |}""".trimMargin()
         subject.evaluateUnsync(js)
 
@@ -2490,7 +2490,7 @@ class JsBridgeTest {
         // Note: mock verify with ordering currently has some issues on API < 24
         if (android.os.Build.VERSION.SDK_INT >= 24) {
             verify(timeout = 2000, ordering = Ordering.SEQUENCE) {
-                jsToNativeFunctionMock(match { responseJson ->
+                jsToJavaFunctionMock(match { responseJson ->
                     assertNotNull(responseJson)
                     val responseObject = PayloadObject.fromJsonString(responseJson as String)
                     assertNotNull(responseObject)
@@ -2500,7 +2500,7 @@ class JsBridgeTest {
                     true
                 })
 
-                jsToNativeFunctionMock(match { headersJson ->
+                jsToJavaFunctionMock(match { headersJson ->
                     val responseHeadersObject = PayloadObject.fromJsonString(headersJson as String)
                     assertNotNull(responseHeadersObject)
                     assertEquals(2, responseHeadersObject.keyCount)
@@ -2534,10 +2534,10 @@ class JsBridgeTest {
             req.open("GET", "$url");
             req.send();
             req.onload = function() {
-                nativeFunctionMock("loaded");
+                javaFunctionMock("loaded");
             }
             req.onabort = function() {
-                nativeFunctionMock("aborted");
+                javaFunctionMock("aborted");
             }
             req.abort();
             """
@@ -2546,9 +2546,9 @@ class JsBridgeTest {
         // THEN
         // Note: mockk verify with timeout has some issues on API < 24
         if (android.os.Build.VERSION.SDK_INT >= 24) {
-            verify(timeout = 2000) { jsToNativeFunctionMock(eq("aborted")) }
+            verify(timeout = 2000) { jsToJavaFunctionMock(eq("aborted")) }
         }
-        verify(inverse = true) { jsToNativeFunctionMock(eq("loaded")) }
+        verify(inverse = true) { jsToJavaFunctionMock(eq("loaded")) }
         assertTrue(errors.isEmpty())
     }
 
@@ -2563,10 +2563,10 @@ class JsBridgeTest {
             req.open("GET", "invalid url");
             req.send();
             req.onload = function() {
-                nativeFunctionMock("loaded");
+                javaFunctionMock("loaded");
             }
             req.onerror = function() {
-                nativeFunctionMock("XHR error: " + req.responseText);
+                javaFunctionMock("XHR error: " + req.responseText);
             }
             """
         subject.evaluateUnsync(js)
@@ -2574,9 +2574,9 @@ class JsBridgeTest {
         // THEN
         // Note: mockk verify with timeout has some issues on API < 24
         if (android.os.Build.VERSION.SDK_INT >= 24) {
-            verify(timeout = 2000) { jsToNativeFunctionMock(eq("XHR error: Cannot parse URL: invalid url")) }
+            verify(timeout = 2000) { jsToJavaFunctionMock(eq("XHR error: Cannot parse URL: invalid url")) }
         }
-        verify(inverse = true) { jsToNativeFunctionMock(eq("loaded")) }
+        verify(inverse = true) { jsToJavaFunctionMock(eq("loaded")) }
         assertTrue(errors.isEmpty())
     }
 
@@ -2718,40 +2718,40 @@ class JsBridgeTest {
     data class EmbeddedObject(val a: Int, val b: String)
 
     @Test
-    fun testWrapNativeObject() {
+    fun testWrapJavaObject() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
         val embeddedObject = EmbeddedObject(1, "two");
-        val jsEmbeddedObject = JsValue.fromNativeValue(subject, NativeObjectWrapper(embeddedObject))
+        val jsEmbeddedObject = JsValue.fromJavaValue(subject, JavaObjectWrapper(embeddedObject))
         val jsNull = JsValue(subject, "null")
 
         // WHEN
-        val objectBack: NativeObjectWrapper<EmbeddedObject> = jsEmbeddedObject.evaluateBlocking()
-        val nullObjectBack: NativeObjectWrapper<EmbeddedObject?> = jsNull.evaluateBlocking()
+        val objectBack: JavaObjectWrapper<EmbeddedObject> = jsEmbeddedObject.evaluateBlocking()
+        val nullObjectBack: JavaObjectWrapper<EmbeddedObject?> = jsNull.evaluateBlocking()
 
         // THEN
         assertSame(embeddedObject, objectBack.obj)
         assertSame(null, nullObjectBack.obj)
     }
 
-    interface SimpleJsToNativeInterface : JsToNativeInterface {
+    interface SimpleJsToJavaInterface : JsToJavaInterface {
         fun ping(): String
     }
 
     @Test
-    fun testJsToNativeProxy() {
+    fun testJsToJavaProxy() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
-        val nativeObject = object : SimpleJsToNativeInterface {
+        val javaObject = object : SimpleJsToJavaInterface {
             override fun ping() = "pong"
         }
-        val jsToNativeProxy = JsValue.fromNativeObject(subject, nativeObject)
+        val jsToJavaProxy = JsValue.createJsToJavaProxy(subject, javaObject)
 
         // WHEN
-        val objectBack: JsToNativeProxy<SimpleJsToNativeInterface> = jsToNativeProxy.evaluateBlocking()
+        val objectBack: JsToJavaProxy<SimpleJsToJavaInterface> = jsToJavaProxy.evaluateBlocking()
 
         // THEN
-        assertSame(nativeObject, objectBack.obj)
+        assertSame(javaObject, objectBack.obj)
 
         runBlocking {
             waitForDone(subject)
@@ -2762,7 +2762,7 @@ class JsBridgeTest {
     // JsExpectations
     // ---
 
-    class JsExpectations: JsExpectationsNativeApi {
+    class JsExpectations: JsExpectationsJavaApi {
         val expectations = mutableMapOf<String, JsValue>()
         val isEmpty: Boolean = expectations.isEmpty()
 
@@ -2811,9 +2811,9 @@ class JsBridgeTest {
 
             jsBridge.registerErrorListener(createErrorListener())
 
-            // Map "jsToNativeFunctionMock" to JS as a global var "NativeFunctionMock"
-            JsValue.fromNativeFunction1(jsBridge, jsToNativeFunctionMock)
-                .assignToGlobal("nativeFunctionMock")
+            // Map "jsToJavaFunctionMock" to JS as a global var "JavaFunctionMock"
+            JsValue.createJsToJavaProxyFunction1(jsBridge, jsToJavaFunctionMock)
+                .assignToGlobal("javaFunctionMock")
         }
     }
 

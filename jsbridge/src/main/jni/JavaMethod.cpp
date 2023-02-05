@@ -210,7 +210,7 @@ JValue JavaMethod::callLambda(const JsBridgeContext *jsBridgeContext, const JniR
     argArray.setElement(i++, argLocalRef);
   }
 
-  JniLocalRef<jobject> ret = jniCache->getMethodInterface(method).callNativeLambda(javaThis, argArray);
+  JniLocalRef<jobject> ret = jniCache->getMethodInterface(method).callJavaLambda(javaThis, argArray);
 
   if (jniContext->exceptionCheck()) {
     throw JniException(jniContext);

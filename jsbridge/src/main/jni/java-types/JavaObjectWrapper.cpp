@@ -16,7 +16,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "NativeObjectWrapper.h"
+#include "JavaObjectWrapper.h"
 
 #include "JavaObject.h"
 #include "JsBridgeContext.h"
@@ -28,8 +28,8 @@
 
 namespace JavaTypes {
 
-NativeObjectWrapper::NativeObjectWrapper(const JsBridgeContext *jsBridgeContext)
- : JavaType(jsBridgeContext, JavaTypeId::NativeObjectWrapper) {
+JavaObjectWrapper::JavaObjectWrapper(const JsBridgeContext *jsBridgeContext)
+ : JavaType(jsBridgeContext, JavaTypeId::JavaObjectWrapper) {
 
 }
 
@@ -37,7 +37,7 @@ NativeObjectWrapper::NativeObjectWrapper(const JsBridgeContext *jsBridgeContext)
 
 #include "StackChecker.h"
 
-JValue NativeObjectWrapper::pop() const {
+JValue JavaObjectWrapper::pop() const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
   if (!duk_is_object(m_ctx, -1) && !duk_is_undefined(m_ctx, -1) && !duk_is_null(m_ctx, -1)) {
@@ -47,50 +47,50 @@ JValue NativeObjectWrapper::pop() const {
 
   JniLocalRef<jobject> javaWrapperObject;
   auto javaWrappedObject = JavaObject::getJavaThis(m_jsBridgeContext, -1);
-  auto javaObject = getJniCache()->nativeObjectWrapperFromJavaObject(javaWrappedObject);
+  auto javaObject = getJniCache()->javaObjectWrapperFromJavaObject(javaWrappedObject);
   duk_pop(m_ctx);
 
   return JValue(javaObject);
 }
 
-duk_ret_t NativeObjectWrapper::push(const JValue &value) const {
+duk_ret_t JavaObjectWrapper::push(const JValue &value) const {
   CHECK_STACK_OFFSET(m_ctx, 1);
 
-  const JniLocalRef<jobject> &javaNativeObjectWrapper = value.getLocalRef();
+  const JniLocalRef<jobject> &javaJavaObjectWrapper = value.getLocalRef();
 
-  if (javaNativeObjectWrapper.isNull()) {
+  if (javaJavaObjectWrapper.isNull()) {
     duk_push_null(m_ctx);
     return 1;
   }
 
-  auto javaWrappedObject = getJniCache()->getNativeObjectWrapperJavaObject(javaNativeObjectWrapper);
-  return JavaObject::push(m_jsBridgeContext, "<wrappedNativeObject>", javaWrappedObject);
+  auto javaWrappedObject = getJniCache()->getJavaObjectWrapperJavaObject(javaJavaObjectWrapper);
+  return JavaObject::push(m_jsBridgeContext, "<wrappedJavaObject>", javaWrappedObject);
 }
 
 #elif defined(QUICKJS)
 
 #include "QuickJsUtils.h"
 
-JValue NativeObjectWrapper::toJava(JSValueConst v) const {
+JValue JavaObjectWrapper::toJava(JSValueConst v) const {
   if (!JS_IsObject(v) && !JS_IsNull(v) && !JS_IsUndefined(v)) {
     return JValue();
   }
 
   auto javaWrappedObject = JavaObject::getJavaThis(m_jsBridgeContext, v);
-  auto javaObject = getJniCache()->nativeObjectWrapperFromJavaObject(javaWrappedObject);
+  auto javaObject = getJniCache()->javaObjectWrapperFromJavaObject(javaWrappedObject);
 
   return JValue(javaObject);
 }
 
-JSValue NativeObjectWrapper::fromJava(const JValue &value) const {
-  const JniLocalRef<jobject> &javaNativeObjectWrapper = value.getLocalRef();
+JSValue JavaObjectWrapper::fromJava(const JValue &value) const {
+  const JniLocalRef<jobject> &javaJavaObjectWrapper = value.getLocalRef();
 
-  if (javaNativeObjectWrapper.isNull()) {
+  if (javaJavaObjectWrapper.isNull()) {
     return JS_NULL;
   }
 
-  auto javaWrappedObject = getJniCache()->getNativeObjectWrapperJavaObject(javaNativeObjectWrapper);
-  return JavaObject::create(m_jsBridgeContext, "<wrappedNativeObject>", javaWrappedObject);
+  auto javaWrappedObject = getJniCache()->getJavaObjectWrapperJavaObject(javaJavaObjectWrapper);
+  return JavaObject::create(m_jsBridgeContext, "<wrappedJavaObject>", javaWrappedObject);
 }
 
 #endif

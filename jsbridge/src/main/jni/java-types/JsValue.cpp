@@ -37,7 +37,7 @@ JsValue::JsValue(const JsBridgeContext *jsBridgeContext, bool isNullable)
 
 #include "StackChecker.h"
 
-// JS to native JsValue
+// JS to Java JsValue
 JValue JsValue::pop() const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
@@ -64,7 +64,7 @@ JValue JsValue::pop() const {
   return JValue(jsValue);
 }
 
-// Native JsValue to JS
+// Java JsValue to JS
 duk_ret_t JsValue::push(const JValue &value) const {
   CHECK_STACK_OFFSET(m_ctx, 1);
 

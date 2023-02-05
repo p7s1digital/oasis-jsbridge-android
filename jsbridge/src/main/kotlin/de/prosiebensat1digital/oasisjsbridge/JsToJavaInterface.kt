@@ -15,5 +15,5 @@
  */
 package de.prosiebensat1digital.oasisjsbridge
 
-interface JsToNativeInterface
+interface JsToJavaInterface
 

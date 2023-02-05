@@ -2,11 +2,11 @@ package de.prosiebensat1digital.oasisjsbridge.extensions
 
 import android.content.Context
 
-import de.prosiebensat1digital.oasisjsbridge.JsToNativeInterface
+import de.prosiebensat1digital.oasisjsbridge.JsToJavaInterface
 import de.prosiebensat1digital.oasisjsbridge.JsonObjectWrapper
 import timber.log.Timber
 
-interface LocalStorageInteface : JsToNativeInterface {
+interface LocalStorageInteface : JsToJavaInterface {
     fun setItem(keyName: JsonObjectWrapper, keyValue: JsonObjectWrapper)
     fun getItem(keyName: JsonObjectWrapper): JsonObjectWrapper
     fun removeItem(keyName: JsonObjectWrapper)

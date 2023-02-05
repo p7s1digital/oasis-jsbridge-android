@@ -24,7 +24,6 @@ import timber.log.Timber;
 import static org.junit.Assert.assertEquals;
 
 import android.content.Context;
-import android.os.RemoteException;
 
 // Minimal test for using JsBridge from Java
 public final class JsBridgeJavaTest {
@@ -68,15 +67,15 @@ public final class JsBridgeJavaTest {
         assertEquals(sumString, "1.5 + 2");
     }
 
-    interface NativeApi extends JsToNativeInterface {
+    interface JavaApi extends JsToJavaInterface {
         int calcSum(int a, int b);
     }
 
     @Test
-    public void testRegisterJsToNative() {
+    public void testRegisterJsToJava() {
         // GIVEN
         JsBridge subject = createAndSetUpJsBridge();
-        NativeApi nativeApi = new NativeApi() {
+        JavaApi javaApi = new JavaApi() {
             @Override
             public int calcSum(int a, int b) {
                 return a + b;
@@ -84,12 +83,12 @@ public final class JsBridgeJavaTest {
         };
 
         // WHEN
-        JsValue nativeApiJsValue = JsValue.fromNativeObject(subject, nativeApi, NativeApi.class);
+        JsValue javaApiJsValue = JsValue.createJsToJavaProxy(subject, javaApi, JavaApi.class);
 
         // THEN
         Integer sum = (Integer) subject.evaluateBlocking(
-                "var nativeApi = " + nativeApiJsValue + ";\n" +
-                    "nativeApi.calcSum(2, 3);\n",
+                "var javaApi = " + javaApiJsValue + ";\n" +
+                    "javaApi.calcSum(2, 3);\n",
                 Integer.class
         );
 
@@ -97,22 +96,22 @@ public final class JsBridgeJavaTest {
         assertEquals(sum, new Integer(5));
     }
 
-    interface JsApi extends NativeToJsInterface {
+    interface JsApi extends JavaToJsInterface {
         int calcSum(int a, int b);
     }
 
     @Test
-    public void testRegisterNativeToJs() {
+    public void testRegisterJavaToJs() {
         // GIVEN
         JsBridge subject = createAndSetUpJsBridge();
-        JsValue nativeApiJsValue = new JsValue(subject,
+        JsValue javaApiJsValue = new JsValue(subject,
                 "({\n" +
                         "  calcSum: function(a, b) { return a + b; }\n" +
                         "})\n"
         );
 
         // THEN
-        JsApi jsApi = nativeApiJsValue.mapToNativeObject(JsApi.class);
+        JsApi jsApi = javaApiJsValue.createJavaToJsProxy(JsApi.class);
         int sum = jsApi.calcSum(6, 4);
 
         // THEN

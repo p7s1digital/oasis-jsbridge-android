@@ -50,7 +50,7 @@ namespace {
       const JniContext *jniContext = jsBridgeContext->getJniContext();
       const JniCache *jniCache = jsBridgeContext->getJniCache();
 
-      // Complete the native Deferred
+      // Complete the Java Deferred
       jniCache->getJsBridgeInterface().resolveDeferred(payload->javaDeferred, value);
       if (jniContext->exceptionCheck()) {
         throw JniException(jniContext);
@@ -77,7 +77,7 @@ namespace {
       JsException jsException(jsBridgeContext, argc > 0 ? JS_DupValue(ctx, *argv) : JS_NULL);
       JValue value(exceptionHandler->getJavaException(jsException));
 
-      // Reject the native Deferred
+      // Reject the Java Deferred
       jniCache->getJsBridgeInterface().rejectDeferred(payload->javaDeferred, value);
       if (jniContext->exceptionCheck()) {
         throw JniException(jniContext);
@@ -116,12 +116,12 @@ Deferred::Deferred(const JsBridgeContext *jsBridgeContext, std::unique_ptr<const
  , m_componentType(std::move(componentType)) {
 }
 
-// JS Promise to native Deferred
+// JS Promise to Java Deferred
 JValue Deferred::toJava(JSValueConst v) const {
   const QuickJsUtils *utils = m_jsBridgeContext->getUtils();
   assert(utils != nullptr);
 
-  // Create a native Deferred instance
+  // Create a Java Deferred instance
   JniLocalRef<jobject> javaDeferred = getJniCache()->getJsBridgeInterface().createCompletableDeferred();
   if (m_jniContext->exceptionCheck()) {
     throw JniException(m_jniContext);
@@ -129,7 +129,7 @@ JValue Deferred::toJava(JSValueConst v) const {
 
   bool isPromise = JS_IsObject(v) && utils->hasPropertyStr(v, "then");
   if (!isPromise) {
-    // Not a Promise => directly resolve the native Deferred with the value
+    // Not a Promise => directly resolve the Java Deferred with the value
     JValue value = m_componentType->toJava(v);
 
     getJniCache()->getJsBridgeInterface().resolveDeferred(javaDeferred, value);
@@ -183,7 +183,7 @@ JValue Deferred::toJava(JSValueConst v) const {
   return JValue(javaDeferred);
 }
 
-// Native Deferred to JS Promise
+// Java Deferred to JS Promise
 JSValue Deferred::fromJava(const JValue &value) const {
   const JniLocalRef<jobject> &jDeferred = value.getLocalRef();
 

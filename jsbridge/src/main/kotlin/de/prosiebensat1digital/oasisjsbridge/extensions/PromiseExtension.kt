@@ -36,7 +36,7 @@ internal class PromiseExtension(
     }
 
     private fun setUpPolyfill() {
-        onUnhandledPromiseRejectedJsValue = JsValue.fromNativeFunction3(jsBridge) { json: JsonObjectWrapper, message: String, stacktrace: String ->
+        onUnhandledPromiseRejectedJsValue = JsValue.createJsToJavaProxyFunction3(jsBridge) { json: JsonObjectWrapper, message: String, stacktrace: String ->
             val e = JsBridgeError.UnhandledJsPromiseError(JsException(json.jsonString, message, stacktrace, null))
             jsBridge.notifyErrorListeners(e)
         }

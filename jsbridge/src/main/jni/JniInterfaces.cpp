@@ -108,9 +108,9 @@ JStringLocalRef MethodInterface::getName() const {
   return m_jniCache->getJniContext()->callStringMethod(m_object, methodId);
 }
 
-JniLocalRef<jobject> MethodInterface::callNativeLambda(const JniRef<jobject> &lambda, const JObjectArrayLocalRef &args) const {
+JniLocalRef<jobject> MethodInterface::callJavaLambda(const JniRef<jobject> &lambda, const JObjectArrayLocalRef &args) const {
   static thread_local jmethodID methodId = m_jniCache->getJniContext()->getMethodID(
-          m_class, "callNativeLambda",
+          m_class, "callJavaLambda",
           "(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
 
   return m_jniCache->getJniContext()->callObjectMethod(m_object, methodId, lambda, args);

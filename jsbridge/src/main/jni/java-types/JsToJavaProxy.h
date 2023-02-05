@@ -16,8 +16,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef _JSBRIDGE_JAVATYPES_NATIVEOBJECTWRAPPER_H
-#define _JSBRIDGE_JAVATYPES_NATIVEOBJECTWRAPPER_H
+#ifndef _JSBRIDGE_JAVATYPES_JSTOJAVAPROXY_H
+#define _JSBRIDGE_JAVATYPES_JSTOJAVAPROXY_H
 
 #include "JavaType.h"
 
@@ -25,10 +25,10 @@ class JsBridgeContext;
 
 namespace JavaTypes {
 
-class NativeObjectWrapper : public JavaType {
+class JsToJavaProxy : public JavaType {
 
 public:
-  NativeObjectWrapper(const JsBridgeContext *);
+  JsToJavaProxy(const JsBridgeContext *);
 
 #if defined(DUKTAPE)
   JValue pop() const override;

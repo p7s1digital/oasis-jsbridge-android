@@ -48,7 +48,7 @@ namespace {
       alog_info("Debugger detached, udata: %p\n", udata);
   }
 
-  // Native functions called from JS
+  // Java functions called from JS
   // ---
   extern "C" {
     void fatalErrorHandler(void *, const char* msg) {

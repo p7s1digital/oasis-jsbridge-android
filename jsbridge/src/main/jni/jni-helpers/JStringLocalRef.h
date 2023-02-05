@@ -25,7 +25,7 @@
 #include <cstring>
 #include <string>
 
-// Same as LocalRef<jstring> with additional conversion from/to native string
+// Same as LocalRef<jstring> with additional conversion from/to Java string
 class JStringLocalRef : public JniLocalRef<jstring> {
 public:
   JStringLocalRef()

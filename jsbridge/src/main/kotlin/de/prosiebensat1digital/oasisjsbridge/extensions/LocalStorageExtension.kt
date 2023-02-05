@@ -28,9 +28,8 @@ internal class LocalStorageExtension(
 
     init {
         if (config.useDefaultLocalStorage) {
-            val localStorageJsValue: JsValue
             val localStorage: LocalStorageInteface = LocalStorage(context)
-            localStorageJsValue = JsValue.fromNativeObject(jsBridge, localStorage)
+            val localStorageJsValue = JsValue.createJsToJavaProxy(jsBridge, localStorage)
             localStorageJsValue.assignToGlobal("localStorage")
         }
     }

@@ -43,7 +43,7 @@ namespace {
       JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
       assert(jsBridgeContext != nullptr);
 
-      // Get the bound native Deferred instance and the generic argument loader
+      // Get the bound Java Deferred instance and the generic argument loader
       duk_push_current_function(ctx);
 
       if (!duk_get_prop_string(ctx, -1, PAYLOAD_PROP_NAME)) {
@@ -64,7 +64,7 @@ namespace {
         const JniContext *jniContext = jsBridgeContext->getJniContext();
         const JniCache *jniCache = jsBridgeContext->getJniCache();
 
-        // Complete the native Deferred
+        // Complete the Java Deferred
         jniCache->getJsBridgeInterface().resolveDeferred(payload->javaDeferred, value);
         if (jniContext->exceptionCheck()) {
           throw JniException(jniContext);
@@ -86,7 +86,7 @@ namespace {
       JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
       assert(jsBridgeContext != nullptr);
 
-      // Get the bound native Deferred instance and the generic argument loader
+      // Get the bound Java Deferred instance and the generic argument loader
       duk_push_current_function(ctx);
 
       if (!duk_get_prop_string(ctx, -1, PAYLOAD_PROP_NAME)) {
@@ -110,7 +110,7 @@ namespace {
           duk_pop(ctx);  // value
         }
 
-        // Reject the native Deferred
+        // Reject the Java Deferred
         jniCache->getJsBridgeInterface().rejectDeferred(payload->javaDeferred, value);
         if (jniContext->exceptionCheck()) {
           throw JniException(jniContext);
@@ -191,18 +191,18 @@ Deferred::Deferred(const JsBridgeContext *jsBridgeContext, std::unique_ptr<const
  , m_componentType(std::move(componentType)) {
 }
 
-// JS Promise to native Deferred
+// JS Promise to Java Deferred
 JValue Deferred::pop() const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
-  // Create a native Deferred instance
+  // Create a Java Deferred instance
   JniLocalRef<jobject> javaDeferred = getJniCache()->getJsBridgeInterface().createCompletableDeferred();
   if (m_jniContext->exceptionCheck()) {
     throw JniException(m_jniContext);
   }
 
   if (!duk_is_object(m_ctx, -1) || !duk_has_prop_string(m_ctx, -1, "then")) {
-    // Not a Promise => directly resolve the native Deferred with the value
+    // Not a Promise => directly resolve the Java Deferred with the value
     JValue value = m_componentType->pop();
 
     getJniCache()->getJsBridgeInterface().resolveDeferred(javaDeferred, value);
@@ -253,7 +253,7 @@ JValue Deferred::pop() const {
   return JValue(javaDeferred);
 }
 
-// Native Deferred to JS Promise
+// Java Deferred to JS Promise
 duk_ret_t Deferred::push(const JValue &value) const {
   CHECK_STACK_OFFSET(m_ctx, 1);
 
