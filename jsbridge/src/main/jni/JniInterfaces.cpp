@@ -90,6 +90,12 @@ void JsBridgeInterface::setUpJsPromise(const JStringLocalRef &name, const JniRef
   m_jniCache->getJniContext()->callVoidMethod(m_object, methodId, name, deferred);
 }
 
+void JsBridgeInterface::addUnhandledJsPromiseException(const JValue &exception) const {
+  static thread_local jmethodID methodId = m_jniCache->getJniContext()->getMethodID(
+          m_class, "addUnhandledJsPromiseException", "(L" JSBRIDGE_PKG_PATH "/JsException;)V");
+  m_jniCache->getJniContext()->callVoidMethod(m_object, methodId, exception);
+}
+
 
 // MethodInterface
 // ---

@@ -1043,6 +1043,7 @@ class JsBridge
                 // Before completing the promise, we want to ensure that pending operations
                 // which has just been triggered (e.g. assigning a JsValue) can be done in the
                 // JS thread before.
+		yield()
 
                 isFulfilled = true
                 result
@@ -1054,6 +1055,12 @@ class JsBridge
             jniCompleteJsPromise(jniJsContext, id, isFulfilled, promiseValue)
             processPromiseQueue()
         }
+    }
+
+    @Suppress("UNUSED")  // Called from JNI
+    private fun addUnhandledJsPromiseException(exception: JsException) {
+        val e = UnhandledJsPromiseError(exception)
+        notifyErrorListeners(e)
     }
 
     private fun launchInJsThread(block: suspend () -> Unit) {

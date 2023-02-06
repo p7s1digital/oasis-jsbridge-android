@@ -70,6 +70,19 @@ namespace {
 
     return m;
   }
+
+  void promiseRejectionTracker(JSContext *ctx, JSValueConst promise, JSValueConst reason, JS_BOOL isHandled, void *opaque) {
+    if (isHandled) return;
+
+    JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
+    const ExceptionHandler *exceptionHandler = jsBridgeContext->getExceptionHandler();
+
+    JsException jsException(jsBridgeContext, JS_DupValue(ctx, reason));
+    JValue value(exceptionHandler->getJavaException(jsException));
+
+    // Reject the Java Deferred
+    jsBridgeContext->getJniCache()->getJsBridgeInterface().addUnhandledJsPromiseException(value);
+  }
 }
 
 
@@ -109,6 +122,9 @@ void JsBridgeContext::init(JniContext *jniContext, const JniLocalRef<jobject> &j
   JS_SetPropertyStr(m_ctx, globalObj, JSBRIDGE_CPP_CLASS_PROP_NAME, cppWrapperObj);
   // No JS_FreeValue(m_ctx, cppWrapperObj) after JS_SetPropertyStr()
   JS_FreeValue(m_ctx, globalObj);
+
+  // Unhandled promise exceptions
+  JS_SetHostPromiseRejectionTracker(m_runtime, promiseRejectionTracker, nullptr);
 }
 
 void JsBridgeContext::startDebugger(int /*port*/) {
