@@ -54,6 +54,7 @@ public:
   void rejectDeferred(const JniRef<jobject> &javaDeferred, const JValue &exception) const;
   JniLocalRef<jobject> createCompletableDeferred() const;
   void setUpJsPromise(const JStringLocalRef &, const JniRef<jobject> &deferred) const;
+  void addUnhandledJsPromiseException(const JValue &exception) const;
 };
 
 // de.prosiebensat1digital.oasisjsbridge.Method

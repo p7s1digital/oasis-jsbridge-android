@@ -699,11 +699,6 @@ class JsBridgeTest {
 
     @Test
     fun testUnhandledPromiseRejection() {
-        if (BuildConfig.FLAVOR == "quickjs") {
-            // Not supported (yet) on QuickJS
-            return
-        }
-
         // GIVEN
         val subject = createAndSetUpJsBridge()
 
