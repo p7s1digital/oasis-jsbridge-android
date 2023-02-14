@@ -216,6 +216,37 @@ class PayloadObjectTest {
     }
 
     @Test
+    fun payload() {
+        val truePayload = Payload.fromJsonString("true")
+        assertNotNull(truePayload)
+        assertEquals(true, truePayload.booleanValue())
+
+        val falsePayload = Payload.fromJsonString("false")
+        assertNotNull(falsePayload)
+        assertEquals(false, falsePayload.booleanValue())
+
+        val stringPayload = Payload.fromJsonString("testString")
+        assertNotNull(stringPayload)
+        assertEquals("testString", falsePayload.stringValue())
+
+        val intPayload = Payload.fromJsonString("123")
+        assertNotNull(intPayload)
+        assertEquals(123, intPayload.intValue())
+
+        val doublePayload = Payload.fromJsonString("456.789")
+        assertNotNull(doublePayload)
+        assertEquals(456.789, doublePayload.doubleValue()!!, 0.0001)
+
+        val objectPayload = Payload.fromJsonString("""{"a": 1, "b": "two"}""")
+        assertTrue(objectPayload is PayloadObject)
+        assertEquals(mapOf("a" to 1, "b" to "two"), objectPayload.toMap())
+
+        val arrayPayload = Payload.fromJsonString("[1, 2, 3]")
+        assertTrue(arrayPayload is PayloadArray)
+        assertEquals(arrayOf<Any?>(1, 2, 3), arrayPayload.array)
+    }
+
+    @Test
     fun setValues() {
         // WHEN
         val subject = PayloadObject()

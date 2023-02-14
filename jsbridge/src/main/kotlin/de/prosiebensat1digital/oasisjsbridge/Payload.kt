@@ -36,6 +36,7 @@ interface Payload {
                     is String -> PayloadString(nextValue)
                     is Double -> PayloadNumber(nextValue)
                     is Int -> PayloadNumber(nextValue)
+                    is Boolean -> PayloadBoolean(nextValue)
                     else -> null
                 }
             } catch (e: Exception) {
@@ -51,10 +52,17 @@ interface Payload {
     fun toJsString(orderAlphabetically: Boolean = false): String
     fun toJsonString(orderAlphabetically: Boolean = false): String
 
+    fun booleanValue() = (this as? PayloadBoolean)?.value
     fun stringValue() = (this as? PayloadString)?.value
     fun intValue() = (this as? PayloadNumber)?.value?.toInt()
     fun doubleValue() = (this as? PayloadNumber)?.value?.toDouble()
     fun isNull() = (this as? PayloadNull) != null
+}
+
+@JvmInline
+value class PayloadBoolean(val value: Boolean): Payload {
+    override fun toJsString(orderAlphabetically: Boolean) = if (value) "true" else "false"
+    override fun toJsonString(orderAlphabetically: Boolean) = if (value) "true" else "false"
 }
 
 @JvmInline
