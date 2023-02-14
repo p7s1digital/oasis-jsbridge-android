@@ -55,7 +55,7 @@ internal class XMLHttpRequestExtension(
         data: String?,
         cb: (JsonObjectWrapper, String, String) -> Unit
     ) {
-        Timber.v("javaSend($httpMethod, $url, $headers)")
+        Timber.v("javaSend($httpMethod, $url, $headers, $timeoutMs)")
 
         jsBridge.launch(Dispatchers.IO) {
             // Load URL and evaluate JS string
