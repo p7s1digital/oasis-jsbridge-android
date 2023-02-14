@@ -2528,12 +2528,9 @@ class JsBridgeTest {
             var req = new XMLHttpRequest();
             req.open("GET", "$url");
             req.send();
-            req.onload = function() {
-                javaFunctionMock("loaded");
-            }
-            req.onabort = function() {
-                javaFunctionMock("aborted");
-            }
+            req.onload = function() { javaFunctionMock("loaded"); }
+            req.onabort = function() { javaFunctionMock("aborted"); }
+            req.ontimeout = function() { javaFunctionMock("timeout"); }
             req.abort();
             """
         subject.evaluateUnsync(js)
@@ -2557,12 +2554,9 @@ class JsBridgeTest {
             var req = new XMLHttpRequest();
             req.open("GET", "invalid url");
             req.send();
-            req.onload = function() {
-                javaFunctionMock("loaded");
-            }
-            req.onerror = function() {
-                javaFunctionMock("XHR error: " + req.responseText);
-            }
+            req.onload = function() { javaFunctionMock("loaded"); }
+            req.onerror = function() { javaFunctionMock("XHR error: " + req.responseText); }
+            req.ontimeout = function() { javaFunctionMock("timeout"); }
             """
         subject.evaluateUnsync(js)
 
@@ -2570,6 +2564,37 @@ class JsBridgeTest {
         // Note: mockk verify with timeout has some issues on API < 24
         if (android.os.Build.VERSION.SDK_INT >= 24) {
             verify(timeout = 2000) { jsToJavaFunctionMock(eq("XHR error: Cannot parse URL: invalid url")) }
+        }
+        verify(inverse = true) { jsToJavaFunctionMock(eq("loaded")) }
+        assertTrue(errors.isEmpty())
+    }
+
+    @Test
+    fun testXmlHttpRequest_timeout() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+
+        val url = "https://test.url/api/request"
+        val responseText = """{"testKey": "testValue"}"""
+        httpInterceptor.mockRequest(url, responseText, "{}", 10000L)
+
+        // WHEN
+        val js = """
+            var req = new XMLHttpRequest();
+            req.open("GET", "$url");
+            req.send();
+            req.timeout = 10;  // msecs
+            req.onload = function() { javaFunctionMock("loaded"); }
+            req.onabort = function() { javaFunctionMock("aborted"); }
+            req.ontimeout = function() { javaFunctionMock("timeout"); }
+            req.abort();
+            """
+        subject.evaluateUnsync(js)
+
+        // THEN
+        // Note: mockk verify with timeout has some issues on API < 24
+        if (android.os.Build.VERSION.SDK_INT >= 24) {
+            verify(timeout = 2000) { jsToJavaFunctionMock(eq("timeout")) }
         }
         verify(inverse = true) { jsToJavaFunctionMock(eq("loaded")) }
         assertTrue(errors.isEmpty())

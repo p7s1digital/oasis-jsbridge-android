@@ -20,12 +20,14 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.json.JSONObject
+import kotlin.time.Duration
 
 class TestHttpInterceptor : Interceptor {
 
     private val urlResponseMocks = mutableMapOf<HttpUrl, Response>()
+    private val urlResponseDelayMsecs = mutableMapOf<HttpUrl, Long?>()
 
-    fun mockRequest(url: String, responseText: String, responseHeadersJson: String = "{}") {
+    fun mockRequest(url: String, responseText: String, responseHeadersJson: String = "{}", delayMsecs: Long? = null) {
         val request = Request.Builder().url(url).build()
         val protocol = Protocol.HTTP_1_1
         val responseBody = responseText.toResponseBody("application/json".toMediaTypeOrNull())
@@ -40,12 +42,15 @@ class TestHttpInterceptor : Interceptor {
         val httpUrl = url.toHttpUrlOrNull()!!
 
         urlResponseMocks[httpUrl] = response
+        delayMsecs?.let { urlResponseDelayMsecs[httpUrl] = it }
     }
 
     override fun intercept(chain: Interceptor.Chain): Response {
 
         val request = chain.request()
         val response = urlResponseMocks[request.url]
+
+        urlResponseDelayMsecs[request.url]?.let { Thread.sleep(it) }
 
         return response ?: chain.proceed(request)
     }
