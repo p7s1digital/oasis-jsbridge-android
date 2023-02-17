@@ -93,11 +93,11 @@ internal class XMLHttpRequestExtension(
                 // Request body
                 val contentType = requestHeaders["content-type"] ?: ""
                 val requestBody = when {
-                    /* in specific case when we want to send an empty post request,
+                    /* in specific case when we want to send an empty post/put request,
                      we should instead send request with body with no data.
                      Otherwise, OkHttp will throw an exception:
-                     "Method post must have a request body */
-                    data == null && httpMethod.lowercase(Locale.ROOT) == "post" -> {
+                     "Method post/put must have a request body */
+                    data == null && httpMethod.lowercase(Locale.ROOT) in listOf("post", "put") -> {
                         "".toRequestBody(contentType.toMediaTypeOrNull())
                     }
                     else -> {
