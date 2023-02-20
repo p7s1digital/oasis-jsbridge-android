@@ -266,6 +266,8 @@ XMLHttpRequest.prototype.constructor = XMLHttpRequest;
 XMLHttpRequest.prototype.open = function(httpMethod, url) {
   this._httpMethod = httpMethod;
   this._url = url;
+  
+  this._requestHeaders = [];
 
   this.readyState = XMLHttpRequest.OPENED;
   if (typeof this.onreadystatechange === "function") {
