@@ -18,6 +18,7 @@ package de.prosiebensat1digital.oasisjsbridge.extensions
 import de.prosiebensat1digital.oasisjsbridge.*
 import java.net.SocketTimeoutException
 import java.util.*
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -35,7 +36,7 @@ internal class XMLHttpRequestExtension(
 
     init {
         // Register XMLHttpRequestJavaHelper_send()
-        JsValue.createJsToJavaProxyFunction5(jsBridge, ::javaSend)
+        JsValue.createJsToJavaProxyFunction6(jsBridge, ::javaSend)
             .assignToGlobal("XMLHttpRequestExtension_send_java")
 
         // Evaluate JS file
@@ -50,10 +51,11 @@ internal class XMLHttpRequestExtension(
         httpMethod: String,
         url: String,
         headers: JsonObjectWrapper,
+        timeoutMs: Long,
         data: String?,
         cb: (JsonObjectWrapper, String, String) -> Unit
     ) {
-        Timber.v("javaSend($httpMethod, $url, $headers)")
+        Timber.v("javaSend($httpMethod, $url, $headers, $timeoutMs)")
 
         jsBridge.launch(Dispatchers.IO) {
             // Load URL and evaluate JS string
@@ -63,7 +65,7 @@ internal class XMLHttpRequestExtension(
             try {
                 // Validate HTTP method
                 when (httpMethod.lowercase(Locale.ROOT)) {
-                    "get", "post", "put", "delete" -> Unit
+                    "get", "post", "put", "delete", "patch" -> Unit
                     else -> throw Throwable("Unsupported http method: $httpMethod")
                 }
 
@@ -108,14 +110,18 @@ internal class XMLHttpRequestExtension(
                 Timber.d("Performing XHR request (query: $url)...")
 
                 // Send request via OkHttp
-                lateinit var request: Request
                 val httpUrl = url.toHttpUrlOrNull() ?: throw Throwable("Cannot parse URL: $url")
-                request = Request.Builder()
+                val request = Request.Builder()
                     .url(httpUrl)
                     .headers(requestHeaders)
                     .method(httpMethod.uppercase(Locale.ROOT), requestBody)
                     .build()
-                val response = okHttpClient.newCall(request).execute()
+                val response = okHttpClient
+                    .newBuilder()
+                    .callTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+                    .build()
+                    .newCall(request)
+                    .execute()
 
                 // Convert header mutlimap (key -> [value1, value2, ...]) into a list of [key, value] arrays
                 val headerKeyValues = response
@@ -251,6 +257,7 @@ var XMLHttpRequest = function() {
   this.readyState = 0;
   this.status = 0;
   this.statusText = "";
+  this.timeout = 0;
   this.withCredentials = null;
 };
 
@@ -287,7 +294,7 @@ XMLHttpRequest.prototype.send = function(data) {
   }
 
   var that = this;
-  sendJava(this._httpMethod, this._url, this._requestHeaders, data || null, function(responseInfo, responseText, error) {
+  sendJava(this._httpMethod, this._url, this._requestHeaders, this.timeout, data || null, function(responseInfo, responseText, error) {
     that._send_java_callback(responseInfo, responseText, error);
   });
 };
