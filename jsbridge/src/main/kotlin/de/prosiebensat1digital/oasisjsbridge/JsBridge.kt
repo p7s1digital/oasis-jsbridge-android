@@ -991,9 +991,7 @@ class JsBridge
         checkJsThread()
 
         val returnClass = method.returnParameter.getJava()
-        if (returnClass != Unit::class.java) {
-             throw JsToJavaFunctionRegistrationError("JS lambda ($globalObjectName)", customMessage = "Unsupported return ($returnClass). JS lambdas should not return any value!")
-        }
+        val hasReturnValue = returnClass != Unit::class.java;
 
         // Wrap the JS object within a JsValue which will be deleted when no longer needed
         // Note: make sure that the function block below "retain" the jsFunctionObject by using it otherwise
@@ -1001,12 +999,27 @@ class JsBridge
         val jsFunctionObject = JsValue(this, null, associatedJsName = globalObjectName)
 
         return method.asFunctionWithArgArray { args ->
-            runInJsThread {
+            val block = {
                 try {
                     val jniJsContext = jniJsContextOrThrow()
-                    jniCallJsLambda(jniJsContext, jsFunctionObject.associatedJsName, args, false)
+                    val ret = jniCallJsLambda(jniJsContext, jsFunctionObject.associatedJsName, args, false)
+
+                    processPromiseQueue()
+                    ret
                 } catch (t: Throwable) {
                     throw JsToJavaFunctionCallError("JS lambda($globalObjectName)", t )
+                }
+            }
+
+            if (hasReturnValue && isJsThread()) {
+                // Directly run the function in the JS thread
+                block()
+            } else if (hasReturnValue) {
+                throw JavaToJsCallError("$<lambda>::${method.name}()", null, "Calling JS lambda with return value outside of the JS thread")
+            } else {
+                // Fire-and-forget in the JS thread
+                runInJsThread {
+                    block()
                 }
             }
         }
@@ -1043,7 +1056,7 @@ class JsBridge
                 // Before completing the promise, we want to ensure that pending operations
                 // which has just been triggered (e.g. assigning a JsValue) can be done in the
                 // JS thread before.
-		yield()
+                yield()
 
                 isFulfilled = true
                 result
