@@ -131,6 +131,24 @@ void JsBridgeContext::enableModuleLoader() {
   throw std::invalid_argument("Cannot use JS module loader on Duktape!");
 }
 
+std::string JsBridgeContext::getCurrentScriptOrModuleName(int level) const {
+  if (level < -1)
+      return {};
+
+  std::string ret;
+  duk_inspect_callstack_entry(m_ctx, -2 - level);
+  if (duk_is_object(m_ctx, -1)) {
+    duk_get_prop_string(m_ctx, -1, "function");
+    duk_get_prop_string(m_ctx, -1, "fileName");
+    auto c = (const char *) duk_get_string(m_ctx, -1);
+    if (c != nullptr)
+      ret = c;
+  }
+
+  duk_pop_3(m_ctx);
+  return ret;
+}
+
 JValue JsBridgeContext::evaluateString(const JStringLocalRef &strCode, const JniLocalRef<jsBridgeParameter> &returnParameter,
                                        bool awaitJsPromise) const {
   CHECK_STACK(m_ctx);

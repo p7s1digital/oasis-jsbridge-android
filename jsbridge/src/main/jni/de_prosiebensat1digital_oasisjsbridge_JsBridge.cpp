@@ -102,6 +102,22 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniEn
   jsBridgeContext->enableModuleLoader();
 }
 
+JNIEXPORT jstring JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniGetCurrentScriptOrModuleName
+        (JNIEnv *env, jobject, jlong lctx, jint level) {
+
+  auto jsBridgeContext = getJsBridgeContext(env, lctx);
+  auto jniContext = jsBridgeContext->getJniContext();
+
+  std::string s = jsBridgeContext->getCurrentScriptOrModuleName(level);
+  auto returnValue = JStringLocalRef(jniContext, s.c_str());
+
+  // Prevent auto-releasing the localref returned to Java
+  returnValue.detach();
+
+  return returnValue.get();
+}
+
+
 JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniEvaluateString
     (JNIEnv *env, jobject, jlong lctx, jstring code, jobject returnParameter, jboolean awaitJsPromise) {
 

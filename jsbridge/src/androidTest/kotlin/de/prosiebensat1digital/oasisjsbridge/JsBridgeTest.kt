@@ -577,10 +577,18 @@ class JsBridgeTest {
 
         // THEN
         assertTrue(errors.isEmpty())
+
+        // JsFileEvaluationError: Error while evaluating <moduleLoader>
         assertEquals("<moduleLoader>", moduleError.fileName)
-        val cause = moduleError.cause as? JsBridgeError.JsFileEvaluationError
-        assertNotNull(cause)
-        assertEquals("non-existing.js", cause.fileName)
+        Timber.e(moduleError)
+
+        // Caused by JS error
+        assertNotNull(moduleError.cause as? JsException)
+
+        // Caused by JsFileEvaluationError: Error while evaluating non-existing.js
+        val rootCause = moduleError.cause?.cause as JsBridgeError.JsFileEvaluationError
+        assertNotNull(rootCause)
+        assertEquals("non-existing.js", rootCause.fileName)
     }
 
     @Test
@@ -2878,6 +2886,60 @@ class JsBridgeTest {
         override fun addExpectation(name: String, value: JsValue) {
             expectations[name] = value
         }
+    }
+
+    @Test
+    fun testGetCurrentScriptOrModuleName() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+        jsBridge = subject
+        val levelToFileName = HashMap<Int, String>()
+        val testFunction = JsValue.createJsToJavaProxyFunction0(subject, {
+            println("N1")
+            levelToFileName[0] = subject.getCurrentScriptOrModuleName(0)
+            levelToFileName[1] = subject.getCurrentScriptOrModuleName(1)
+            levelToFileName[2] = subject.getCurrentScriptOrModuleName(2)
+            levelToFileName[3] = subject.getCurrentScriptOrModuleName(3)
+            println("N3")
+        })
+
+        // WHEN
+        runBlocking {
+            subject.evaluateFileContent(
+                """
+                globalThis.function1 = function() {
+                    globalThis.function2();
+                }
+            """.trimIndent(), "path/to/file1.js"
+            )
+            subject.evaluateFileContent(
+                """
+                function helperFunction() {
+                    globalThis.function3();
+                }
+                globalThis.function2 = function() {
+                    helperFunction();
+                }
+            """.trimIndent(), "path/to/file2.js"
+            )
+            subject.evaluateFileContent(
+                """
+                globalThis.function3 = function() {
+                    $testFunction();
+                }
+            """.trimIndent(), "path/to/file3.js"
+            )
+
+            subject.evaluate<Unit>("globalThis.function1();")
+            testFunction.hold()
+        }
+
+        // THEN
+        println("LEVEL TO FILE NAME = $levelToFileName")
+        assertEquals("path/to/file3.js", levelToFileName[0])
+        assertEquals("path/to/file2.js", levelToFileName[1])
+        assertEquals("path/to/file2.js", levelToFileName[2])
+        assertEquals("path/to/file1.js", levelToFileName[3])
     }
 
 
