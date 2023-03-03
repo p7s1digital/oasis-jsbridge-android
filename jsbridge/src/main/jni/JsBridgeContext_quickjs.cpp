@@ -46,14 +46,17 @@ namespace {
   JSModuleDef *jsModuleLoader(JSContext *ctx, const char *moduleName, void *opaque) {
     JsBridgeContext *jsBridgeContext = JsBridgeContext::getInstance(ctx);
     JniContext *jniContext = jsBridgeContext->getJniContext();
+
     auto contentRef = jsBridgeContext->getJniCache()->getJsBridgeInterface().callJsModuleLoader(JStringLocalRef(jniContext, moduleName));
 
     if (jniContext->exceptionCheck()) {
-      throw JniException(jniContext);
+      jsBridgeContext->getExceptionHandler()->jsThrow(JniException(jniContext));
+      return nullptr;
     }
 
     if (contentRef.isNull()) {
-      throw std::invalid_argument("JS module returned a null content");
+      JS_ThrowTypeError(ctx, "JS module returned a null content");
+      return nullptr;
     }
 
     const char *content = contentRef.toUtf8Chars();

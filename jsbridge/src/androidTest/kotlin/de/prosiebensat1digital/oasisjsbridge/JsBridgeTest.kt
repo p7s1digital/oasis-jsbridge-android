@@ -577,10 +577,18 @@ class JsBridgeTest {
 
         // THEN
         assertTrue(errors.isEmpty())
+
+        // JsFileEvaluationError: Error while evaluating <moduleLoader>
         assertEquals("<moduleLoader>", moduleError.fileName)
-        val cause = moduleError.cause as? JsBridgeError.JsFileEvaluationError
-        assertNotNull(cause)
-        assertEquals("non-existing.js", cause.fileName)
+        Timber.e(moduleError)
+
+        // Caused by JS error
+        assertNotNull(moduleError.cause as? JsException)
+
+        // Caused by JsFileEvaluationError: Error while evaluating non-existing.js
+        val rootCause = moduleError.cause?.cause as JsBridgeError.JsFileEvaluationError
+        assertNotNull(rootCause)
+        assertEquals("non-existing.js", rootCause.fileName)
     }
 
     @Test

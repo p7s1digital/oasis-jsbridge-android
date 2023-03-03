@@ -792,6 +792,8 @@ class JsBridge
 
     @Suppress("UNUSED")  // Called from JNI
     private fun callJsModuleLoader(moduleName: String): String {
+        // Note: it is perfectly fine if the function throws an exception
+        // (it will be properly caught by JNI and thrown as a JS exception)
         return jsModuleLoaderFunc!!(moduleName)
     }
 
