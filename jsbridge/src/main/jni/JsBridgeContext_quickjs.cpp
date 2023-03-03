@@ -139,6 +139,28 @@ void JsBridgeContext::enableModuleLoader() {
   JS_SetModuleLoaderFunc(m_runtime, nullptr, jsModuleLoader, nullptr);
 }
 
+std::string JsBridgeContext::getCurrentScriptOrModuleName(int level) const {
+    const JSAtom basename_atom = JS_GetScriptOrModuleName(m_ctx, level);
+    if (basename_atom == JS_ATOM_NULL)
+        return {};
+
+    const JSValue basename_val = JS_AtomToValue(m_ctx, basename_atom);
+    JS_AUTORELEASE_VALUE(m_ctx, basename_val);
+    if (!JS_IsString(basename_val)) {
+        JS_ThrowTypeError(m_ctx, "no function filename for import()");
+        return {};
+    }
+
+    const char *basename = JS_ToCString(m_ctx, basename_val);
+    if (!basename)
+        return {};
+
+    std::string ret = basename;
+    JS_FreeCString(m_ctx, basename);
+
+    return basename;
+}
+
 JValue JsBridgeContext::evaluateString(const JStringLocalRef &strCode, const JniLocalRef<jsBridgeParameter> &returnParameter,
                                        bool awaitJsPromise) const {
   JSValue v = JS_Eval(m_ctx, strCode.toUtf8Chars(), strCode.utf8Length(), "eval", JS_EVAL_TYPE_GLOBAL);

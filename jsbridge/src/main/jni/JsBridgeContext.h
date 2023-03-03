@@ -56,6 +56,7 @@ public:
   void cancelDebug();
 
   void enableModuleLoader();
+  std::string getCurrentScriptOrModuleName(int level) const;
 
   JValue evaluateString(const JStringLocalRef &strSourceCode, const JniLocalRef<jsBridgeParameter> &returnParameter,
                         bool awaitJsPromise) const;

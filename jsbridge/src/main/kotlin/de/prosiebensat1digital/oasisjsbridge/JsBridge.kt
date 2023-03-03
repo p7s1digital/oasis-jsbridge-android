@@ -276,6 +276,18 @@ class JsBridge
     }
 
     /**
+     * Get the current script (or module) name
+     */
+    fun getCurrentScriptOrModuleName(level: Int): String {
+        if (!isJsThread()) {
+            throw InternalError("JsBridge.getCurrentScriptOrModuleName() can only be called inside the JS thread!")
+        }
+
+        val jniJsContext = jniJsContextOrThrow()
+        return jniGetCurrentScriptOrModuleName(jniJsContext, level)
+    }
+
+    /**
      * Set a custom module loader which will return the content of the given module
      */
     private var jsModuleLoaderFunc: ((moduleName: String) -> String)? = null
@@ -1117,6 +1129,7 @@ class JsBridge
     private external fun jniCancelDebug(context: Long)
     private external fun jniDeleteContext(context: Long)
     private external fun jniEnableModuleLoader(context: Long)
+    private external fun jniGetCurrentScriptOrModuleName(context: Long, level: Int): String
     private external fun jniEvaluateString(context: Long, js: String, type: Parameter?, awaitJsPromise: Boolean): Any?
     private external fun jniEvaluateFileContent(context: Long, js: String, filename: String, asModule: Boolean)
     private external fun jniRegisterJavaLambda(context: Long, name: String, obj: Any, method: Any)

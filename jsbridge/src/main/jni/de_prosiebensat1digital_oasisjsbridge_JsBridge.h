@@ -40,6 +40,9 @@ JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniDe
 JNIEXPORT void JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniEnableModuleLoader
         (JNIEnv *, jobject, jlong);
 
+JNIEXPORT jstring JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniGetCurrentScriptOrModuleName
+        (JNIEnv *, jobject, jlong, jint);
+
 JNIEXPORT jobject JNICALL Java_de_prosiebensat1digital_oasisjsbridge_JsBridge_jniEvaluateString
   (JNIEnv *, jobject, jlong, jstring, jobject, jboolean);
 
