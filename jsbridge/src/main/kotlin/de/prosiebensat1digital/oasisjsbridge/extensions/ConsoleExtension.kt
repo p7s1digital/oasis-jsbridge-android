@@ -72,8 +72,8 @@ internal class ConsoleExtension(
     private fun createStringConsole(): JsValue {
         val consoleJavaObject = object: StringConsole {
             override fun log(vararg args: DebugString) = message(Log.DEBUG, ds2s(args))
-            override fun debug(vararg args: DebugString) = message(Log.DEBUG, ds2s(args))
-            override fun trace(vararg args: DebugString) = message(Log.DEBUG, ds2s(args))
+            override fun debug(vararg args: DebugString) = message(Log.VERBOSE, ds2s(args))
+            override fun trace(vararg args: DebugString) = message(Log.VERBOSE, ds2s(args))
             override fun info(vararg args: DebugString) = message(Log.INFO, ds2s(args))
             override fun warn(vararg args: DebugString) = message(Log.WARN, ds2s(args))
             override fun error(vararg args: DebugString) = message(Log.ERROR, ds2s(args))
@@ -140,4 +140,3 @@ internal class ConsoleExtension(
         config.appendMessage(priority, message)
     }
 }
-
