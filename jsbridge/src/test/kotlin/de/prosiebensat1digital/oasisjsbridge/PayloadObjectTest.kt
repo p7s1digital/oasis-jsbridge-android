@@ -65,6 +65,15 @@ class PayloadObjectTest {
     }
 
     @Test
+    fun payloadBoolean() {
+        val truePayload = Payload.fromJsonString("true")
+        val falsePayload = Payload.fromJsonString("false")
+
+        assertEquals(true, truePayload?.booleanValue());
+        assertEquals(false, falsePayload?.booleanValue());
+    }
+
+    @Test
     fun payloadObjectOf() {
         // WHEN
         val subject = payloadObjectOf(

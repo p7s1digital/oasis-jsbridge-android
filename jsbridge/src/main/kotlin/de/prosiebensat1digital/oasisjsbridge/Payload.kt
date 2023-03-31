@@ -33,6 +33,7 @@ interface Payload {
                     null, JSONObject.NULL -> null
                     is JSONObject -> PayloadObject.fromJsonObject(nextValue)
                     is JSONArray -> PayloadArray.fromJsonArray(nextValue)
+                    is Boolean -> PayloadBoolean(nextValue)
                     is String -> PayloadString(nextValue)
                     is Double -> PayloadNumber(nextValue)
                     is Int -> PayloadNumber(nextValue)
@@ -52,6 +53,7 @@ interface Payload {
     fun toJsonString(orderAlphabetically: Boolean = false): String
 
     fun stringValue() = (this as? PayloadString)?.value
+    fun booleanValue() = (this as? PayloadBoolean)?.value
     fun intValue() = (this as? PayloadNumber)?.value?.toInt()
     fun doubleValue() = (this as? PayloadNumber)?.value?.toDouble()
     fun isNull() = (this as? PayloadNull) != null
@@ -67,6 +69,12 @@ value class PayloadString(val value: String): Payload {
 value class PayloadNumber(val value: Number): Payload {
     override fun toJsString(orderAlphabetically: Boolean) = "$value"
     override fun toJsonString(orderAlphabetically: Boolean) = "$value"
+}
+
+@JvmInline
+value class PayloadBoolean(val value: Boolean): Payload {
+    override fun toJsString(orderAlphabetically: Boolean) = if (value) "true" else "false"
+    override fun toJsonString(orderAlphabetically: Boolean) = if (value) "true" else "false"
 }
 
 class PayloadNull: Payload {
