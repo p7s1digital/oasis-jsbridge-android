@@ -33,6 +33,7 @@ static thread_local std::unordered_map<std::u16string_view, JavaTypeId> sJavaNam
   { u"byte", JavaTypeId::Byte },
   { u"int", JavaTypeId::Int },
   { u"long", JavaTypeId::Long },
+  { u"short", JavaTypeId::Short },
   { u"float", JavaTypeId::Float },
   { u"double", JavaTypeId::Double },
   { u"void", JavaTypeId::Void },
@@ -41,10 +42,12 @@ static thread_local std::unordered_map<std::u16string_view, JavaTypeId> sJavaNam
   { u"java.lang.Byte", JavaTypeId::BoxedByte },
   { u"java.lang.Integer", JavaTypeId::BoxedInt },
   { u"java.lang.Long", JavaTypeId::BoxedLong },
+  { u"java.lang.Short", JavaTypeId::BoxedShort },
   { u"java.lang.Float", JavaTypeId::BoxedFloat },
   { u"java.lang.Double", JavaTypeId::BoxedDouble },
 
   { u"java.lang.String", JavaTypeId::String },
+  { u"java.lang.Number", JavaTypeId::Number },
   { u"java.lang.Object", JavaTypeId::Object },
 
   { u"[Ljava.lang.Object;", JavaTypeId::ObjectArray },
@@ -54,6 +57,7 @@ static thread_local std::unordered_map<std::u16string_view, JavaTypeId> sJavaNam
   { u"[B", JavaTypeId::ByteArray },
   { u"[I", JavaTypeId::IntArray },
   { u"[J", JavaTypeId::LongArray },
+  { u"[S", JavaTypeId::ShortArray },
   { u"[F", JavaTypeId::FloatArray },
   { u"[D", JavaTypeId::DoubleArray },
 

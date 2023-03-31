@@ -28,11 +28,12 @@
 #include "java-types/Integer.h"
 #include "java-types/JsToJavaProxy.h"
 #include "java-types/JsValue.h"
+#include "java-types/JavaObjectWrapper.h"
 #include "java-types/JsonObjectWrapper.h"
 #include "java-types/List.h"
 #include "java-types/Long.h"
-#include "java-types/JavaObjectWrapper.h"
 #include "java-types/Object.h"
+#include "java-types/Short.h"
 #include "java-types/String.h"
 #include "java-types/Void.h"
 #include "jni-helpers/JniContext.h"
@@ -78,6 +79,8 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
       return createPrimitive<Integer>(m_jsBridgeContext, boxed);
     case JavaTypeId::Long:
       return createPrimitive<Long>(m_jsBridgeContext, boxed);
+    case JavaTypeId::Short:
+      return createPrimitive<Short>(m_jsBridgeContext, boxed);
     case JavaTypeId::Float:
       return createPrimitive<Float>(m_jsBridgeContext, boxed);
     case JavaTypeId::Double:
@@ -93,6 +96,8 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
       return createPrimitive<Integer>(m_jsBridgeContext, true);
     case JavaTypeId::BoxedLong:
       return createPrimitive<Long>(m_jsBridgeContext, true);
+    case JavaTypeId::BoxedShort:
+      return createPrimitive<Short>(m_jsBridgeContext, true);
     case JavaTypeId::BoxedFloat:
       return createPrimitive<Float>(m_jsBridgeContext, true);
     case JavaTypeId::BoxedDouble:
@@ -102,8 +107,10 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
       return new String(m_jsBridgeContext, false);
     case JavaTypeId::DebugString:
       return new String(m_jsBridgeContext, true);
+    case JavaTypeId::Number:
+      return createPrimitive<Double>(m_jsBridgeContext, true);
     case JavaTypeId::Object:
-      return new Object(m_jsBridgeContext);
+      return new Object(m_jsBridgeContext, std::nullopt);
 
     case JavaTypeId::ObjectArray: {
       auto genericParameterType = getGenericParameterType(parameter);
@@ -121,6 +128,8 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
       return createPrimitiveArray<Integer>(m_jsBridgeContext);
     case JavaTypeId::LongArray:
       return createPrimitiveArray<Long>(m_jsBridgeContext);
+    case JavaTypeId::ShortArray:
+      return createPrimitiveArray<Short>(m_jsBridgeContext);
     case JavaTypeId::FloatArray:
       return createPrimitiveArray<Float>(m_jsBridgeContext);
     case JavaTypeId::DoubleArray:
@@ -151,7 +160,7 @@ std::unique_ptr<const JavaType> JavaTypeProvider::makeUniqueType(const JniRef<js
 
 const std::unique_ptr<const JavaType> &JavaTypeProvider::getObjectType() const {
   if (m_objectType == nullptr)   {
-    m_objectType.reset(new Object(m_jsBridgeContext));
+    m_objectType.reset(new Object(m_jsBridgeContext, std::nullopt));
   }
 
   return m_objectType;

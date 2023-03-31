@@ -23,7 +23,10 @@ JniCache::JniCache(const JsBridgeContext *jsBridgeContext, const JniLocalRef<job
  : m_jsBridgeContext(jsBridgeContext)
  , m_jniContext(m_jsBridgeContext->getJniContext())
  , m_objectClass(m_jniContext->findClass("java/lang/Object"))
+ , m_numberClass(m_jniContext->findClass("java/lang/Number"))
+ , m_stringClass(m_jniContext->findClass("java/lang/String"))
  , m_arrayListClass(m_jniContext->findClass("java/util/ArrayList"))
+ , m_javaClassClass(m_jniContext->findClass("java/lang/Class"))
  , m_listClass(m_jniContext->findClass("java/util/List"))
  , m_jsBridgeClass(m_jniContext->findClass(JSBRIDGE_PKG_PATH "/JsBridge"))
  , m_jsExceptionClass(m_jniContext->findClass(JSBRIDGE_PKG_PATH "/JsException"))
@@ -127,6 +130,11 @@ JStringLocalRef JniCache::getJsonObjectWrapperString(const JniRef<jobject> &json
 
 // JavaObjectWrapper
 // ---
+
+JniLocalRef<jobject> JniCache::getOrCreateJavaObjectWrapper(const JniRef<jobject> &javaObject) const {
+  static thread_local jmethodID methodId = m_jniContext->getStaticMethodID(m_javaObjectWrapperClass, "getOrCreate", "(Ljava/lang/Object;)L" JSBRIDGE_PKG_PATH "/JavaObjectWrapper;");
+  return m_jniContext->callStaticObjectMethod<jobject>(m_javaObjectWrapperClass, methodId, javaObject);
+}
 
 JniLocalRef<jobject> JniCache::javaObjectWrapperFromJavaObject(const JniRef<jobject> &javaObject) const {
   static thread_local jmethodID methodId = m_jniContext->getStaticMethodID(m_javaObjectWrapperClass, "fromJavaObject", "(Ljava/lang/Object;)L" JSBRIDGE_PKG_PATH "/JavaObjectWrapper;");

@@ -18,8 +18,12 @@
  */
 #include "Array.h"
 
+#include "JniCache.h"
 #include "JsBridgeContext.h"
+#include "Object.h"
 #include "Primitive.h"
+
+#include "exceptions/JniException.h"
 #include "jni-helpers/JValue.h"
 #include <string>
 
@@ -31,6 +35,32 @@ namespace {
     }
     return primitive->arrayId();
   }
+
+  std::unique_ptr<const JavaType> getComponentType(const JsBridgeContext *jsBridgeContext, const JniRef<jclass> &arrayJavaClass) {
+    const JniContext *jniContext = jsBridgeContext->getJniContext();
+
+    JniLocalRef<jclass> javaClassClass = jsBridgeContext->getJniCache()->getJavaClassClass();
+
+    // Get the component class of the array
+    jmethodID getComponentType = jniContext->getMethodID(javaClassClass, "getComponentType", "()Ljava/lang/Class;");
+    JniLocalRef<jclass> javaClassRef = jniContext->callObjectMethod<jclass>(arrayJavaClass, getComponentType);
+    if (jniContext->exceptionCheck()) {
+      throw JniException(jniContext);
+    }
+
+    // Get its Java name
+    jmethodID getName = jniContext->getMethodID(javaClassClass, "getName", "()Ljava/lang/String;");
+    if (jniContext->exceptionCheck()) {
+      throw JniException(jniContext);
+    }
+    JStringLocalRef javaNameRef = jniContext->callStringMethod(javaClassRef, getName);
+    if (jniContext->exceptionCheck()) {
+      throw JniException(jniContext);
+    }
+
+    const auto objectType = new JavaTypes::Object(jsBridgeContext, std::optional(JniGlobalRef(javaNameRef)));
+    return std::unique_ptr<const JavaType>(objectType);
+  }
 }
 
 namespace JavaTypes {
@@ -39,6 +69,11 @@ Array::Array(const JsBridgeContext *jsBridgeContext, std::unique_ptr<const JavaT
  : JavaType(jsBridgeContext, getArrayId(componentType.get()))
  , m_componentType(std::move(componentType)) {
 }
+
+Array::Array(const JsBridgeContext *jsBridgeContext, const JniRef<jclass> &arrayJavaClass)
+ : JavaType(jsBridgeContext, JavaTypeId::ObjectArray)
+ , m_componentType(getComponentType(jsBridgeContext, arrayJavaClass)) {
+  }
 
 #if defined(DUKTAPE)
 

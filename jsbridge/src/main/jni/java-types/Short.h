@@ -16,31 +16,43 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef _JSBRIDGE_JAVATYPES_ARRAY_H
-#define _JSBRIDGE_JAVATYPES_ARRAY_H
+#ifndef _JSBRIDGE_JAVATYPES_SHORT_H
+#define _JSBRIDGE_JAVATYPES_SHORT_H
 
-#include "JavaType.h"
+#include "Primitive.h"
 
 namespace JavaTypes {
 
-class Array : public JavaType {
+class Short : public Primitive {
 
 public:
-  Array(const JsBridgeContext *, std::unique_ptr<const JavaType> &&componentType);
-  Array(const JsBridgeContext *, const JniRef<jclass> &arrayJavaClass);
+  Short(const JsBridgeContext *);
 
 #if defined(DUKTAPE)
   JValue pop() const override;
+  JValue popArray(uint32_t count, bool expanded) const override;
+
   duk_ret_t push(const JValue &) const override;
+  duk_ret_t pushArray(const JniLocalRef<jarray> &values, bool expand) const override;
 #elif defined(QUICKJS)
   JValue toJava(JSValueConst) const override;
+  JValue toJavaArray(JSValueConst) const override;
+
   JSValue fromJava(const JValue &) const override;
+  JSValue fromJavaArray(const JniLocalRef<jarray> &) const override;
 #endif
 
+  JValue callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
+                    const std::vector<JValue> &args) const override;
+
+  JavaTypeId arrayId() const override { return JavaTypeId::ShortArray; }
+
 private:
-  std::unique_ptr<const JavaType> m_componentType;
+  JValue box(const JValue &) const override;
+  JValue unbox(const JValue &) const override;
 };
 
 }  // namespace JavaTypes
 
 #endif
+

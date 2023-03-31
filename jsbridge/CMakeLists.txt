@@ -45,6 +45,7 @@ add_library(
     src/main/jni/java-types/JavaObjectWrapper.cpp
     src/main/jni/java-types/Object.cpp
     src/main/jni/java-types/Primitive.cpp
+    src/main/jni/java-types/Short.cpp
     src/main/jni/java-types/String.cpp
     src/main/jni/java-types/Void.cpp
     src/main/jni/jni-helpers/JniContext.cpp

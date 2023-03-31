@@ -16,31 +16,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "Byte.h"
+#include "Short.h"
 
 #include "JsBridgeContext.h"
-#include "log.h"
 #include "exceptions/JniException.h"
 #include "jni-helpers/JArrayLocalRef.h"
+#include "log.h"
 
-#if defined(DUKTAPE)
+#ifdef DUKTAPE
 # include "JsBridgeContext.h"
 # include "StackChecker.h"
 #endif
 
 namespace JavaTypes {
 
-Byte::Byte(const JsBridgeContext *jsBridgeContext)
- : Primitive(jsBridgeContext, JavaTypeId::Byte, JavaTypeId::BoxedByte) {
+Short::Short(const JsBridgeContext *jsBridgeContext)
+  : Primitive(jsBridgeContext, JavaTypeId::Short, JavaTypeId::BoxedShort) {
 }
 
 #if defined(DUKTAPE)
 
-JValue Byte::pop() const {
+JValue Short::pop() const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
   if (!duk_is_number(m_ctx, -1)) {
-    const auto message = std::string("Cannot convert return value ") + duk_safe_to_string(m_ctx, -1) + " to byte";
+    const auto message = std::string("Cannot convert return value ") + duk_safe_to_string(m_ctx, -1) + " to short";
     duk_pop(m_ctx);
     throw std::invalid_argument(message);
   }
@@ -48,23 +48,23 @@ JValue Byte::pop() const {
     duk_pop(m_ctx);
     return JValue();
   }
-  auto b = static_cast<jbyte>(duk_require_int(m_ctx, -1));
+  auto l = (jshort) duk_require_number(m_ctx, -1);  // no real Duktape for int64 so needing a cast from double
   duk_pop(m_ctx);
-  return JValue(b);
+  return JValue(l);
 }
 
-JValue Byte::popArray(uint32_t count, bool expanded) const {
+JValue Short::popArray(uint32_t count, bool expanded) const {
   if (!expanded) {
     count = static_cast<uint32_t>(duk_get_length(m_ctx, -1));
     if (!duk_is_array(m_ctx, -1)) {
-      const auto message = std::string("Cannot convert JS value ") + duk_safe_to_string(m_ctx, -1) + " to Array<Byte>";
+      const auto message = std::string("Cannot convert JS value ") + duk_safe_to_string(m_ctx, -1) + " to Array<Short>";
       duk_pop(m_ctx);  // pop the array
       throw std::invalid_argument(message);
     }
   }
 
-  JArrayLocalRef<jbyte> byteArray(m_jniContext, count);
-  jbyte *elements = byteArray.isNull() ? nullptr : byteArray.getMutableElements();
+  JArrayLocalRef<jshort> shortArray(m_jniContext, count);
+  jshort *elements = shortArray.isNull() ? nullptr : shortArray.getMutableElements();
   if (elements == nullptr) {
     duk_pop_n(m_ctx, expanded ? count : 1);  // pop the expanded elements or the array
     throw JniException(m_jniContext);
@@ -76,7 +76,7 @@ JValue Byte::popArray(uint32_t count, bool expanded) const {
     }
     try {
       JValue value = pop();
-      elements[i] = value.getByte();
+      elements[i] = value.getShort();
     } catch (const std::exception &e) {
       if (!expanded) {
         duk_pop(m_ctx);  // pop the array
@@ -89,19 +89,19 @@ JValue Byte::popArray(uint32_t count, bool expanded) const {
     duk_pop(m_ctx);  // pop the array
   }
 
-  return JValue(byteArray);
+  return JValue(shortArray);
 }
 
-duk_ret_t Byte::push(const JValue &value) const {
-  duk_push_int(m_ctx, value.getByte());
+duk_ret_t Short::push(const JValue &value) const {
+  duk_push_number(m_ctx, static_cast<duk_double_t>(value.getShort()));  // no real Duktape for int64 so needing a cast to double
   return 1;
 }
 
-duk_ret_t Byte::pushArray(const JniLocalRef<jarray> &values, bool expand) const {
-  JArrayLocalRef<jbyte> byteArray(values);
-  const auto count = byteArray.getLength();
+duk_ret_t Short::pushArray(const JniLocalRef<jarray> &values, bool expand) const {
+  JArrayLocalRef<jshort> shortArray(values);
+  const auto count = shortArray.getLength();
 
-  const jbyte *elements = byteArray.getElements();
+  const jshort *elements = shortArray.getElements();
   if (elements == nullptr) {
     throw JniException(m_jniContext);
   }
@@ -113,7 +113,7 @@ duk_ret_t Byte::pushArray(const JniLocalRef<jarray> &values, bool expand) const 
   }
 
   for (jsize i = 0; i < count; ++i) {
-    duk_push_int(m_ctx, elements[i]);
+    duk_push_number(m_ctx, elements[i]);
     if (!expand) {
       duk_put_prop_index(m_ctx, -2, static_cast<duk_uarridx_t>(i));
     }
@@ -125,34 +125,38 @@ duk_ret_t Byte::pushArray(const JniLocalRef<jarray> &values, bool expand) const 
 #elif defined(QUICKJS)
 
 namespace {
-  inline jbyte getByte(JSValue v) {
+  inline jshort getShort(JSContext *ctx, JSValue v) {
     int tag = JS_VALUE_GET_TAG(v);
     if (tag == JS_TAG_INT) {
-      return JS_VALUE_GET_INT(v);
+      int64_t i64;
+      JS_ToInt64(ctx, &i64, v);
+      return i64;
     }
 
     if (JS_TAG_IS_FLOAT64(tag)) {
-      return jbyte(JS_VALUE_GET_FLOAT64(v));
+      return jshort(JS_VALUE_GET_FLOAT64(v));
     }
 
-    throw std::invalid_argument("Cannot convert JS value to Java byte");
+    throw std::invalid_argument("Cannot convert JS value to Java short");
   }
 }
 
-JValue Byte::toJava(JSValueConst v) const {
+JValue Short::toJava(JSValueConst v) const {
+  if (!JS_IsNumber(v)) {
+    throw std::invalid_argument("Cannot convert return value to short");
+  }
+
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
     return JValue();
   }
 
-  return JValue(getByte(v));
+  return JValue(getShort(m_ctx, v));
 }
 
-JValue Byte::toJavaArray(JSValueConst v) const {
+JValue Short::toJavaArray(JSValueConst v) const {
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
     return JValue();
   }
-
-  // TODO: if it is an ArrayBuffer...
 
   if (!JS_IsArray(m_ctx, v)) {
     throw std::invalid_argument("Cannot convert JS value to Java array");
@@ -163,44 +167,43 @@ JValue Byte::toJavaArray(JSValueConst v) const {
   uint32_t count = JS_VALUE_GET_INT(lengthValue);
   JS_FreeValue(m_ctx, lengthValue);
 
-  JArrayLocalRef<jbyte> byteArray(m_jniContext, count);
-  if (byteArray.isNull()) {
+  JArrayLocalRef<jshort> shortArray(m_jniContext, count);
+  if (shortArray.isNull()) {
     throw JniException(m_jniContext);
   }
 
-  jbyte *elements = byteArray.getMutableElements();
+  jshort *elements = shortArray.getMutableElements();
   if (elements == nullptr) {
     throw JniException(m_jniContext);
   }
 
   for (uint32_t i = 0; i < count; ++i) {
     JSValue ev = JS_GetPropertyUint32(m_ctx, v, i);
-    elements[i] = getByte(ev);
+    elements[i] = getShort(m_ctx, ev);
   }
 
-  byteArray.releaseArrayElements();  // copy back elements to Java
-  return JValue(byteArray);
+  shortArray.releaseArrayElements();  // copy back elements to Java
+  return JValue(shortArray);
 }
 
-JSValue Byte::fromJava(const JValue &value) const {
-  return JS_NewInt32(m_ctx, value.getByte());
+JSValue Short::fromJava(const JValue &value) const {
+  return JS_NewInt64(m_ctx, value.getShort());
 }
 
-JSValue Byte::fromJavaArray(const JniLocalRef<jarray> &values) const {
-  JArrayLocalRef<jbyte> byteArray(values);
-  const auto count = byteArray.getLength();
+JSValue Short::fromJavaArray(const JniLocalRef<jarray> &values) const {
+  JArrayLocalRef<jshort> shortArray(values);
+  const auto count = shortArray.getLength();
 
-  // TODO: or ByteArray???
   JSValue jsArray = JS_NewArray(m_ctx);
 
-  const jbyte *elements = byteArray.getElements();
+  const jshort *elements = shortArray.getElements();
   if (elements == nullptr) {
     JS_FreeValue(m_ctx, jsArray);
     throw JniException(m_jniContext);
   }
 
   for (jsize i = 0; i < count; ++i) {
-    JSValue elementValue = JS_NewInt32(m_ctx, elements[i]);
+    JSValue elementValue = JS_NewInt64(m_ctx, elements[i]);
     JS_SetPropertyUint32(m_ctx, jsArray, static_cast<uint32_t>(i), elementValue);
   }
 
@@ -209,9 +212,9 @@ JSValue Byte::fromJavaArray(const JniLocalRef<jarray> &values) const {
 
 #endif
 
-JValue Byte::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
-                           const std::vector<JValue> &args) const {
-  jbyte returnValue = m_jniContext->callByteMethodA(javaThis, methodId, args);
+JValue Short::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
+                        const std::vector<JValue> &args) const {
+  jshort l = m_jniContext->callShortMethodA(javaThis, methodId, args);
 
   // Explicitly release all values now because they won't be used afterwards
   JValue::releaseAll(args);
@@ -220,20 +223,19 @@ JValue Byte::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
     throw JniException(m_jniContext);
   }
 
-  return JValue(returnValue);
+  return JValue(l);
 }
 
-JValue Byte::box(const JValue &byteValue) const {
-  // From byte to Byte
-  static thread_local jmethodID boxId = m_jniContext->getStaticMethodID(getBoxedJavaClass(), "valueOf", "(B)Ljava/lang/Byte;");
-  return JValue(m_jniContext->callStaticObjectMethod(getBoxedJavaClass(), boxId, byteValue.getByte()));
+JValue Short::box(const JValue &shortValue) const {
+  // From short to Short
+  static thread_local jmethodID boxId = m_jniContext->getStaticMethodID(getBoxedJavaClass(), "valueOf", "(S)Ljava/lang/Short;");
+  return JValue(m_jniContext->callStaticObjectMethod(getBoxedJavaClass(), boxId, shortValue.getShort()));
 }
 
-JValue Byte::unbox(const JValue &boxedValue) const {
-  // From Byte to byte
-  static thread_local jmethodID unboxId = m_jniContext->getMethodID(getBoxedJavaClass(), "byteValue", "()B");
-  return JValue(m_jniContext->callByteMethod(boxedValue.getLocalRef(), unboxId));
+JValue Short::unbox(const JValue &boxedValue) const {
+  // From Short to short
+  static thread_local jmethodID unboxId = m_jniContext->getMethodID(getBoxedJavaClass(), "shortValue", "()S");
+  return JValue(m_jniContext->callShortMethod(boxedValue.getLocalRef(), unboxId));
 }
 
 }  // namespace JavaTypes
-

@@ -60,6 +60,11 @@ public:
     return JniLocalRef<jclass>(this, env->GetStaticObjectField(clazz.get(), fieldId));
   }
 
+  jboolean isInstanceOf(const JniRef<jobject> &obj, const JniRef<jclass> &klass) const {
+    JNIEnv *env = getJNIEnv();
+    return env->IsInstanceOf(obj.get(), klass.get());
+  }
+
   template <class T>
   jmethodID fromReflectedMethod(const JniRef<T> &t) const {
     JNIEnv *env = getJNIEnv();
@@ -150,6 +155,21 @@ public:
     JNIEnv *env = getJNIEnv();
     jvalue *rawArgs = JValue::createArray(args);
     jlong ret = env->CallLongMethodA(t.get(), methodId, rawArgs);
+    delete[] rawArgs;
+    return ret;
+  }
+
+  template <class ObjT, typename ...InputArgs>
+  jshort callShortMethod(const JniRef<ObjT> &t, jmethodID methodId, InputArgs &&...args) const {
+    JNIEnv *env = getJNIEnv();
+    return env->CallShortMethod(t.get(), methodId, JniValueConverter::toJniValues(std::forward<InputArgs>(args))...);
+  }
+
+  template <class ObjT>
+  jshort callShortMethodA(const JniRef<ObjT> &t, jmethodID methodId, const std::vector<JValue> &args) const {
+    JNIEnv *env = getJNIEnv();
+    jvalue *rawArgs = JValue::createArray(args);
+    jlong ret = env->CallShortMethodA(t.get(), methodId, rawArgs);
     delete[] rawArgs;
     return ret;
   }

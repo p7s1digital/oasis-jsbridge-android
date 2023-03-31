@@ -26,6 +26,7 @@ class JsException(val jsonValue: String? = null, detailedMessage: String, jsStac
     init {
         Timber.v("JsException() - detailedMessage = $detailedMessage")
         Timber.v("JsException() - jsStackTrace = $jsStackTrace")
+        Timber.v("JsException() - cause = $cause")
 
         // Parses `StackTraceElement`s from `jsStackTrace` and prepend them to the Java stack trace
         stackTrace = jsStackTrace.orEmpty().split('\n')

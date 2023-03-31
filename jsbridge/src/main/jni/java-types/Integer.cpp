@@ -93,6 +93,7 @@ JValue Integer::popArray(uint32_t count, bool expanded) const {
 }
 
 duk_ret_t Integer::push(const JValue &value) const {
+  alog("BW - I0");
   duk_push_int(m_ctx, value.getInt());
   return 1;
 }

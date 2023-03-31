@@ -141,6 +141,9 @@ JniLocalRef<jthrowable> ExceptionHandler::getJavaException(const JsException &js
     duk_get_prop_string(ctx, -1, JAVA_EXCEPTION_PROP_NAME);
     cause = m_jsBridgeContext->getUtils()->getJavaRef<jthrowable>(-1);
     duk_pop(ctx);  // Java exception
+  } else if (duk_is_object(ctx, -1) && !duk_is_null(ctx, -1) && duk_has_prop_string(ctx, -1, "cause")) {
+    duk_get_prop_string(ctx, -1, "cause");
+    cause = getJavaException(JsException(m_jsBridgeContext, -1));
   }
 
   duk_pop(ctx);  // error
@@ -173,8 +176,16 @@ JniLocalRef<jthrowable> ExceptionHandler::getJavaException(const JsException &js
   if (JS_IsObject(exceptionValue) && !JS_IsNull(exceptionValue)) {
     JSValue javaExceptionValue = JS_GetPropertyStr(ctx, exceptionValue, JAVA_EXCEPTION_PROP_NAME);
     if (!JS_IsUndefined(javaExceptionValue)) {
+      // Cause is a Java exception
       cause = utils->getJavaRef<jthrowable>(javaExceptionValue);
       JS_FreeValue(ctx, javaExceptionValue);
+    } else {
+      // Cause explicitely given by the JS Error instance
+      alog("We have a cause!!!");
+      JSValue jsCauseValue = JS_GetPropertyStr(ctx, exceptionValue, "cause");
+      if (!JS_IsUndefined(jsCauseValue)) {
+        cause = getJavaException(JsException(m_jsBridgeContext, jsCauseValue));
+      }
     }
   }
 
