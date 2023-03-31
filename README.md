@@ -315,7 +315,9 @@ Offers the possibility to set a custom class loader which will be used by the Js
 | --------------------- | --------------------- | ---------- | ---
 | `Boolean`             | `boolean`, `Boolean`  | `number`   |
 | `Byte`                | `byte`, `Byte`        | `number`   |
+| `Short`               | `short`, `Short`      | `number`   |
 | `Int`                 | `int`, `Integer`      | `number`   |
+| `Long`                | `long`, `Long`        | `number`   |
 | `Float`               | `float`, `Float`      | `number`   |
 | `Double`              | `double`, `Double`    | `number`   |
 | `String`              | `String`              | `string`   |

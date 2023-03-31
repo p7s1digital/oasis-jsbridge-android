@@ -177,6 +177,7 @@ class JsBridgeTest {
             assertEquals(2.toByte(), subject.evaluate("1.5+1"))  // Byte
             assertEquals(2, subject.evaluate("1.5+1"))  // Int
             assertEquals(2L, subject.evaluate("1.5+1"))  // Long
+            assertEquals(2.toShort(), subject.evaluate("1.5+1"))  // Short
             assertEquals(2.5, subject.evaluate("1.5+1"))  // Double
             assertEquals(2.5f, subject.evaluate("1.5+1"))  // Float
 
@@ -234,6 +235,8 @@ class JsBridgeTest {
             assertArrayEquals(arrayOf(1, 2, 3), subject.evaluate<Array<Int>>("""[1.0, 2.2, 3.8]"""))  // Array<Int>
             assertArrayEquals(longArrayOf(1L, 2L, 3L), subject.evaluate("""[1.0, 2.2, 3.8]"""))  // LongArray
             assertArrayEquals(arrayOf(1L, 2L, 3L), subject.evaluate<Array<Long>>("""[1.0, 2.2, 3.8]"""))  // Array<Long>
+            assertArrayEquals(shortArrayOf(1, 2, 3), subject.evaluate("""[1.0, 2.2, 3.8]"""))  // ShortArray
+            assertArrayEquals(arrayOf(1.toShort(), 2.toShort(), 3.toShort()), subject.evaluate<Array<Short>>("""[1.0, 2.2, 3.8]"""))  // Array<Short>
             assertTrue(subject.evaluate<DoubleArray>("""[1.0, 2.2, 3.8]""").contentEquals(doubleArrayOf(1.0, 2.2, 3.8)))  // DoubleArray
             assertArrayEquals(arrayOf(1.0, 2.2, 3.8), subject.evaluate<Array<Double>>("""[1.0, 2.2, 3.8]"""))  // Array<Double>
             assertTrue(subject.evaluate<FloatArray>("""[1.0, 2.2, 3.8]""").contentEquals(floatArrayOf(1.0f, 2.2f, 3.8f)))  // FloatArray
@@ -721,15 +724,20 @@ class JsBridgeTest {
             // JS to Java
             assertEquals(12.0, subject.evaluate<Any>("12.0"))
             assertEquals(12.0, subject.evaluate<Any>("12"))
+            assertArrayEquals(arrayOf(12.0, null, 14.4), subject.evaluate<Any?>("[12.0, null, 14.4]") as Array<Any?>)
             assertEquals(true, subject.evaluate<Any>("true"))
             assertEquals(false, subject.evaluate<Any>("false"))
+            assertArrayEquals(arrayOf(true, null, false), subject.evaluate<Any?>("[true, null, false]") as Array<Any?>)
             assertEquals("test123", subject.evaluate<Any>("'test123'"))
+            assertArrayEquals(arrayOf("one", null, "two"), subject.evaluate<Any?>("['one', null, 'two']") as Array<Any?>)
             assertSame(javaObject, subject.evaluate<Any>("$jsJavaObject"))
             assertSame(javaApi, subject.evaluate<Any>("$jsJavaApi"))
 
             // Java to JS
             assertEquals(12.0, JsValue.fromJavaValue<Any?>(subject, 12.0).evaluate<Any?>());
             assertEquals(12.0, JsValue.fromJavaValue<Any?>(subject, 12).evaluate<Any?>());
+            //assertArrayEquals(arrayOf(12.0, null, 69.0), JsValue.fromJavaValue<Any?>(subject, arrayOf<Int?>(12, null, 69)).evaluate<Any?>() as Array<Any?>); val todo =
+            val todo = JsValue.fromJavaValue<Any?>(subject, arrayOf<Int?>(12, null, 69));
             assertEquals(true, JsValue.fromJavaValue<Any?>(subject, true).evaluate<Any?>());
             assertEquals(false, JsValue.fromJavaValue<Any?>(subject, false).evaluate<Any?>());
             assertEquals("test123", JsValue.fromJavaValue<Any?>(subject, "test123").evaluate<Any?>());
@@ -916,6 +924,9 @@ class JsBridgeTest {
             subject.evaluateBlocking<LongArray>("new Array($arrayLength);")
         }
         assertFailsWith<OutOfMemoryError> {
+            subject.evaluateBlocking<ShortArray>("new Array($arrayLength);")
+        }
+        assertFailsWith<OutOfMemoryError> {
             subject.evaluateBlocking<FloatArray>("new Array($arrayLength);")
         }
         assertFailsWith<OutOfMemoryError> {
@@ -989,6 +1000,11 @@ class JsBridgeTest {
             assertArrayEquals(longArrayOf(1L, 2L, 3L), jsArrayLong.evaluate())
             assertArrayEquals(arrayOf(1L, null, 3L), jsArrayNullableLong.evaluate<Array<Long?>>())
 
+            val jsArrayShort = JsValue.fromJavaValue(subject, shortArrayOf(1, 2, 3))
+            val jsArrayNullableShort = JsValue.fromJavaValue(subject, arrayOf(1.toShort(), null, 3.toShort()))
+            assertArrayEquals(shortArrayOf(1, 2, 3), jsArrayShort.evaluate())
+            assertArrayEquals(arrayOf(1.toShort(), null, 3.toShort()), jsArrayNullableShort.evaluate<Array<Short?>>())
+
             val jsArrayFloat = JsValue.fromJavaValue(subject, floatArrayOf(1f, 2f, 3f))
             val jsArrayNullableFloat = JsValue.fromJavaValue(subject, arrayOf(1f, null, 3f))
             assertTrue(jsArrayFloat.evaluate<FloatArray>().contentEquals(floatArrayOf(1f, 2f, 3f)))
@@ -1035,6 +1051,7 @@ class JsBridgeTest {
             assertFailsWith<IllegalArgumentException> { subject.evaluate<BooleanArray>("1") }
             assertFailsWith<IllegalArgumentException> { subject.evaluate<IntArray>("1") }
             assertFailsWith<IllegalArgumentException> { subject.evaluate<LongArray>("1") }
+            assertFailsWith<IllegalArgumentException> { subject.evaluate<ShortArray>("1") }
             assertFailsWith<IllegalArgumentException> { subject.evaluate<FloatArray>("1") }
             assertFailsWith<IllegalArgumentException> { subject.evaluate<DoubleArray>("1") }
             assertFailsWith<IllegalArgumentException> { subject.evaluate<Array<Any>>("1") }
@@ -1050,6 +1067,9 @@ class JsBridgeTest {
             }
             assertFailsWith<IllegalArgumentException> {
                 subject.evaluate<LongArray>("[1, 2, 'patate']")
+            }
+            assertFailsWith<IllegalArgumentException> {
+                subject.evaluate<ShortArray>("[1, 2, 'patate']")
             }
             assertFailsWith<IllegalArgumentException> {
                 subject.evaluate<FloatArray>("[1.0, 2.0, 'patate']")

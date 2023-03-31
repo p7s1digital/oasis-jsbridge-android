@@ -50,6 +50,11 @@ public:
     m_value.j = l;
   }
 
+  explicit JValue(jshort s)
+   : m_value() {
+    m_value.s = s;
+  }
+
   explicit JValue(jdouble d)
     : m_value() {
     m_value.d = d;
@@ -112,6 +117,7 @@ public:
   jbyte getByte() const { return m_value.b; }
   jint getInt() const { return m_value.i; }
   jlong getLong() const { return m_value.j; }
+  jshort getShort() const { return m_value.s; }
   jdouble getDouble() const { return m_value.d; }
   jfloat getFloat() const { return m_value.f; }
 

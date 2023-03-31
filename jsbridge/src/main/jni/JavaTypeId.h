@@ -31,6 +31,7 @@ enum class JavaTypeId {
   Long = 13,
   Float = 14,
   Double = 15,
+  Short = 16,
 
   BoxedBoolean = 20,
   BoxedByte = 21,
@@ -38,6 +39,7 @@ enum class JavaTypeId {
   BoxedLong = 23,
   BoxedFloat = 24,
   BoxedDouble = 25,
+  BoxedShort = 26,
 
   String = 30,
   Number = 31,
@@ -52,6 +54,7 @@ enum class JavaTypeId {
   LongArray = 63,
   FloatArray = 64,
   DoubleArray = 65,
+  ShortArray = 66,
 
   DebugString = 90,
   FunctionX = 100,

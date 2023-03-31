@@ -22,7 +22,7 @@
 #include <string>
 
 // Same as LocalRef<jarray> with additional array-specific utilities
-// Note: only works for jboolean, jlong, jint, jdouble, jfloat; use JObjectArrayLocalRef for jobject!
+// Note: only works for jboolean, jlong, jshort, jint, jdouble, jfloat; use JObjectArrayLocalRef for jobject!
 template <typename T>
 class JArrayLocalRef : public JniLocalRef<jarray> {
 
@@ -69,6 +69,12 @@ public:
   }
 
   template<typename U = T>
+  JArrayLocalRef(const JniContext *jniContext, jsize count, Mode mode = Mode::AutoReleased, typename std::enable_if_t<std::is_same<U, jshort>::value>* = nullptr)
+          : JniLocalRef<jarray>(jniContext, JniRefHelper::getJNIEnv(jniContext)->NewShortArray(count), mode)
+          , m_jniReleaseArrayMode(JNI_ABORT) {
+  }
+
+    template<typename U = T>
   JArrayLocalRef(const JniContext *jniContext, jsize count, Mode mode = Mode::AutoReleased, typename std::enable_if_t<std::is_same<U, jdouble>::value>* = nullptr)
       : JniLocalRef<jarray>(jniContext, JniRefHelper::getJNIEnv(jniContext)->NewDoubleArray(count), mode)
       , m_jniReleaseArrayMode(JNI_ABORT) {
@@ -179,6 +185,26 @@ public:
     return static_cast<T *>(m_elements);
   }
 
+  template<typename U = T, typename = std::enable_if_t<std::is_same<U, jshort>::value>>
+  const jshort *getElements() const {
+    if (!m_elements) {
+      m_elements = getJniEnv()->GetShortArrayElements(static_cast<jshortArray>(get()), nullptr);
+      m_jniReleaseArrayMode = JNI_ABORT;  // no copy  back
+    }
+
+    return static_cast<const T *>(m_elements);
+  }
+
+  template<typename U = T, typename = std::enable_if_t<std::is_same<U, jshort>::value>>
+  jshort *getMutableElements() {
+    if (!m_elements) {
+      m_elements = getJniEnv()->GetShortArrayElements(static_cast<jshortArray>(get()), nullptr);
+    }
+
+    m_jniReleaseArrayMode = 0;  // copy back + free
+    return static_cast<T *>(m_elements);
+  }
+
   template<typename U = T, typename = std::enable_if_t<std::is_same<U, jfloat>::value>>
   const jfloat *getElements() const {
     if (!m_elements) {
@@ -264,6 +290,18 @@ public:
       getJniEnv()->ReleaseLongArrayElements(
           static_cast<jlongArray >(get()),
           static_cast<T *>(m_elements), m_jniReleaseArrayMode);
+      m_elements = nullptr;
+    }
+  }
+
+  // Release / copy back array elements returned by get(Mutable)Elements()
+  template <typename V = void, class Q = T>
+  typename std::enable_if<std::is_same<Q, jshort>::value, V>::type
+  releaseArrayElements() {
+    if (m_elements != nullptr) {
+      getJniEnv()->ReleaseShortArrayElements(
+              static_cast<jshortArray >(get()),
+              static_cast<T *>(m_elements), m_jniReleaseArrayMode);
       m_elements = nullptr;
     }
   }

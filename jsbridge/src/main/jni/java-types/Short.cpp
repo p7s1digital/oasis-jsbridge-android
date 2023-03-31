@@ -16,7 +16,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "Long.h"
+#include "Short.h"
 
 #include "JsBridgeContext.h"
 #include "exceptions/JniException.h"
@@ -30,17 +30,17 @@
 
 namespace JavaTypes {
 
-Long::Long(const JsBridgeContext *jsBridgeContext)
-  : Primitive(jsBridgeContext, JavaTypeId::Long, JavaTypeId::BoxedLong) {
+Short::Short(const JsBridgeContext *jsBridgeContext)
+  : Primitive(jsBridgeContext, JavaTypeId::Short, JavaTypeId::BoxedShort) {
 }
 
 #if defined(DUKTAPE)
 
-JValue Long::pop() const {
+JValue Short::pop() const {
   CHECK_STACK_OFFSET(m_ctx, -1);
 
   if (!duk_is_number(m_ctx, -1)) {
-    const auto message = std::string("Cannot convert return value ") + duk_safe_to_string(m_ctx, -1) + " to long";
+    const auto message = std::string("Cannot convert return value ") + duk_safe_to_string(m_ctx, -1) + " to short";
     duk_pop(m_ctx);
     throw std::invalid_argument(message);
   }
@@ -48,12 +48,12 @@ JValue Long::pop() const {
     duk_pop(m_ctx);
     return JValue();
   }
-  auto l = (jlong) duk_require_number(m_ctx, -1);  // no real Duktape for int64 so needing a cast from double
+  auto l = (jshort) duk_require_number(m_ctx, -1);  // no real Duktape for int64 so needing a cast from double
   duk_pop(m_ctx);
   return JValue(l);
 }
 
-JValue Long::popArray(uint32_t count, bool expanded) const {
+JValue Short::popArray(uint32_t count, bool expanded) const {
   if (!expanded) {
     count = static_cast<uint32_t>(duk_get_length(m_ctx, -1));
     if (!duk_is_array(m_ctx, -1)) {
@@ -63,8 +63,8 @@ JValue Long::popArray(uint32_t count, bool expanded) const {
     }
   }
 
-  JArrayLocalRef<jlong> longArray(m_jniContext, count);
-  jlong *elements = longArray.isNull() ? nullptr : longArray.getMutableElements();
+  JArrayLocalRef<jshort> shortArray(m_jniContext, count);
+  jshort *elements = shortArray.isNull() ? nullptr : shortArray.getMutableElements();
   if (elements == nullptr) {
     duk_pop_n(m_ctx, expanded ? count : 1);  // pop the expanded elements or the array
     throw JniException(m_jniContext);
@@ -76,7 +76,7 @@ JValue Long::popArray(uint32_t count, bool expanded) const {
     }
     try {
       JValue value = pop();
-      elements[i] = value.getLong();
+      elements[i] = value.getShort();
     } catch (const std::exception &e) {
       if (!expanded) {
         duk_pop(m_ctx);  // pop the array
@@ -89,19 +89,19 @@ JValue Long::popArray(uint32_t count, bool expanded) const {
     duk_pop(m_ctx);  // pop the array
   }
 
-  return JValue(longArray);
+  return JValue(shortArray);
 }
 
-duk_ret_t Long::push(const JValue &value) const {
-  duk_push_number(m_ctx, static_cast<duk_double_t>(value.getLong()));  // no real Duktape for int64 so needing a cast to double
+duk_ret_t Short::push(const JValue &value) const {
+  duk_push_number(m_ctx, static_cast<duk_double_t>(value.getShort()));  // no real Duktape for int64 so needing a cast to double
   return 1;
 }
 
-duk_ret_t Long::pushArray(const JniLocalRef<jarray> &values, bool expand) const {
-  JArrayLocalRef<jlong> longArray(values);
-  const auto count = longArray.getLength();
+duk_ret_t Short::pushArray(const JniLocalRef<jarray> &values, bool expand) const {
+  JArrayLocalRef<jshort> shortArray(values);
+  const auto count = shortArray.getLength();
 
-  const jlong *elements = longArray.getElements();
+  const jshort *elements = shortArray.getElements();
   if (elements == nullptr) {
     throw JniException(m_jniContext);
   }
@@ -125,7 +125,7 @@ duk_ret_t Long::pushArray(const JniLocalRef<jarray> &values, bool expand) const 
 #elif defined(QUICKJS)
 
 namespace {
-  inline jlong getLong(JSContext *ctx, JSValue v) {
+  inline jshort getShort(JSContext *ctx, JSValue v) {
     int tag = JS_VALUE_GET_TAG(v);
     if (tag == JS_TAG_INT) {
       int64_t i64;
@@ -134,26 +134,26 @@ namespace {
     }
 
     if (JS_TAG_IS_FLOAT64(tag)) {
-      return jlong(JS_VALUE_GET_FLOAT64(v));
+      return jshort(JS_VALUE_GET_FLOAT64(v));
     }
 
-    throw std::invalid_argument("Cannot convert JS value to Java long");
+    throw std::invalid_argument("Cannot convert JS value to Java short");
   }
 }
 
-JValue Long::toJava(JSValueConst v) const {
+JValue Short::toJava(JSValueConst v) const {
   if (!JS_IsNumber(v)) {
-    throw std::invalid_argument("Cannot convert return value to long");
+    throw std::invalid_argument("Cannot convert return value to short");
   }
 
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
     return JValue();
   }
 
-  return JValue(getLong(m_ctx, v));
+  return JValue(getShort(m_ctx, v));
 }
 
-JValue Long::toJavaArray(JSValueConst v) const {
+JValue Short::toJavaArray(JSValueConst v) const {
   if (JS_IsNull(v) || JS_IsUndefined(v)) {
     return JValue();
   }
@@ -167,36 +167,36 @@ JValue Long::toJavaArray(JSValueConst v) const {
   uint32_t count = JS_VALUE_GET_INT(lengthValue);
   JS_FreeValue(m_ctx, lengthValue);
 
-  JArrayLocalRef<jlong> longArray(m_jniContext, count);
-  if (longArray.isNull()) {
+  JArrayLocalRef<jshort> shortArray(m_jniContext, count);
+  if (shortArray.isNull()) {
     throw JniException(m_jniContext);
   }
 
-  jlong *elements = longArray.getMutableElements();
+  jshort *elements = shortArray.getMutableElements();
   if (elements == nullptr) {
     throw JniException(m_jniContext);
   }
 
   for (uint32_t i = 0; i < count; ++i) {
     JSValue ev = JS_GetPropertyUint32(m_ctx, v, i);
-    elements[i] = getLong(m_ctx, ev);
+    elements[i] = getShort(m_ctx, ev);
   }
 
-  longArray.releaseArrayElements();  // copy back elements to Java
-  return JValue(longArray);
+  shortArray.releaseArrayElements();  // copy back elements to Java
+  return JValue(shortArray);
 }
 
-JSValue Long::fromJava(const JValue &value) const {
-  return JS_NewInt64(m_ctx, value.getLong());
+JSValue Short::fromJava(const JValue &value) const {
+  return JS_NewInt64(m_ctx, value.getShort());
 }
 
-JSValue Long::fromJavaArray(const JniLocalRef<jarray> &values) const {
-  JArrayLocalRef<jlong> longArray(values);
-  const auto count = longArray.getLength();
+JSValue Short::fromJavaArray(const JniLocalRef<jarray> &values) const {
+  JArrayLocalRef<jshort> shortArray(values);
+  const auto count = shortArray.getLength();
 
   JSValue jsArray = JS_NewArray(m_ctx);
 
-  const jlong *elements = longArray.getElements();
+  const jshort *elements = shortArray.getElements();
   if (elements == nullptr) {
     JS_FreeValue(m_ctx, jsArray);
     throw JniException(m_jniContext);
@@ -212,9 +212,9 @@ JSValue Long::fromJavaArray(const JniLocalRef<jarray> &values) const {
 
 #endif
 
-JValue Long::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
+JValue Short::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
                         const std::vector<JValue> &args) const {
-  jlong l = m_jniContext->callLongMethodA(javaThis, methodId, args);
+  jshort l = m_jniContext->callShortMethodA(javaThis, methodId, args);
 
   // Explicitly release all values now because they won't be used afterwards
   JValue::releaseAll(args);
@@ -226,17 +226,16 @@ JValue Long::callMethod(jmethodID methodId, const JniRef<jobject> &javaThis,
   return JValue(l);
 }
 
-JValue Long::box(const JValue &longValue) const {
-  // From long to Long
-  static thread_local jmethodID boxId = m_jniContext->getStaticMethodID(getBoxedJavaClass(), "valueOf", "(J)Ljava/lang/Long;");
-  return JValue(m_jniContext->callStaticObjectMethod(getBoxedJavaClass(), boxId, longValue.getLong()));
+JValue Short::box(const JValue &shortValue) const {
+  // From short to Short
+  static thread_local jmethodID boxId = m_jniContext->getStaticMethodID(getBoxedJavaClass(), "valueOf", "(S)Ljava/lang/Short;");
+  return JValue(m_jniContext->callStaticObjectMethod(getBoxedJavaClass(), boxId, shortValue.getShort()));
 }
 
-JValue Long::unbox(const JValue &boxedValue) const {
-  // From Long to long
-  static thread_local jmethodID unboxId = m_jniContext->getMethodID(getBoxedJavaClass(), "longValue", "()J");
-  return JValue(m_jniContext->callLongMethod(boxedValue.getLocalRef(), unboxId));
+JValue Short::unbox(const JValue &boxedValue) const {
+  // From Short to short
+  static thread_local jmethodID unboxId = m_jniContext->getMethodID(getBoxedJavaClass(), "shortValue", "()S");
+  return JValue(m_jniContext->callShortMethod(boxedValue.getLocalRef(), unboxId));
 }
 
 }  // namespace JavaTypes
-
