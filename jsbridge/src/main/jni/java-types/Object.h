@@ -26,7 +26,7 @@ namespace JavaTypes {
 class Object : public JavaType {
 
 public:
-  Object(const JsBridgeContext *);
+  Object(const JsBridgeContext *, std::optional<JniGlobalRef<jstring>> optJavaName);
 
 #if defined(DUKTAPE)
   JValue pop() const override;
@@ -37,7 +37,14 @@ public:
 #endif
 
 private:
+  friend class Array;
+
+  const std::optional<JniGlobalRef<jstring>> m_optJavaName;
+
+  JStringLocalRef getJavaName(const JniLocalRef<jobject> &object) const;
   JavaType *newJavaType(const JniLocalRef<jobject> &jobject) const;
+  JavaType *newJavaTypeFromJavaName(std::u16string_view javaName) const;
+  JavaType *newJavaTypeFromJavaTypeId(JavaTypeId id, std::unique_ptr<const JavaType> &&componentJavaType) const;
 };
 
 }  // namespace JavaTypes

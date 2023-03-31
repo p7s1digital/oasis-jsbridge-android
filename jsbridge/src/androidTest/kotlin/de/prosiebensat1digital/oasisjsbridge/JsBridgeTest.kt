@@ -706,6 +706,39 @@ class JsBridgeTest {
     }
 
     @Test
+    fun testGenericJavaObject() {
+        // GIVEN
+        val subject = createAndSetUpJsBridge()
+        val javaObject = object : Any() {}
+        val javaApi = object : SimpleJsToJavaInterface {
+            override fun ping() = "pong"
+        }
+        val jsJavaObject = JsValue.fromJavaValue(subject, JavaObjectWrapper(javaObject))
+        val jsJavaApi = JsValue.createJsToJavaProxy(subject, javaApi)
+
+        // WHEN
+        runBlocking {
+            // JS to Java
+            assertEquals(12.0, subject.evaluate<Any>("12.0"))
+            assertEquals(12.0, subject.evaluate<Any>("12"))
+            assertEquals(true, subject.evaluate<Any>("true"))
+            assertEquals(false, subject.evaluate<Any>("false"))
+            assertEquals("test123", subject.evaluate<Any>("'test123'"))
+            assertSame(javaObject, subject.evaluate<Any>("$jsJavaObject"))
+            assertSame(javaApi, subject.evaluate<Any>("$jsJavaApi"))
+
+            // Java to JS
+            assertEquals(12.0, JsValue.fromJavaValue<Any?>(subject, 12.0).evaluate<Any?>());
+            assertEquals(12.0, JsValue.fromJavaValue<Any?>(subject, 12).evaluate<Any?>());
+            assertEquals(true, JsValue.fromJavaValue<Any?>(subject, true).evaluate<Any?>());
+            assertEquals(false, JsValue.fromJavaValue<Any?>(subject, false).evaluate<Any?>());
+            assertEquals("test123", JsValue.fromJavaValue<Any?>(subject, "test123").evaluate<Any?>());
+            assertSame(javaObject, JsValue.fromJavaValue<Any?>(subject, JavaObjectWrapper(javaObject)).evaluate<Any?>())
+            assertSame(javaApi, JsValue.fromJavaValue<Any?>(subject, JavaObjectWrapper(javaApi)).evaluate<Any?>())
+        }
+    }
+
+    @Test
     fun testUnhandledPromiseRejection() {
         // GIVEN
         val subject = createAndSetUpJsBridge()
@@ -1640,7 +1673,8 @@ class JsBridgeTest {
         jsExpectations.checkEquals("cbBool2", false)
         jsExpectations.checkEquals("cbInt", 69)
         jsExpectations.checkEquals("cbDouble", 16.64)
-        assertNotNull(jsExpectations.takeExpectation<Any>("javaException"))
+        val jsException = jsExpectations.takeExpectation<JsonObjectWrapper>("javaException")
+        assertNotNull(jsException)  // TODO
         assertTrue(jsExpectations.isEmpty)
         assertTrue(errors.isEmpty())
     }

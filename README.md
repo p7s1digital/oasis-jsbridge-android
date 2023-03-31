@@ -329,9 +329,10 @@ Offers the possibility to set a custom class loader which will be used by the Js
 | `Function<R>`         | n.a.                  | `function` | lambda with supported types
 | `Deferred<T>`         | n.a.                  | `Promise`  | T must be a supported type
 | `JsonObjectWrapper`   | `JsonObjectWrapper`   | `object`   | serializes JS objects via JSON
-| `JavaObjectWrapper` | `JavaObjectWrapper` | `object`   | serializes JS objects via JSON
+| `JavaObjectWrapper`   | `JavaObjectWrapper`   | `object`   | serializes JS objects via JSON
 | `JsValue`             | `JsValue`             | `any       | references any JS value
-| `JsToJavaProxy<T>`  | `JsToJavaProxy`     | `object`   | references a JS object proxy to a Java interface
+| `JsToJavaProxy<T>`    | `JsToJavaProxy`       | `object`   | references a JS object proxy to a Java interface
+| `Any?`                | `Object`              | <auto>     | dynamically mapped to a string, number, boolean, array or wrapped Java objects
 
 
 ## Example: consuming a JS API from Kotlin

@@ -152,6 +152,8 @@ JValue Byte::toJavaArray(JSValueConst v) const {
     return JValue();
   }
 
+  // TODO: if it is an ArrayBuffer...
+
   if (!JS_IsArray(m_ctx, v)) {
     throw std::invalid_argument("Cannot convert JS value to Java array");
   }
@@ -188,6 +190,7 @@ JSValue Byte::fromJavaArray(const JniLocalRef<jarray> &values) const {
   JArrayLocalRef<jbyte> byteArray(values);
   const auto count = byteArray.getLength();
 
+  // TODO: or ByteArray???
   JSValue jsArray = JS_NewArray(m_ctx);
 
   const jbyte *elements = byteArray.getElements();

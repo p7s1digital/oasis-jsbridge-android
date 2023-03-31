@@ -284,6 +284,19 @@ duk_ret_t JavaObject::pushLambda(const JsBridgeContext *jsBridgeContext, const s
 }
 
 // static
+bool JavaObject::hasJavaThis(const JsBridgeContext *jsBridgeContext, duk_idx_t index) {
+  duk_context *ctx = jsBridgeContext->getDuktapeContext();
+  CHECK_STACK_OFFSET(ctx, 0);
+
+  if (!duk_is_object(ctx, index) || duk_is_null(ctx, index)) {
+    return false;
+  }
+
+  const JniContext *jniContext = jsBridgeContext->getJniContext();
+  return duk_has_prop_string(ctx, index, JAVA_THIS_PROP_NAME);
+}
+
+// static
 JniLocalRef<jobject> JavaObject::getJavaThis(const JsBridgeContext *jsBridgeContext, duk_idx_t index) {
   duk_context *ctx = jsBridgeContext->getDuktapeContext();
   CHECK_STACK_OFFSET(ctx, 0);
@@ -427,6 +440,19 @@ JSValue JavaObject::createLambda(const JsBridgeContext *jsBridgeContext, const s
   JS_FreeValue(ctx, javaThisValue);
 
   return javaLambdaHandlerValue;
+}
+
+// static
+bool JavaObject::hasJavaThis(const JsBridgeContext *jsBridgeContext, JSValue jsObject) {
+  if (!JS_IsObject(jsObject) || JS_IsNull(jsObject)) {
+    return false;
+  }
+
+  auto ctx = jsBridgeContext->getQuickJsContext();
+  JSValue javaThisValue = JS_GetPropertyStr(ctx, jsObject, JAVA_THIS_PROP_NAME);
+  JS_AUTORELEASE_VALUE(ctx, javaThisValue);
+
+  return !JS_IsUndefined(javaThisValue);
 }
 
 // static

@@ -28,10 +28,10 @@
 #include "java-types/Integer.h"
 #include "java-types/JsToJavaProxy.h"
 #include "java-types/JsValue.h"
+#include "java-types/JavaObjectWrapper.h"
 #include "java-types/JsonObjectWrapper.h"
 #include "java-types/List.h"
 #include "java-types/Long.h"
-#include "java-types/JavaObjectWrapper.h"
 #include "java-types/Object.h"
 #include "java-types/String.h"
 #include "java-types/Void.h"
@@ -102,8 +102,10 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
       return new String(m_jsBridgeContext, false);
     case JavaTypeId::DebugString:
       return new String(m_jsBridgeContext, true);
+    case JavaTypeId::Number:
+      return createPrimitive<Double>(m_jsBridgeContext, true);
     case JavaTypeId::Object:
-      return new Object(m_jsBridgeContext);
+      return new Object(m_jsBridgeContext, std::nullopt);
 
     case JavaTypeId::ObjectArray: {
       auto genericParameterType = getGenericParameterType(parameter);
@@ -151,7 +153,7 @@ std::unique_ptr<const JavaType> JavaTypeProvider::makeUniqueType(const JniRef<js
 
 const std::unique_ptr<const JavaType> &JavaTypeProvider::getObjectType() const {
   if (m_objectType == nullptr)   {
-    m_objectType.reset(new Object(m_jsBridgeContext));
+    m_objectType.reset(new Object(m_jsBridgeContext, std::nullopt));
   }
 
   return m_objectType;

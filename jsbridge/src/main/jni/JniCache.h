@@ -39,7 +39,10 @@ public:
 
   const JniGlobalRef<jclass> &getJavaClass(JavaTypeId) const;
   const JniRef<jclass> &getObjectClass() const { return m_objectClass; }
+  const JniRef<jclass> &getNumberClass() const { return m_numberClass; }
+  const JniRef<jclass> &getStringClass() const { return m_stringClass; }
   const JniRef<jclass> &getListClass() const { return m_listClass; }
+  const JniRef<jclass> &getJavaClassClass() const { return m_javaClassClass; }
   const JniRef<jclass> &getJsBridgeClass() const { return m_jsBridgeClass; }
   const JniRef<jclass> &getJsBridgeMethodClass() const { return m_jsBridgeMethodClass; }
   const JniRef<jclass> &getJsBridgeParameterClass() const { return m_jsBridgeParameterClass; }
@@ -73,6 +76,7 @@ public:
   JStringLocalRef getJsonObjectWrapperString(const JniRef<jobject> &jsonObjectWrapper) const;
 
   // JavaObjectWrapper (de.prosiebensat1digital.oasisjsbridge.JavaObjectWrapper)
+  JniLocalRef<jobject> getOrCreateJavaObjectWrapper(const JniRef<jobject> &javaObject) const;
   JniLocalRef<jobject> javaObjectWrapperFromJavaObject(const JniRef<jobject> &javaObject) const;
   JniLocalRef<jobject> getJavaObjectWrapperJavaObject(const JniRef<jobject> &javaObjectWrapper) const;
 
@@ -97,7 +101,10 @@ private:
   mutable std::unordered_map<JavaTypeId, JniGlobalRef<jclass>> m_javaClasses;
 
   JniGlobalRef<jclass> m_objectClass;
+  JniGlobalRef<jclass> m_numberClass;
+  JniGlobalRef<jclass> m_stringClass;
   JniGlobalRef<jclass> m_listClass;
+  JniGlobalRef<jclass> m_javaClassClass;
   JniGlobalRef<jclass> m_arrayListClass;
   JniGlobalRef<jclass> m_jsBridgeClass;
   JniGlobalRef<jclass> m_jsExceptionClass;

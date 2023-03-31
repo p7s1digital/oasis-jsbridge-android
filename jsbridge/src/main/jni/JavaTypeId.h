@@ -40,6 +40,7 @@ enum class JavaTypeId {
   BoxedDouble = 25,
 
   String = 30,
+  Number = 31,
   Object = 40,
 
   ObjectArray = 50,

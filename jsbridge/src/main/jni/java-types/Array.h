@@ -27,6 +27,7 @@ class Array : public JavaType {
 
 public:
   Array(const JsBridgeContext *, std::unique_ptr<const JavaType> &&componentType);
+  Array(const JsBridgeContext *, const JniRef<jclass> &arrayJavaClass);
 
 #if defined(DUKTAPE)
   JValue pop() const override;
@@ -43,4 +44,3 @@ private:
 }  // namespace JavaTypes
 
 #endif
-
