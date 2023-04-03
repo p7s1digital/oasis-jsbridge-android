@@ -101,34 +101,27 @@ JValue Object::pop() const {
 }
 
 duk_ret_t Object::push(const JValue &value) const {
-  alog("BW - 0");
-  alog("BW - 0.0");
   CHECK_STACK_OFFSET(m_ctx, 1);
-  alog("BW - 0.0.0");
 
   const JniLocalRef<jobject> &jBasicObject = value.getLocalRef();
 
-  alog("BW - 0.0.0.0");
   if (jBasicObject.isNull()) {
-    alog("BW - 0.1");
     duk_push_null(m_ctx);
     return 1;
   }
 
-  alog("BW - 0.1.1");
   JavaType *javaType = newJavaType(jBasicObject);
-  alog("BW - 0.2");
 
-  alog("BW - 1");
   if (javaType == nullptr) {
-    alog("BW - 2");
-    duk_push_null(m_ctx);
-    throw std::invalid_argument("Cannot push Object: unsupported Java type");
+    // Java Any -> JS wrapped JavaObject
+    auto javaObjectWrapper = m_jsBridgeContext->getJniCache()->getOrCreateJavaObjectWrapper(jBasicObject);
+    javaType = new JavaObjectWrapper(m_jsBridgeContext);
+    duk_ret_t ret = javaType->push(JValue(javaObjectWrapper));
+    delete javaType;
+    return ret;
   }
 
-  alog("BW - 3");
   duk_ret_t ret = javaType->push(value);
-  alog("BW - 4 - ret = %d", ret);
   delete javaType;
   return ret;
 }
@@ -188,7 +181,10 @@ JSValue Object::fromJava(const JValue &value) const {
 
   auto javaType = std::unique_ptr<JavaType>(newJavaType(jBasicObject));
   if (javaType == nullptr) {
-    throw std::invalid_argument("Cannot transfer Java Object to JS: unsupported Java type");
+    // Java Any -> JS wrapped JavaObject
+    auto javaObjectWrapper = m_jsBridgeContext->getJniCache()->getOrCreateJavaObjectWrapper(jBasicObject);
+    javaType.reset(new JavaObjectWrapper(m_jsBridgeContext));
+    return javaType->fromJava(JValue(javaObjectWrapper));
   }
 
   return javaType->fromJava(value);
@@ -250,24 +246,17 @@ JavaType *Object::newJavaType(const JniLocalRef<jobject> &object) const {
       return new String(m_jsBridgeContext, false);
     case JavaTypeId::DebugString:
       return new String(m_jsBridgeContext, true);
-    case JavaTypeId::JavaObjectWrapper:
-      return new JavaObjectWrapper(m_jsBridgeContext);
-    case JavaTypeId::JsonObjectWrapper:
-      return new JsonObjectWrapper(m_jsBridgeContext, false /*isNullable*/);
     case JavaTypeId::Object: {
       if (m_jniContext->isInstanceOf(object, getJniCache()->getNumberClass())) {
         // Java number -> JS double
         auto doubleType = std::make_unique<Double>(m_jsBridgeContext);
         return new BoxedPrimitive(m_jsBridgeContext, std::move(doubleType));
       }
-      else if (m_jniContext->isInstanceOf(object, getJniCache()->getStringClass())) {
+      if (m_jniContext->isInstanceOf(object, getJniCache()->getStringClass())) {
         // Java String -> JS String
         return new String(m_jsBridgeContext, false);
-      } else {
-        // Java Any -> JS wrapped JavaObject
-        auto javaObjectWrapper = m_jsBridgeContext->getJniCache()->getOrCreateJavaObjectWrapper(object);
-        return new JavaObjectWrapper(m_jsBridgeContext);
       }
+      break;
     }
     case JavaTypeId::ObjectArray: {
       // ObjectArray -> Array of Object
@@ -279,7 +268,6 @@ JavaType *Object::newJavaType(const JniLocalRef<jobject> &object) const {
     }
     case JavaTypeId::Unknown:
     default:
-      alog_warn("Class %s (type id = %d) cannot be transferred from Java to JS", javaNameRef.toUtf8Chars(), id);
       return nullptr;
   }
 }

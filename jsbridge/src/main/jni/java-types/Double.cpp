@@ -89,7 +89,6 @@ JValue Double::popArray(uint32_t count, bool expanded) const {
 }
 
 duk_ret_t Double::push(const JValue &value) const {
-  alog("BW - D0");
   duk_push_number(m_ctx, value.getDouble());
   return 1;
 }
