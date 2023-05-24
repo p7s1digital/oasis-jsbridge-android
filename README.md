@@ -7,7 +7,7 @@
 Evaluate JavaScript code and map values, objects and functions between Kotlin/Java and JavaScript on Android.
 
 ```kotlin
-val jsBridge = JsBridge(JsBridgeConfig.bareConfig())
+val jsBridge = JsBridge(JsBridgeConfig.bareConfig(), context, "namespace")
 val msg: String = jsBridge.evaluate("'Hello world!'.toUpperCase()")
 println(msg)  // HELLO WORLD!
 ```
@@ -404,7 +404,7 @@ val javaApi = object: JavaApi {
 
 Bridging JavaScript and Kotlin:
 ```kotlin
-val jsBridge = JsBridge(JsBridgeConfig.standardConfig())
+val jsBridge = JsBridge(JsBridgeConfig.standardConfig(), context, "namespace")
 jsBridge.evaluateLocalFile(context, "js/api.js")
 
 // JS "proxy" to Java API
