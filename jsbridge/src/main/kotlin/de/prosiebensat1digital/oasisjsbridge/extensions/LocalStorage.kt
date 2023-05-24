@@ -13,10 +13,10 @@ interface LocalStorageInteface : JsToNativeInterface {
     fun clear()
 }
 
-class LocalStorage(context: Context) : LocalStorageInteface {
+class LocalStorage(context: Context, namespace: String) : LocalStorageInteface {
 
     private val localStoragePreferences = context.getSharedPreferences(
-        context.applicationInfo.packageName + ".LOCAL_STORAGE_PREFERENCE_FILE_KEY",
+        "${namespace.takeIf { it.isNotEmpty() } ?: "default"}.LOCAL_STORAGE_PREFERENCES",
         Context.MODE_PRIVATE
     )
 

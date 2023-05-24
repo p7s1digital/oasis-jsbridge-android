@@ -57,9 +57,13 @@ import java.lang.reflect.Proxy
  * Note: all the public methods are asynchronous and will not block the caller threads. They
  * can be safely called in a "synchronous" way. though, because their executions are guaranteed
  * to be performed sequentially (via an internal queue).
+ *
+ * @param config JsBridge configuration
+ * @param context Context needed for built in implementation of local storage
+ * @param namespace arbitrary string for separation of local storage between multiple JsBridge instances
  */
 class JsBridge
-    constructor(config: JsBridgeConfig, context: Context) : CoroutineScope {
+    constructor(config: JsBridgeConfig, context: Context, namespace: String) : CoroutineScope {
 
     companion object {
         private var isLibraryLoaded = false
@@ -158,7 +162,7 @@ class JsBridge
             if (config.xhrConfig.enabled)
                 xhrExtension = XMLHttpRequestExtension(this@JsBridge, config.xhrConfig)
             if (config.localStorageConfig.enabled)
-                localStorageExtension = LocalStorageExtension(this@JsBridge, config.localStorageConfig, context.applicationContext)
+                localStorageExtension = LocalStorageExtension(this@JsBridge, config.localStorageConfig, context.applicationContext, namespace)
             config.jvmConfig.customClassLoader?.let { customClassLoader = it }
         }
     }

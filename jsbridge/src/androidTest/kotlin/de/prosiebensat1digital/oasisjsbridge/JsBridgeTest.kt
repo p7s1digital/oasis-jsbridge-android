@@ -76,6 +76,8 @@ interface JsExpectationsNativeApi : JsToNativeInterface {
     fun addExpectation(name: String, value: JsValue)
 }
 
+private const val NAMESPACE = "test_namespace"
+
 class JsBridgeTest {
     private var jsBridge: JsBridge? = null
     private val context: Context = InstrumentationRegistry.getInstrumentation().context
@@ -1180,7 +1182,7 @@ class JsBridgeTest {
         val config = JsBridgeConfig.standardConfig().apply {
             xhrConfig.okHttpClient = okHttpClient
         }
-        val subject = JsBridge(config, context)
+        val subject = JsBridge(config, context, NAMESPACE)
 
         val jsExpectations = JsExpectations()
         val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
@@ -1551,7 +1553,7 @@ class JsBridgeTest {
         val config = JsBridgeConfig.standardConfig().apply {
             xhrConfig.okHttpClient = okHttpClient
         }
-        val subject = JsBridge(config, context)
+        val subject = JsBridge(config, context, NAMESPACE)
 
         val jsExpectations = JsExpectations()
         val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
@@ -2591,7 +2593,7 @@ class JsBridgeTest {
                 messages.add(priority to message)
             }
         }
-        val subject = JsBridge(config, context)
+        val subject = JsBridge(config, context, NAMESPACE)
         jsBridge = subject
 
         // WHEN
@@ -2629,7 +2631,7 @@ class JsBridgeTest {
                 messages.add(priority to message)
             }
         }
-        val subject = JsBridge(config, context)
+        val subject = JsBridge(config, context, NAMESPACE)
         jsBridge = subject
 
         // WHEN
@@ -2667,7 +2669,7 @@ class JsBridgeTest {
                 hasMessage = true
             }
         }
-        val subject = JsBridge(config, context)
+        val subject = JsBridge(config, context, NAMESPACE)
         jsBridge = subject
 
         // WHEN
@@ -2883,11 +2885,11 @@ class JsBridgeTest {
         val subject = createAndSetUpJsBridge()
 
         // WHEN
-        subject.evaluateBlocking<Unit>("""localStorage.setItem("foo", "bar");""")
-        val result = subject.evaluateBlocking<String>("""localStorage.getItem("foo");""")
+        subject.evaluateBlocking<Unit>("""localStorage.setItem("key", "value");""")
+        val result = subject.evaluateBlocking<String>("""localStorage.getItem("key");""")
 
         // THEN
-        assertEquals(result, "bar")
+        assertEquals("value", result)
         assertTrue(errors.isEmpty())
 
         // GIVEN
@@ -2900,6 +2902,27 @@ class JsBridgeTest {
 
         // THEN
         assertTrue(localStorageNotSet)
+        assertTrue(errors.isEmpty())
+    }
+
+    @Test
+    fun testLocalStorageNamespaces() {
+        // GIVEN
+        val subject1 = createAndSetUpJsBridge()
+        val subject2 = createAndSetUpJsBridge(namespace = "other_namespace")
+
+        // WHEN
+        subject1.evaluateBlocking<Unit>("""localStorage.setItem("key", "value");""")
+        subject1.evaluateBlocking<Unit>("""localStorage.setItem("key2", "value");""")
+        val result1 = subject1.evaluateBlocking<String>("""localStorage.getItem("key");""")
+        subject2.evaluateBlocking<Unit>("""localStorage.setItem("key", "TEST");""")
+        val result2 = subject2.evaluateBlocking<String>("""localStorage.getItem("key");""")
+        val result3 = subject2.evaluateBlocking<String>("""localStorage.getItem("key2");""")
+
+        // THEN
+        assertEquals("value", result1)
+        assertEquals("TEST", result2)
+        assertNull(result3)
         assertTrue(errors.isEmpty())
     }
 
@@ -2947,10 +2970,11 @@ class JsBridgeTest {
     private fun createAndSetUpJsBridge(
         config: JsBridgeConfig = JsBridgeConfig.standardConfig().apply {
             xhrConfig.okHttpClient = okHttpClient
-        }
+        },
+        namespace: String = NAMESPACE,
     ): JsBridge {
 
-        return JsBridge(config, context).also { jsBridge ->
+        return JsBridge(config, context, namespace).also { jsBridge ->
             this@JsBridgeTest.jsBridge = jsBridge
 
             jsBridge.registerErrorListener(createErrorListener())
