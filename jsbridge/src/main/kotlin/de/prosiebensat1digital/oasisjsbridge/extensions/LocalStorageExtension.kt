@@ -21,14 +21,15 @@ import de.prosiebensat1digital.oasisjsbridge.JsBridgeConfig
 import de.prosiebensat1digital.oasisjsbridge.JsValue
 
 internal class LocalStorageExtension(
-    private val jsBridge: JsBridge,
-    val config: JsBridgeConfig.LocalStorageConfig,
+    jsBridge: JsBridge,
+    config: JsBridgeConfig.LocalStorageConfig,
     context: Context,
+    namespace: String,
 ) {
 
     init {
         if (config.useDefaultLocalStorage) {
-            val localStorage: LocalStorageInteface = LocalStorage(context)
+            val localStorage: LocalStorageInteface = LocalStorage(context, namespace)
             val localStorageJsValue = JsValue.createJsToJavaProxy(jsBridge, localStorage)
             localStorageJsValue.assignToGlobal("localStorage")
         }
