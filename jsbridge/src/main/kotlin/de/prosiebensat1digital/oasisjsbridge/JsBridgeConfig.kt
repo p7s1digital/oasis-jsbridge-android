@@ -62,6 +62,16 @@ private constructor() {
     class LocalStorageConfig {
         var enabled: Boolean = false
         var useDefaultLocalStorage: Boolean = true
+
+        /**
+         * Only disable namespaces if a particular instance of JsBridge requires access to local
+         * storage key/value pairs that were saved with a previous version of the library.
+         *
+         * You should try to avoid using multiple unrelated instances of JsBridge without namespaces
+         * or with an identical namespace. An exception would be if you want to explicitly share data
+         * between instances and the possibility of key name collisions is not an issue.
+         */
+        var useNamespaces: Boolean = true
     }
 
     class JvmConfig {

@@ -7,7 +7,7 @@
 Evaluate JavaScript code and map values, objects and functions between Kotlin/Java and JavaScript on Android.
 
 ```kotlin
-val jsBridge = JsBridge(JsBridgeConfig.bareConfig())
+val jsBridge = JsBridge(JsBridgeConfig.bareConfig(), context, "namespace")
 val msg: String = jsBridge.evaluate("'Hello world!'.toUpperCase()")
 println(msg)  // HELLO WORLD!
 ```
@@ -304,6 +304,9 @@ Other network clients are not tested but should work as well (polyfill for
 Support for ES6 promises (Duktape: via polyfill, QuickJS: built-in). Pending jobs are triggered
 after each evaluation.
 
+- **LocalStorage:**<br/>
+Support for browser-like local storage.
+
 - **JS Debugger:**<br/>
 JS debugger support (Duktape only via Visual Studio Code plugin)
 
@@ -401,7 +404,7 @@ val nativeApi = object: NativeApi {
 
 Bridging JavaScript and Kotlin:
 ```kotlin
-val jsBridge = JsBridge(JsBridgeConfig.standardConfig())
+val jsBridge = JsBridge(JsBridgeConfig.standardConfig(), context, "namespace")
 jsBridge.evaluateLocalFileUnsync(context, "js/api.js")
 
 // JS "proxy" to native API

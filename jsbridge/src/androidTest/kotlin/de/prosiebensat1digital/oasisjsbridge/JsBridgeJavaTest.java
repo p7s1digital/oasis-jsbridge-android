@@ -153,7 +153,7 @@ public final class JsBridgeJavaTest {
     // ---
 
     private JsBridge createAndSetUpJsBridge() {
-        JsBridge jsBridge = new JsBridge(JsBridgeConfig.standardConfig(), context);
+        JsBridge jsBridge = new JsBridge(JsBridgeConfig.standardConfig(), context, "test_namespace");
         this.jsBridge = jsBridge;
         return jsBridge;
     }
