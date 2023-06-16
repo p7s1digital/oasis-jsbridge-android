@@ -2894,7 +2894,7 @@ class JsBridgeTest {
 
         // GIVEN
         val subjectNoLocalStorage = createAndSetUpJsBridge(JsBridgeConfig.standardConfig().apply {
-            localStorageConfig.useDefaultLocalStorage = false
+            localStorageConfig.enabled = false
         })
 
         // WHEN

@@ -61,7 +61,6 @@ private constructor() {
 
     class LocalStorageConfig {
         var enabled: Boolean = false
-        var useDefaultLocalStorage: Boolean = true
 
         /**
          * Only disable namespaces if a particular instance of JsBridge requires access to local
