@@ -28,11 +28,9 @@ internal class LocalStorageExtension(
 ) {
 
     init {
-        if (config.useDefaultLocalStorage) {
-            val localStorage: LocalStorageInteface = LocalStorage(context, namespace.takeIf { config.useNamespaces })
-            val localStorageJsValue = JsValue.createJsToJavaProxy(jsBridge, localStorage)
-            localStorageJsValue.assignToGlobal("localStorage")
-        }
+        val localStorage: LocalStorageInteface = LocalStorage(context, namespace.takeIf { config.useNamespaces })
+        val localStorageJsValue = JsValue.createJsToJavaProxy(jsBridge, localStorage)
+        localStorageJsValue.assignToGlobal("localStorage")
     }
 }
 
