@@ -1179,10 +1179,10 @@ class JsBridgeTest {
     }
 
     private fun stressTestHelper() {
-        val config = JsBridgeConfig.standardConfig().apply {
+        val config = JsBridgeConfig.standardConfig(NAMESPACE).apply {
             xhrConfig.okHttpClient = okHttpClient
         }
-        val subject = JsBridge(config, context, NAMESPACE)
+        val subject = JsBridge(config, context)
 
         val jsExpectations = JsExpectations()
         val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
@@ -1550,10 +1550,10 @@ class JsBridgeTest {
             }
         }
 
-        val config = JsBridgeConfig.standardConfig().apply {
+        val config = JsBridgeConfig.standardConfig(NAMESPACE).apply {
             xhrConfig.okHttpClient = okHttpClient
         }
-        val subject = JsBridge(config, context, NAMESPACE)
+        val subject = JsBridge(config, context)
 
         val jsExpectations = JsExpectations()
         val jsExpectationsJsValue = JsValue.fromNativeObject(subject, jsExpectations)
@@ -2593,7 +2593,7 @@ class JsBridgeTest {
                 messages.add(priority to message)
             }
         }
-        val subject = JsBridge(config, context, NAMESPACE)
+        val subject = JsBridge(config, context)
         jsBridge = subject
 
         // WHEN
@@ -2631,7 +2631,7 @@ class JsBridgeTest {
                 messages.add(priority to message)
             }
         }
-        val subject = JsBridge(config, context, NAMESPACE)
+        val subject = JsBridge(config, context)
         jsBridge = subject
 
         // WHEN
@@ -2669,7 +2669,7 @@ class JsBridgeTest {
                 hasMessage = true
             }
         }
-        val subject = JsBridge(config, context, NAMESPACE)
+        val subject = JsBridge(config, context)
         jsBridge = subject
 
         // WHEN
@@ -2893,7 +2893,7 @@ class JsBridgeTest {
         assertTrue(errors.isEmpty())
 
         // GIVEN
-        val subjectNoLocalStorage = createAndSetUpJsBridge(JsBridgeConfig.standardConfig().apply {
+        val subjectNoLocalStorage = createAndSetUpJsBridge(JsBridgeConfig.standardConfig(NAMESPACE).apply {
             localStorageConfig.enabled = false
         })
 
@@ -2909,7 +2909,9 @@ class JsBridgeTest {
     fun testLocalStorageNamespaces() {
         // GIVEN
         val subject1 = createAndSetUpJsBridge()
-        val subject2 = createAndSetUpJsBridge(namespace = "other_namespace")
+        val subject2 = createAndSetUpJsBridge(config = JsBridgeConfig.standardConfig("other_namespace").apply {
+            xhrConfig.okHttpClient = okHttpClient
+        },)
 
         // WHEN
         subject1.evaluateBlocking<Unit>("""localStorage.setItem("key", "value");""")
@@ -2968,13 +2970,12 @@ class JsBridgeTest {
     // ---
 
     private fun createAndSetUpJsBridge(
-        config: JsBridgeConfig = JsBridgeConfig.standardConfig().apply {
+        config: JsBridgeConfig = JsBridgeConfig.standardConfig(NAMESPACE).apply {
             xhrConfig.okHttpClient = okHttpClient
         },
-        namespace: String = NAMESPACE,
     ): JsBridge {
 
-        return JsBridge(config, context, namespace).also { jsBridge ->
+        return JsBridge(config, context).also { jsBridge ->
             this@JsBridgeTest.jsBridge = jsBridge
 
             jsBridge.registerErrorListener(createErrorListener())

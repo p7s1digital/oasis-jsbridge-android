@@ -24,11 +24,10 @@ internal class LocalStorageExtension(
     jsBridge: JsBridge,
     config: JsBridgeConfig.LocalStorageConfig,
     context: Context,
-    namespace: String,
 ) {
 
     init {
-        val localStorage: LocalStorageInteface = LocalStorage(context, namespace.takeIf { config.useNamespaces })
+        val localStorage: LocalStorageInteface = LocalStorage(context, config.namespace)
         val localStorageJsValue = JsValue.fromNativeObject(jsBridge, localStorage)
         localStorageJsValue.assignToGlobal("localStorage")
     }
