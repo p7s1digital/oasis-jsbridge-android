@@ -39,7 +39,7 @@ class ReadmeTest {
 
     @Before
     fun setUp() {
-        jsBridge = JsBridge(JsBridgeConfig.standardConfig(), context,"test_namespace")
+        jsBridge = JsBridge(JsBridgeConfig.standardConfig("test_namespace"), context)
     }
 
     @After
