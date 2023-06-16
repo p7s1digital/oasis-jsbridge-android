@@ -2925,7 +2925,6 @@ class JsBridgeTest {
         }
     }
 
-
     // JsExpectations
     // ---
 

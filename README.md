@@ -301,7 +301,7 @@ after each evaluation.
 
 - **LocalStorage:**<br/>
 Support for browser-like local storage.
-- 
+
 - **JS Debugger:**<br/>
 JS debugger support (Duktape only via Visual Studio Code plugin)
 
