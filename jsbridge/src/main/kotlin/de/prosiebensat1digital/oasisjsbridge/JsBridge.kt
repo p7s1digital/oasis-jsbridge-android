@@ -58,11 +58,10 @@ import java.lang.reflect.Proxy
  * to be performed sequentially (via an internal queue).
  *
  * @param config JsBridge configuration
- * @param context Context needed for built in implementation of local storage
- * @param namespace arbitrary string for separation of local storage between multiple JsBridge instances
+ * @param context Context needed for local storage extension
  */
 class JsBridge
-    constructor(config: JsBridgeConfig, context: Context, namespace: String) : CoroutineScope {
+    constructor(config: JsBridgeConfig, context: Context) : CoroutineScope {
 
     companion object {
         private var isLibraryLoaded = false
@@ -161,7 +160,7 @@ class JsBridge
             if (config.xhrConfig.enabled)
                 xhrExtension = XMLHttpRequestExtension(this@JsBridge, config.xhrConfig)
             if (config.localStorageConfig.enabled)
-                localStorageExtension = LocalStorageExtension(this@JsBridge, config.localStorageConfig, context.applicationContext, namespace)
+                localStorageExtension = LocalStorageExtension(this@JsBridge, config.localStorageConfig, context.applicationContext)
             config.jvmConfig.customClassLoader?.let { customClassLoader = it }
         }
     }

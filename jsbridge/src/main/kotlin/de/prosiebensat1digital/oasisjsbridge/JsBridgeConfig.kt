@@ -6,16 +6,28 @@ import okhttp3.OkHttpClient
 class JsBridgeConfig
 private constructor() {
     companion object {
+        /**
+         * Creates an instance of JsBridgeConfig without any extensions.
+         */
         @JvmStatic
         fun bareConfig() = JsBridgeConfig()
 
+        /**
+         * Creates an instance of JsBridgeConfig and enables all extensions.
+         * @param localStorageNamespace arbitrary string for separation of local storage between
+         * multiple JsBridge instances. If you use the same namespace for multiple instances of
+         * JsBridge there might be collisions if identical keys are used to store values.
+         */
         @JvmStatic
-        fun standardConfig() = JsBridgeConfig().apply {
+        fun standardConfig(localStorageNamespace: String) = JsBridgeConfig().apply {
             setTimeoutConfig.enabled = true
             xhrConfig.enabled = true
             promiseConfig.enabled = true
             consoleConfig.enabled = true
-            localStorageConfig.enabled = true
+            localStorageConfig.apply {
+                enabled = true
+                namespace = localStorageNamespace
+            }
         }
     }
 
@@ -61,17 +73,8 @@ private constructor() {
 
     class LocalStorageConfig {
         var enabled: Boolean = false
-        var useDefaultLocalStorage: Boolean = true
 
-        /**
-         * Only disable namespaces if a particular instance of JsBridge requires access to local
-         * storage key/value pairs that were saved with a previous version of the library.
-         *
-         * You should try to avoid using multiple unrelated instances of JsBridge without namespaces
-         * or with an identical namespace. An exception would be if you want to explicitly share data
-         * between instances and the possibility of key name collisions is not an issue.
-         */
-        var useNamespaces: Boolean = true
+        var namespace: String = ""
     }
 
     class JvmConfig {

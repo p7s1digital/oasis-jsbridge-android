@@ -7,7 +7,7 @@
 Evaluate JavaScript code and map values, objects and functions between Kotlin/Java and JavaScript on Android.
 
 ```kotlin
-val jsBridge = JsBridge(JsBridgeConfig.bareConfig(), context, "namespace")
+val jsBridge = JsBridge(JsBridgeConfig.bareConfig(), context)
 val msg: String = jsBridge.evaluate("'Hello world!'.toUpperCase()")
 println(msg)  // HELLO WORLD!
 ```
@@ -300,14 +300,16 @@ Support for ES6 promises (Duktape: via polyfill, QuickJS: built-in). Pending job
 after each evaluation.
 
 - **LocalStorage:**<br/>
-Support for browser-like local storage.
+Built-in support for browser-like local storage. Use `JsBridgeConfig.standardConfig(namespace)`
+to initialise the local storage extension using a namespace for separation of saved data between
+multiple JsBridge instances.
+_Note: If you use your own implementation of local storage you should disable this extension! 
 
 - **JS Debugger:**<br/>
 JS debugger support (Duktape only via Visual Studio Code plugin)
 
 - **JVM config:**<br/>
 Offers the possibility to set a custom class loader which will be used by the JsBridge to find classes.
-
 
 ## Supported types
 
@@ -404,7 +406,7 @@ val javaApi = object: JavaApi {
 
 Bridging JavaScript and Kotlin:
 ```kotlin
-val jsBridge = JsBridge(JsBridgeConfig.standardConfig(), context, "namespace")
+val jsBridge = JsBridge(JsBridgeConfig.standardConfig("namespace"), context)
 jsBridge.evaluateLocalFile(context, "js/api.js")
 
 // JS "proxy" to Java API
