@@ -303,7 +303,7 @@ after each evaluation.
 Built-in support for browser-like local storage. Use `JsBridgeConfig.standardConfig(namespace)`
 to initialise the local storage extension using a namespace for separation of saved data between
 multiple JsBridge instances.
-_Note: If you use your own implementation of local storage you should disable this extension! 
+_Note: If you use your own implementation of local storage you should disable this extension!_
 
 - **JS Debugger:**<br/>
 JS debugger support (Duktape only via Visual Studio Code plugin)
