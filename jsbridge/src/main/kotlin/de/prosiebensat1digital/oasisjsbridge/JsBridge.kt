@@ -163,7 +163,7 @@ constructor(config: JsBridgeConfig, context: Context) : CoroutineScope {
             if (config.consoleConfig.enabled)
                 consoleExtension = ConsoleExtension(this@JsBridge, config.consoleConfig)
             if (config.xhrConfig.enabled)
-                xhrExtension = XMLHttpRequestExtension(this@JsBridge, config.xhrConfig)
+                xhrExtension = XMLHttpRequestExtension(context, this@JsBridge, config.xhrConfig)
             if (config.localStorageConfig.enabled)
                 localStorageExtension = LocalStorageExtension(
                     this@JsBridge,
