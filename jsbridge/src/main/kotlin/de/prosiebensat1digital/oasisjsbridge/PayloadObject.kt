@@ -174,23 +174,41 @@ class PayloadObject: Payload {
     @Throws
     override fun toJsString(orderAlphabetically: Boolean): String {
         val keys = if (orderAlphabetically) values.keys.sorted() else values.keys
-
-        return "{" + keys.fold("") { acc, key ->
-            val valueString = valueToJsString(values[key])
-            val prefix = if (acc.isEmpty()) "" else ", "
-            "$acc$prefix$key: $valueString"
-        } + "}"
+        val builder = StringBuilder()
+        builder.append('{')
+        keys.forEachIndexed { index, key ->
+            val value = valueToJsString(values[key])
+            builder.append(key)
+            builder.append(": ")
+            builder.append(value)
+            if (index != keys.size - 1) {
+                builder.append(JsonObjectWrapper.SEPARATOR)
+                builder.append(' ')
+            }
+        }
+        builder.append('}')
+        return builder.toString()
     }
 
     @Throws
     override fun toJsonString(orderAlphabetically: Boolean): String {
         val keys = if (orderAlphabetically) values.keys.sorted() else values.keys
-
-        return "{" + keys.fold("") { acc, key ->
-            val valueString = valueToJsonString(values[key])
-            val prefix = if (acc.isEmpty()) "" else ", "
-            "$acc$prefix\"$key\": $valueString"
-        } + "}"
+        val builder = StringBuilder()
+        builder.append('{')
+        keys.forEachIndexed { index, key ->
+            val value = valueToJsonString(values[key])
+            builder.append('"')
+            builder.append(key)
+            builder.append('"')
+            builder.append(": ")
+            builder.append(value)
+            if (index != keys.size - 1) {
+                builder.append(JsonObjectWrapper.SEPARATOR)
+                builder.append(' ')
+            }
+        }
+        builder.append('}')
+        return builder.toString()
     }
 
     override fun toString(): String {

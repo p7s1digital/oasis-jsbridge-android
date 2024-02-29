@@ -29,6 +29,8 @@ open class JsonObjectWrapper(val jsonString: String) {
 
     companion object {
 
+        const val SEPARATOR = ","
+
         private fun mapToJsonString(map: Map<String, Any?>): String {
             val stringBuilder = StringBuilder()
             stringBuilder.append('{')
@@ -42,7 +44,7 @@ open class JsonObjectWrapper(val jsonString: String) {
                     stringBuilder.append("\":")
                     stringBuilder.append(valueToString(value))
                     if (index != map.size - 1) {
-                        stringBuilder.append(',')
+                        stringBuilder.append(SEPARATOR)
                     }
                 }
                 index++
@@ -62,7 +64,7 @@ open class JsonObjectWrapper(val jsonString: String) {
                     stringBuilder.append("\":")
                     stringBuilder.append(valueToString(value))
                     if (index != pairs.size - 1) {
-                        stringBuilder.append(',')
+                        stringBuilder.append(SEPARATOR)
                     }
                 }
             }
@@ -77,7 +79,7 @@ open class JsonObjectWrapper(val jsonString: String) {
                 if (item !is Undefined) {
                     stringBuilder.append(valueToString(item))
                     if (index != array.size - 1) {
-                        stringBuilder.append(',')
+                        stringBuilder.append(SEPARATOR)
                     }
                 }
             }
@@ -93,7 +95,7 @@ open class JsonObjectWrapper(val jsonString: String) {
                 if (item !is Undefined) {
                     stringBuilder.append(valueToString(item))
                     if (index != collection.size - 1) {
-                        stringBuilder.append(',')
+                        stringBuilder.append(SEPARATOR)
                     }
                 }
             }
