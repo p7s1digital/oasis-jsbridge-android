@@ -39,9 +39,10 @@ open class JsonObjectWrapper(val jsonString: String) {
                 val key = entry.key
                 val value = entry.value
                 if (value !is Undefined) {
-                    stringBuilder.append("\"")
+                    stringBuilder.append('"')
                     stringBuilder.append(key)
-                    stringBuilder.append("\":")
+                    stringBuilder.append('"')
+                    stringBuilder.append(':')
                     stringBuilder.append(valueToString(value))
                     if (index != map.size - 1) {
                         stringBuilder.append(SEPARATOR)
