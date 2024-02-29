@@ -90,12 +90,11 @@ open class JsonObjectWrapper(val jsonString: String) {
             stringBuilder.append('[')
 
             collection.forEachIndexed { index, item ->
-                if (item is Undefined) {
-                    return@forEachIndexed
-                }
-                stringBuilder.append(valueToString(item))
-                if (index != collection.size - 1) {
-                    stringBuilder.append(',')
+                if (item !is Undefined) {
+                    stringBuilder.append(valueToString(item))
+                    if (index != collection.size - 1) {
+                        stringBuilder.append(',')
+                    }
                 }
             }
             stringBuilder.append(']')
