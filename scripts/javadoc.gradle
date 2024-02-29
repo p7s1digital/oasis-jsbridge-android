@@ -23,8 +23,6 @@ android {
                 exclude 'com/google/android/exoplayer/demo/*'
             }
             task("generate${variant.name.capitalize()}JavadocJar", type: Jar, dependsOn: "generate${variant.name.capitalize()}Javadoc") {
-                classifier = 'javadoc'
-                destinationDir = file("${buildDir}/outputs/javadoc/")
                 from file("${buildDir}/javadoc/")
             }
         }
