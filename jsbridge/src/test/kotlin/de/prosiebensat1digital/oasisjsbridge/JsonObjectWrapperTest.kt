@@ -15,6 +15,8 @@
  */
 package de.prosiebensat1digital.oasisjsbridge
 
+import com.google.common.truth.Truth.assertThat
+import com.google.gson.Gson
 import org.junit.Test
 import kotlin.test.assertEquals
 
@@ -60,7 +62,7 @@ class JsonObjectWrapperTest {
         val wrapperFromPairs = JsonObjectWrapper(*keyValuePairs)
 
         val value3 = objectString.removeWhiteSpaces()
-        assertEquals(wrapperFromPairs.jsonString.removeWhiteSpaces(), """{"key1":"value1","key2":2,"key3":$value3,"key4":true,"key5":false,"key7":null}""")
+        assertThat(wrapperFromPairs.jsonString.removeWhiteSpaces()).isEqualTo("""{"key1":"value1","key2":2,"key3":$value3,"key4":true,"key5":false,"key7":null}""")
     }
 
     @Test
@@ -68,14 +70,15 @@ class JsonObjectWrapperTest {
         val wrapperFromMap = JsonObjectWrapper(mapOf(*keyValuePairs))
 
         val value3 = objectString.removeWhiteSpaces()
-        assertEquals(wrapperFromMap.jsonString.removeWhiteSpaces(), """{"key1":"value1","key2":2,"key3":$value3,"key4":true,"key5":false,"key7":null}""")
+        assertThat(wrapperFromMap.jsonString.removeWhiteSpaces())
+            .isEqualTo("""{"key1":"value1","key2":2,"key3":$value3,"key4":true,"key5":false,"key7":null}""")
     }
 
     @Test
     fun constructorWithArrayItems() {
         val wrapperFromArrayItems = JsonObjectWrapper(array)
 
-        assertEquals(wrapperFromArrayItems.jsonString.removeWhiteSpaces(), """[1,"three"]""")
+        assertThat(wrapperFromArrayItems.jsonString.removeWhiteSpaces()).isEqualTo("""[1,"three"]""")
     }
 
     @Test
@@ -92,5 +95,24 @@ class JsonObjectWrapperTest {
             """JSON.parse("{\"key1\":\"value1\",\"key2\":2,\"key3\":{\"key1\":\"value1\",\"key2\":2,\"key3\":[\"one\",2]},\"key4\":true,\"key5\":false,\"key7\":null}")""")
         assertEquals(arrayWrapper.toJsString().removeWhiteSpaces(),
             """JSON.parse("[1,\"three\"]")""")
+    }
+
+    @Test
+    fun `test large json collection`() {
+        val input = List(1000) {
+            val string = generateString(length = 1000)
+            val map = mutableMapOf<String, String>()
+            repeat(10) {
+                map["property$it"] = string
+            }
+            map
+        }
+        val json = JsonObjectWrapper(input).jsonString
+        assertThat(json).isEqualTo(Gson().toJson(input))
+    }
+
+    private fun generateString(length: Int) : String {
+        val charArray = CharArray(length) { 'X' }
+        return String(charArray)
     }
 }

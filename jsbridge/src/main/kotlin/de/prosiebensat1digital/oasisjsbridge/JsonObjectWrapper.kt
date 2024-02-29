@@ -15,72 +15,141 @@
  */
 package de.prosiebensat1digital.oasisjsbridge
 
+import java.lang.IllegalArgumentException
+
 open class JsonObjectWrapper(val jsonString: String) {
 
-    constructor(undefined: Undefined): this("")
-    constructor(vararg pairs: Pair<String, Any?>): this(pairsToJsonString(pairs))
-    constructor(map: Map<String, Any?>): this(*map.map { it.toPair() }.toTypedArray())
-    constructor(array: Array<out Any?>): this(arrayToJsonString(array))
-    constructor(collection: Collection<Any?>): this(collectionToJsonString(collection))
+    constructor(undefined: Undefined) : this("")
+    constructor(vararg pairs: Pair<String, Any?>) : this(pairsToJsonString(pairs))
+    constructor(map: Map<String, Any?>) : this(mapToJsonString(map))
+    constructor(array: Array<out Any?>) : this(arrayToJsonString(array))
+    constructor(collection: Collection<Any?>) : this(collectionToJsonString(collection))
 
-    object Undefined: JsonObjectWrapper("")
+    object Undefined : JsonObjectWrapper("")
 
     companion object {
+
         private fun mapToJsonString(map: Map<String, Any?>): String {
-            val inside = map.entries.fold("") { acc, entry ->
-                if (entry.value == Undefined) return@fold acc
-                val prefix = if (acc.isEmpty()) acc else "$acc, "
-                """$prefix"${entry.key}": ${valueToString(entry.value)}"""
+            val stringBuilder = StringBuilder()
+            stringBuilder.append('{')
+            var index = 0
+            map.forEach { entry ->
+                val key = entry.key
+                val value = entry.value
+                if (value !is Undefined) {
+                    stringBuilder.append("\"")
+                    stringBuilder.append(key)
+                    stringBuilder.append("\":")
+                    stringBuilder.append(valueToString(value))
+                    if (index != map.size - 1) {
+                        stringBuilder.append(',')
+                    }
+                }
+                index++
             }
-            return "{$inside}"
+            stringBuilder.append('}')
+            return stringBuilder.toString()
         }
 
         private fun pairsToJsonString(pairs: Array<out Pair<String, Any?>>): String {
-            val inside = pairs.fold("") { acc, pair ->
-                if (pair.second == Undefined) return@fold acc
-                val prefix = if (acc.isEmpty()) acc else "$acc, "
-                """$prefix"${pair.first}": ${valueToString(pair.second)}"""
+            val stringBuilder = StringBuilder()
+            stringBuilder.append('{')
+            pairs.forEachIndexed { index, pair ->
+                val value = pair.second
+                if (value !is Undefined) {
+                    stringBuilder.append('"')
+                    stringBuilder.append(pair.first)
+                    stringBuilder.append("\":")
+                    stringBuilder.append(valueToString(value))
+                    if (index != pairs.size - 1) {
+                        stringBuilder.append(',')
+                    }
+                }
             }
-            return "{$inside}"
+            stringBuilder.append('}')
+            return stringBuilder.toString()
         }
 
         private fun arrayToJsonString(array: Array<out Any?>): String {
-            val inside = array.fold("") { acc, item ->
-                if (item is Undefined) return@fold acc
-                val prefix = if (acc.isEmpty()) acc else "$acc, "
-                """$prefix${valueToString(item)}"""
+            val stringBuilder = StringBuilder()
+            stringBuilder.append('[')
+            array.forEachIndexed { index, item ->
+                if (item !is Undefined) {
+                    stringBuilder.append(valueToString(item))
+                    if (index != array.size - 1) {
+                        stringBuilder.append(',')
+                    }
+                }
             }
-            return "[$inside]"
+            stringBuilder.append(']')
+            return stringBuilder.toString()
         }
 
         private fun collectionToJsonString(collection: Collection<Any?>): String {
-            val inside = collection.fold("") { acc, item ->
-                if (item is Undefined) return@fold acc
-                val prefix = if (acc.isEmpty()) acc else "$acc, "
-                """$prefix${valueToString(item)}"""
+            val stringBuilder = StringBuilder()
+            stringBuilder.append('[')
+
+            collection.forEachIndexed { index, item ->
+                if (item is Undefined) {
+                    return@forEachIndexed
+                }
+                stringBuilder.append(valueToString(item))
+                if (index != collection.size - 1) {
+                    stringBuilder.append(',')
+                }
             }
-            return "[$inside]"
+            stringBuilder.append(']')
+            return stringBuilder.toString()
         }
 
         @Suppress("UNCHECKED_CAST")
-        private fun<T> valueToString(value: T) = when (value) {
+        private fun <T> valueToString(value: T) = when (value) {
             null -> "null"
             Undefined -> ""
             is JsonObjectWrapper -> value.jsonString
             is Number -> "$value"
             is Boolean -> if (value) "true" else "false"
-            is String -> "\"${escape(value)}\""
+            is String -> escape(value)
             is Array<*> -> JsonObjectWrapper(value).jsonString
             is Collection<*> -> JsonObjectWrapper(value as Collection<Any?>).jsonString
             is Map<*, *> -> JsonObjectWrapper(value as Map<String, Any?>).jsonString
-            else -> throw Exception("Unsupported value in JsonStringWrapper ($value)")
+            else -> throw IllegalArgumentException("Unsupported value in JsonStringWrapper ($value)")
         }
+
+        private fun escape(string: String): String {
+            val builder = StringBuilder()
+            builder.append('"')
+            string.forEach { char ->
+                when (char) {
+                    '"' -> builder.append("\\\"")
+                    '\n' -> builder.append("\\n")
+                    '\t' -> builder.append("\\t")
+                    '\r' -> builder.append("\\r")
+                    else -> builder.append(char)
+                }
+            }
+            builder.append('"')
+            return builder.toString()
+        }
+
     }
 
-    fun toJsString() = jsonString
-        .replace("\"", "\\\"")
-        .replace("\n", " ")
-        .let { if (it.isEmpty()) "undefined" else "JSON.parse(\"$it\")" }
+    fun toJsString(): String {
+        if (jsonString.isBlank()) {
+            return "undefined"
+        }
+        val builder = StringBuilder()
+        builder.append("JSON.parse(\"")
+        jsonString.forEach { char ->
+            when (char) {
+                '"' -> builder.append("\\\"")
+                '\n' -> builder.append(" ")
+                else -> builder.append(char)
+            }
+        }
+        builder.append("\")")
+        return builder.toString()
+    }
 
     override fun equals(other: Any?): Boolean {
         if (other !is JsonObjectWrapper) return false
@@ -90,9 +159,7 @@ open class JsonObjectWrapper(val jsonString: String) {
     override fun hashCode() = jsonString.hashCode()
 
     override fun toString() = jsonString
+
+
 }
 
-private fun escape(s: String): String = s.replace("\"", "\\\"")
-    .replace("\n", "\\n")
-    .replace("\t", "\\t")
-    .replace("\r", "\\r")

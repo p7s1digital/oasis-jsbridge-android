@@ -126,6 +126,8 @@ dependencies {
 
     testImplementation "junit:junit:$versions.junit"
     testImplementation 'org.json:json:20180813'
+    testImplementation "com.google.truth:truth:1.4.1"
+
     androidTestImplementation "junit:junit:$versions.junit"
 
     testImplementation "org.jetbrains.kotlin:kotlin-test:$versions.kotlin.kotlin"
