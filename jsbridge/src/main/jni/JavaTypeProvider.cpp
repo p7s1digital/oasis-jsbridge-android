@@ -17,8 +17,6 @@
 
 #include "JniCache.h"
 #include "JsBridgeContext.h"
-#include "java-types/AidlInterface.h"
-#include "java-types/AidlParcelable.h"
 #include "java-types/Array.h"
 #include "java-types/BoxedPrimitive.h"
 #include "java-types/Boolean.h"
@@ -136,11 +134,6 @@ const JavaType *JavaTypeProvider::newType(const JniRef<jsBridgeParameter> &param
       return new JsonObjectWrapper(m_jsBridgeContext, isParameterNullable(parameter));
     case JavaTypeId::Deferred:
       return new Deferred(m_jsBridgeContext, getGenericParameterType(parameter));
-
-    case JavaTypeId::AidlInterface:
-      return new AidlInterface(m_jsBridgeContext, parameter);
-    case JavaTypeId::AidlParcelable:
-      return new AidlParcelable(m_jsBridgeContext, parameter, isParameterNullable(parameter));
   }
 }
 
@@ -176,16 +169,6 @@ JavaTypeId JavaTypeProvider::getJavaTypeId(const JniRef<jsBridgeParameter> &para
 
   JavaTypeId id = getJavaTypeIdByJavaName(javaName.getUtf16View());
   if (id == JavaTypeId::Unknown) {
-    // AIDL types
-    ParameterInterface parameterInterface = m_jsBridgeContext->getJniCache()->getParameterInterface(parameter);
-    if (parameterInterface.isAidlInterface()) {
-      return JavaTypeId::AidlInterface;
-    }
-    if (parameterInterface.isAidlParcelable()) {
-      return JavaTypeId::AidlParcelable;
-    }
-
-    // TODO: check if implements NativeToJsInterface or JsToNativeInterface
     throw std::invalid_argument(std::string("Unsupported Java type: ") + javaName.toStdString());
   }
 
@@ -202,19 +185,6 @@ JniLocalRef<jsBridgeParameter> JavaTypeProvider::getGenericParameter(const JniRe
 }
 
 std::unique_ptr<const JavaType> JavaTypeProvider::getGenericParameterType(const JniRef<jsBridgeParameter> &parameter) const {
-  auto type = makeUniqueType(getGenericParameter(parameter), true /*boxed*/);
-
-  if (type->getTypeId() == JavaTypeId::Object) {
-    // Because a java.lang.Object could mean that the real generic type has been erased, we need to add more hints
-    auto parentMethod = m_jsBridgeContext->getJniCache()->getParameterInterface(parameter).getParentMethod();
-    if (!parentMethod.isNull()) {
-      // Check if the parent method is an AIDL method and pass the information to the Object
-      bool isAidlMethod = m_jsBridgeContext->getJniCache()->getMethodInterface(parentMethod).isAidl();
-      auto objectType = const_cast<Object *>(dynamic_cast<const Object *>(type.get()));
-      objectType->setInsideAidl(true);
-    }
-  }
-
-  return type;
+  return makeUniqueType(getGenericParameter(parameter), true /*boxed*/);
 }
 
