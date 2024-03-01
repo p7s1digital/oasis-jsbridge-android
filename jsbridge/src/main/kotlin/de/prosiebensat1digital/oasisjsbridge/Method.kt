@@ -31,7 +31,6 @@ internal class Method {
     val name: String?
 
     val javaMethod: JavaMethod?
-    val isAidl: Boolean
 
     @Suppress("UNUSED")  // Called from JNI
     var returnParameter: Parameter
@@ -44,10 +43,9 @@ internal class Method {
     val isVarArgs: Boolean
 
     // KFunction with full reflection information
-    constructor(kotlinFunction: KFunction<*>, isLambda: Boolean, isAidl: Boolean, customClassLoader: ClassLoader?) {
+    constructor(kotlinFunction: KFunction<*>, isLambda: Boolean, customClassLoader: ClassLoader?) {
         this.name = kotlinFunction.name
         this.javaMethod = kotlinFunction.javaMethod ?: throw Throwable("Given kotlin Function does not have any Java method")
-        this.isAidl = isAidl
 
         // The return type of Unit functions must be "Unit" for lambdas but "Void" for methods
         val returnType = if (!isLambda && kotlinFunction.returnType.classifier == Unit::class) Void::class.createType() else kotlinFunction.returnType
@@ -58,10 +56,9 @@ internal class Method {
     }
 
     // Java-only reflection
-    constructor(javaMethod: JavaMethod, isAidl: Boolean, customClassLoader: ClassLoader?) {
+    constructor(javaMethod: JavaMethod, customClassLoader: ClassLoader?) {
         this.name = javaMethod.name
         this.javaMethod = javaMethod
-        this.isAidl = isAidl
         this.returnParameter = Parameter(this, javaMethod.returnType, customClassLoader)
         this.parameters = javaMethod.parameterTypes.map { Parameter(this, it, customClassLoader) }.toTypedArray()
         this.isVarArgs = javaMethod.isVarArgs
@@ -79,7 +76,6 @@ internal class Method {
     constructor(javaMethod: JavaMethod, genericArguments: List<KTypeProjection>, isLambda: Boolean, customClassLoader: ClassLoader?) {
         this.name = javaMethod.name
         this.javaMethod = javaMethod
-        this.isAidl = false
         this.isVarArgs = javaMethod.isVarArgs
 
         var outParameterType: KType? = null
@@ -117,7 +113,6 @@ internal class Method {
     constructor(parameters: Array<Parameter>, returnParameter: Parameter, isVarArgs: Boolean) {
         this.name = null
         this.javaMethod = null
-        this.isAidl = false
         this.isVarArgs = isVarArgs
         this.parameters = parameters
         this.returnParameter = returnParameter
