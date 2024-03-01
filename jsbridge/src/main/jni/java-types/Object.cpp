@@ -270,6 +270,7 @@ JavaType *Object::newJavaType(const JniLocalRef<jobject> &object) const {
     default:
       return nullptr;
   }
+  return nullptr;
 }
 
 }  // namespace JavaTypes

@@ -61,7 +61,7 @@ import java.lang.reflect.Proxy
  * @param context Context needed for local storage extension
  */
 class JsBridge
-    constructor(config: JsBridgeConfig, context: Context) : CoroutineScope {
+constructor(config: JsBridgeConfig, context: Context) : CoroutineScope {
 
     companion object {
         private var isLibraryLoaded = false
@@ -76,6 +76,7 @@ class JsBridge
         Pending(0), AboutToStart(1), Starting(2), Started(3),
         Releasing(4), Released(5);
     }
+
     private val startReleaseLock = ReentrantLock()
     private var state = AtomicInteger(State.Pending.intValue)
     private val currentState get() = State.values().firstOrNull { it.intValue == state.get() }
@@ -152,15 +153,23 @@ class JsBridge
             if (config.jsDebuggerConfig.enabled)
                 jsDebuggerExtension = JsDebuggerExtension(this, config.jsDebuggerConfig)
             if (config.promiseConfig.enabled)
-                promiseExtension = PromiseExtension(this@JsBridge, config.promiseConfig)
+                promiseExtension = PromiseExtension(
+                    context = context,
+                    jsBridge = this@JsBridge,
+                    config = config.promiseConfig
+                )
             if (config.setTimeoutConfig.enabled)
                 setTimeoutExtension = SetTimeoutExtension(this@JsBridge)
             if (config.consoleConfig.enabled)
                 consoleExtension = ConsoleExtension(this@JsBridge, config.consoleConfig)
             if (config.xhrConfig.enabled)
-                xhrExtension = XMLHttpRequestExtension(this@JsBridge, config.xhrConfig)
+                xhrExtension = XMLHttpRequestExtension(context, this@JsBridge, config.xhrConfig)
             if (config.localStorageConfig.enabled)
-                localStorageExtension = LocalStorageExtension(this@JsBridge, config.localStorageConfig, context.applicationContext)
+                localStorageExtension = LocalStorageExtension(
+                    this@JsBridge,
+                    config.localStorageConfig,
+                    context.applicationContext
+                )
             config.jvmConfig.customClassLoader?.let { customClassLoader = it }
         }
     }
@@ -192,13 +201,20 @@ class JsBridge
 
         if (!state.compareAndSet(State.AboutToStart.intValue, State.Releasing.intValue) &&
             !state.compareAndSet(State.Starting.intValue, State.Releasing.intValue) &&
-            !state.compareAndSet(State.Started.intValue, State.Releasing.intValue)) {
-            throw DestroyError(null, "Cannot destroy the JsBridge because its current state is $currentState}")
+            !state.compareAndSet(State.Started.intValue, State.Releasing.intValue)
+        ) {
+            throw DestroyError(
+                null,
+                "Cannot destroy the JsBridge because its current state is $currentState}"
+            )
                 .also(::notifyErrorListeners)
         }
 
         if (!rootJob.isActive) {
-            throw DestroyError(null, "JsBridge won't be destroyed because the main coroutine Job is not active")
+            throw DestroyError(
+                null,
+                "JsBridge won't be destroyed because the main coroutine Job is not active"
+            )
                 .also(::notifyErrorListeners)
         }
 
@@ -309,14 +325,24 @@ class JsBridge
      * If the given file has a corresponding .max file, this one will be used in debug mode.
      * e.g.: "myfile.js" / "myfile.max.js"
      */
-    suspend fun evaluateLocalFile(context: Context, filename: String, useMaxJs: Boolean = false, type: JsFileEvaluationType = JsFileEvaluationType.Global) {
+    suspend fun evaluateLocalFile(
+        context: Context,
+        filename: String,
+        useMaxJs: Boolean = false,
+        type: JsFileEvaluationType = JsFileEvaluationType.Global
+    ) {
         withContext(coroutineContext) {
             val jniJsContext = jniJsContextOrThrow()
 
             try {
                 val (inputStream, jsFileName) = getInputStream(context, filename, useMaxJs)
                 val jsString = inputStream.bufferedReader().use { it.readText() }
-                jniEvaluateFileContent(jniJsContext, jsString, jsFileName, type == JsFileEvaluationType.Module)
+                jniEvaluateFileContent(
+                    jniJsContext,
+                    jsString,
+                    jsFileName,
+                    type == JsFileEvaluationType.Module
+                )
                 Timber.d("-> $filename ($jsFileName) has been successfully evaluated!")
             } catch (t: Throwable) {
                 throw JsFileEvaluationError(filename, t)
@@ -329,7 +355,12 @@ class JsBridge
     /**
      * Evaluate a local JS file which should be bundled as an asset (blocking version).
      */
-    fun evaluateLocalFileUnsync(context: Context, filename: String, useMaxJs: Boolean = false, type: JsFileEvaluationType = JsFileEvaluationType.Global) {
+    fun evaluateLocalFileUnsync(
+        context: Context,
+        filename: String,
+        useMaxJs: Boolean = false,
+        type: JsFileEvaluationType = JsFileEvaluationType.Global
+    ) {
         launch {
             evaluateLocalFile(context, filename, useMaxJs, type)
         }
@@ -338,7 +369,12 @@ class JsBridge
     /**
      * Evaluate a local JS file which should be bundled as an asset (blocking version)
      */
-    fun evaluateLocalFileBlocking(context: Context, filename: String, useMaxJs: Boolean = false, type: JsFileEvaluationType = JsFileEvaluationType.Global) {
+    fun evaluateLocalFileBlocking(
+        context: Context,
+        filename: String,
+        useMaxJs: Boolean = false,
+        type: JsFileEvaluationType = JsFileEvaluationType.Global
+    ) {
         runBlocking(coroutineContext) {
             evaluateLocalFile(context, filename, useMaxJs, type)
         }
@@ -347,12 +383,21 @@ class JsBridge
     /*
      * Evaluate the content of a JavaScript file (e.g. fetched from the network).
      */
-    suspend fun evaluateFileContent(content: String, filename: String, type: JsFileEvaluationType = JsFileEvaluationType.Global) {
+    suspend fun evaluateFileContent(
+        content: String,
+        filename: String,
+        type: JsFileEvaluationType = JsFileEvaluationType.Global
+    ) {
         withContext(coroutineContext) {
             val jniJsContext = jniJsContextOrThrow()
 
             try {
-                jniEvaluateFileContent(jniJsContext, content, filename, type == JsFileEvaluationType.Module)
+                jniEvaluateFileContent(
+                    jniJsContext,
+                    content,
+                    filename,
+                    type == JsFileEvaluationType.Module
+                )
                 Timber.d("-> file content ($filename) has been successfully evaluated!")
             } catch (t: Throwable) {
                 throw JsFileEvaluationError(filename, t)
@@ -365,7 +410,11 @@ class JsBridge
     /**
      * Evaluate the content of a JavaScript file (e.g. fetched from the network).
      */
-    fun evaluateFileContentUnsync(content: String, filename: String, type: JsFileEvaluationType = JsFileEvaluationType.Global) {
+    fun evaluateFileContentUnsync(
+        content: String,
+        filename: String,
+        type: JsFileEvaluationType = JsFileEvaluationType.Global
+    ) {
         launch {
             evaluateFileContent(content, filename, type)
         }
@@ -374,7 +423,11 @@ class JsBridge
     /**
      * Evaluate the content of a JavaScript file (e.g. fetched from the network).
      */
-    fun evaluateFileContentBlocking(content: String, filename: String, type: JsFileEvaluationType = JsFileEvaluationType.Global) {
+    fun evaluateFileContentBlocking(
+        content: String,
+        filename: String,
+        type: JsFileEvaluationType = JsFileEvaluationType.Global
+    ) {
         runBlocking(coroutineContext) {
             evaluateFileContent(content, filename, type)
         }
@@ -404,19 +457,22 @@ class JsBridge
     /**
      * Evaluate the given JS code and return the value as a Deferred
      */
-    fun <T: Any?> evaluateAsync(js: String, type: KType?): Deferred<T> = async {
+    fun <T : Any?> evaluateAsync(js: String, type: KType?): Deferred<T> = async {
         evaluate(js, type, false)
     }
 
-    inline fun <reified T: Any?> evaluateAsync(js: String): Deferred<T> {
+    inline fun <reified T : Any?> evaluateAsync(js: String): Deferred<T> {
         return evaluateAsync(js, typeOf<T>())
     }
 
-    suspend inline fun <reified T: Any?> evaluate(js: String): T {
+    suspend inline fun <reified T : Any?> evaluate(js: String): T {
         return evaluate(js, typeOf<T>(), true)
     }
 
-    inline fun <reified T: Any?> evaluateBlocking(js: String, context: CoroutineContext = EmptyCoroutineContext): T {
+    inline fun <reified T : Any?> evaluateBlocking(
+        js: String,
+        context: CoroutineContext = EmptyCoroutineContext
+    ): T {
         return runBlocking(context) {
             if (isMainThread()) {
                 Timber.w("WARNING: evaluating JS code in the main thread! Consider using non-blocking API or evaluating JS code in another thread!")
@@ -442,7 +498,7 @@ class JsBridge
     // ---
 
     @PublishedApi
-    internal suspend fun <T: Any?> evaluate(js: String, type: KType?, awaitJsPromise: Boolean): T {
+    internal suspend fun <T : Any?> evaluate(js: String, type: KType?, awaitJsPromise: Boolean): T {
         //val initialStackTrace = Thread.currentThread().stackTrace
         val parameter = type?.let { Parameter(type, customClassLoader) }
 
@@ -473,19 +529,28 @@ class JsBridge
 
     // Evaluate the given JS value and return the result as a deferred
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
-    suspend fun <T: Any?> evaluateJsValue(jsValue: JsValue, type: KType?, awaitJsPromise: Boolean): T {
+    suspend fun <T : Any?> evaluateJsValue(
+        jsValue: JsValue,
+        type: KType?,
+        awaitJsPromise: Boolean
+    ): T {
         jsValue.codeEvaluationDeferred?.await()
         return evaluate("$jsValue", type, awaitJsPromise)
     }
 
     // Evaluate the given JS value and return the result as a deferred
     @PublishedApi
-    internal fun <T: Any?> evaluateJsValueAsync(jsValue: JsValue, type: KType?): Deferred<T> = async {
-        evaluateJsValue(jsValue, type, true)
-    }
+    internal fun <T : Any?> evaluateJsValueAsync(jsValue: JsValue, type: KType?): Deferred<T> =
+        async {
+            evaluateJsValue(jsValue, type, true)
+        }
 
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
-    fun newJsFunctionAsync(jsValue: JsValue, functionArgs: Array<String>, jsCode: String): Deferred<Unit> {
+    fun newJsFunctionAsync(
+        jsValue: JsValue,
+        functionArgs: Array<String>,
+        jsCode: String
+    ): Deferred<Unit> {
         if (isJsThread()) {
             val jniJsContext = jniJsContextOrThrow()
             jniNewJsFunction(jniJsContext, jsValue.associatedJsName, functionArgs, jsCode)
@@ -513,7 +578,11 @@ class JsBridge
     // - Java methods returning a "Kotlin coroutine" Deferred are mapped to a JS Promise
     // - if the JS value is a promise, you need to resolve it first with jsValue.await() or jsValue.awaitAsync()
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
-    suspend fun <T : JavaToJsInterface> registerJavaToJsInterface(jsValue: JsValue, type: KClass<T>, check: Boolean): T {
+    suspend fun <T : JavaToJsInterface> registerJavaToJsInterface(
+        jsValue: JsValue,
+        type: KClass<T>,
+        check: Boolean
+    ): T {
         return registerJavaToJsInterfaceHelper(jsValue, type, check, true)
     }
 
@@ -523,7 +592,12 @@ class JsBridge
     // When check = true, the method will block the current thread until the registration has been
     // done and then return the proxy object
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
-    fun <T : JavaToJsInterface> registerJavaToJsInterfaceBlocking(jsValue: JsValue, type: KClass<T>, check: Boolean, context: CoroutineContext?): T {
+    fun <T : JavaToJsInterface> registerJavaToJsInterfaceBlocking(
+        jsValue: JsValue,
+        type: KClass<T>,
+        check: Boolean,
+        context: CoroutineContext?
+    ): T {
 
         return runBlocking(context ?: Dispatchers.Unconfined) {
             registerJavaToJsInterfaceHelper(jsValue, type, check, waitForRegistration = check)
@@ -543,7 +617,10 @@ class JsBridge
     // Note: please be aware that the object instance is strongly referenced by the JS
     // variable with the given name!
     @VisibleForTesting(otherwise = VisibleForTesting.PACKAGE_PRIVATE)
-    fun <T: JsToJavaInterface> registerJsToJavaInterface(kClass: KClass<*>, obj: T): JsToJavaProxy<T> {
+    fun <T : JsToJavaInterface> registerJsToJavaInterface(
+        kClass: KClass<*>,
+        obj: T
+    ): JsToJavaProxy<T> {
         val suffix = internalCounter.incrementAndGet()
         val jsObjectName = "__jsBridge_${kClass.simpleName ?: "unnamed_class"}$suffix"
         val jsValue = JsToJavaProxy(this, obj, associatedJsName = jsObjectName)
@@ -560,7 +637,11 @@ class JsBridge
     //
     // Return a new JsValue which can be used for calling the lambda via callJsLambda()
     @PublishedApi
-    internal suspend fun registerJsLambda(jsValue: JsValue, types: List<KType>, waitForRegistration: Boolean): JsValue {
+    internal suspend fun registerJsLambda(
+        jsValue: JsValue,
+        types: List<KType>,
+        waitForRegistration: Boolean
+    ): JsValue {
         return registerJsLambdaHelper(jsValue, types, waitForRegistration)
     }
 
@@ -584,14 +665,22 @@ class JsBridge
     // When check = true, the method will block the current thread until the registration has been
     // done and then return the proxy function
     @PublishedApi
-    internal fun registerJsLambdaBlocking(jsValue: JsValue, types: List<KType>, context: CoroutineContext?): JsValue {
+    internal fun registerJsLambdaBlocking(
+        jsValue: JsValue,
+        types: List<KType>,
+        context: CoroutineContext?
+    ): JsValue {
         return runBlocking(context ?: Dispatchers.Unconfined) {
             registerJsLambdaHelper(jsValue, types, false)
         }
     }
 
     @PublishedApi
-    internal suspend fun registerJsLambdaHelper(jsValue: JsValue, types: List<KType>, waitForRegistration: Boolean): JsValue {
+    internal suspend fun registerJsLambdaHelper(
+        jsValue: JsValue,
+        types: List<KType>,
+        waitForRegistration: Boolean
+    ): JsValue {
         val parameters = types.map { Parameter(it, customClassLoader) }
         val inputParameters = parameters.take(types.count() - 1)
         val outputParameter = parameters.last()
@@ -599,7 +688,7 @@ class JsBridge
 
         // Create a separate JS value just for the call
         val suffix = internalCounter.incrementAndGet()
-        val lambdaJsValue = JsValue(this, null, associatedJsName =  "__jsBridge_jsLambda$suffix")
+        val lambdaJsValue = JsValue(this, null, associatedJsName = "__jsBridge_jsLambda$suffix")
 
         val registerBlock = suspend {
             val jniJsContext = jniJsContextOrThrow()
@@ -623,7 +712,7 @@ class JsBridge
                     registerBlock()
                 } catch (t: Throwable) {
                     throw t as? JsException
-                            ?: JavaToJsFunctionRegistrationError(jsValue.associatedJsName, t)
+                        ?: JavaToJsFunctionRegistrationError(jsValue.associatedJsName, t)
                 }
             }
         }
@@ -633,14 +722,19 @@ class JsBridge
 
     // Call a JS lambda registered via registerJsLambda()
     @PublishedApi
-    internal suspend fun callJsLambda(lambdaJsValue: JsValue, args: Array<Any?>, awaitJsPromise: Boolean): Any? {
+    internal suspend fun callJsLambda(
+        lambdaJsValue: JsValue,
+        args: Array<Any?>,
+        awaitJsPromise: Boolean
+    ): Any? {
         return withContext(coroutineContext) {
             val jniJsContext = jniJsContextOrThrow()
 
             lambdaJsValue.codeEvaluationDeferred?.await()
 
             // Exceptions must be directly caught by the caller
-            var ret = jniCallJsLambda(jniJsContext, lambdaJsValue.associatedJsName, args, awaitJsPromise)
+            var ret =
+                jniCallJsLambda(jniJsContext, lambdaJsValue.associatedJsName, args, awaitJsPromise)
 
             if (awaitJsPromise && ret is Deferred<*>) {
                 processPromiseQueue()
@@ -653,7 +747,11 @@ class JsBridge
     }
 
     // Directly call a registered JS lambda. It only works when being called from the JS thread!
-    internal fun callJsLambdaUnsafe(lambdaJsValue: JsValue, args: Array<Any?>, awaitJsPromise: Boolean): Any? {
+    internal fun callJsLambdaUnsafe(
+        lambdaJsValue: JsValue,
+        args: Array<Any?>,
+        awaitJsPromise: Boolean
+    ): Any? {
         checkJsThread()
 
         val jniJsContext = jniJsContextOrThrow()
@@ -671,14 +769,24 @@ class JsBridge
                 val jniJsContext = jniJsContextOrThrow()
 
                 val invokeJavaMethod = func::class.java.methods.firstOrNull { it.name == "invoke" }
-                        ?: throw JsToJavaRegistrationError(func::class, null, "Cannot map Java function to JS: the object does not contain any 'invoke' method!")
+                    ?: throw JsToJavaRegistrationError(
+                        func::class,
+                        null,
+                        "Cannot map Java function to JS: the object does not contain any 'invoke' method!"
+                    )
 
                 val invokeMethod = Method(invokeJavaMethod, types.mapIndexed { typeIndex, type ->
-                    val variance = if (typeIndex == types.count() - 1) KVariance.OUT else KVariance.IN
+                    val variance =
+                        if (typeIndex == types.count() - 1) KVariance.OUT else KVariance.IN
                     KTypeProjection(variance, type)
                 }, true, customClassLoader)
 
-                jniRegisterJavaLambda(jniJsContext, jsFunctionValue.associatedJsName, func, invokeMethod)
+                jniRegisterJavaLambda(
+                    jniJsContext,
+                    jsFunctionValue.associatedJsName,
+                    func,
+                    invokeMethod
+                )
                 jsFunctionValue.hold()
             } catch (e: JsToJavaRegistrationError) {
                 throw e
@@ -801,7 +909,11 @@ class JsBridge
     }
 
     @Throws
-    private fun getInputStream(context: Context, filename: String, useMaxJs: Boolean): Pair<InputStream, String> {
+    private fun getInputStream(
+        context: Context,
+        filename: String,
+        useMaxJs: Boolean
+    ): Pair<InputStream, String> {
         if (filename.contains("""\.max\.js$""".toRegex())) {
             throw Throwable(".max.js file should not be directly set, use .js and set useMaxJs parameter to true instead!")
         }
@@ -824,15 +936,26 @@ class JsBridge
     }
 
     @Throws(JsToJavaRegistrationError::class)
-    private fun registerJsToJavaInterfaceHelper(jniJsContext: Long, jsValue: JsValue, type: KClass<*>, obj: Any) {
+    private fun registerJsToJavaInterfaceHelper(
+        jniJsContext: Long,
+        jsValue: JsValue,
+        type: KClass<*>,
+        obj: Any
+    ) {
         checkJsThread()
 
         // Pick up the most "bottom" interface which implements JsToJaveInterface (or android.os.IInterface)
         val apiInterface = findApiInterface(obj::class.java)
-                ?: throw JsToJavaRegistrationError(this::class, customMessage = "Cannot map Java object to JS because it does not implement JsToJavaInterface or android.os.IInterface")
+            ?: throw JsToJavaRegistrationError(
+                this::class,
+                customMessage = "Cannot map Java object to JS because it does not implement JsToJavaInterface or android.os.IInterface"
+            )
 
         if (!type.isInstance(obj)) {
-            throw JsToJavaRegistrationError(type, Throwable("${obj.javaClass.name} is not an instance of $type"))
+            throw JsToJavaRegistrationError(
+                type,
+                Throwable("${obj.javaClass.name} is not an instance of $type")
+            )
         }
 
         val methods = linkedMapOf<String, Method>()
@@ -843,7 +966,10 @@ class JsBridge
                 // TODO: check that there is no optional!
                 val method = Method(kFunction, false, customClassLoader)
                 if (methods.put(kFunction.name, method) != null) {
-                    throw JsToJavaRegistrationError(type, customMessage = ("${kFunction.name} is overloaded in $type"))
+                    throw JsToJavaRegistrationError(
+                        type,
+                        customMessage = ("${kFunction.name} is overloaded in $type")
+                    )
                 }
             }
         } catch (e: JsToJavaRegistrationError) {
@@ -857,13 +983,21 @@ class JsBridge
             for (javaMethod in type.java.methods) {
                 val method = Method(javaMethod, customClassLoader)
                 if (methods.put(javaMethod.name, method) != null) {
-                    throw JsToJavaRegistrationError(type, Throwable("${method.name} is overloaded in $type"))
+                    throw JsToJavaRegistrationError(
+                        type,
+                        Throwable("${method.name} is overloaded in $type")
+                    )
                 }
             }
         }
 
         try {
-            jniRegisterJavaObject(jniJsContext, jsValue.associatedJsName, obj, methods.values.toTypedArray())
+            jniRegisterJavaObject(
+                jniJsContext,
+                jsValue.associatedJsName,
+                obj,
+                methods.values.toTypedArray()
+            )
         } catch (t: Throwable) {
             throw JsToJavaRegistrationError(type, t)
         }
@@ -883,9 +1017,17 @@ class JsBridge
     // done asynchronously)
     // - If async = false, the proxy object is only returned after a successful registration
     @Throws
-    private suspend fun <T: Any> registerJavaToJsInterfaceHelper(jsValue: JsValue, type: KClass<T>, check: Boolean, waitForRegistration: Boolean): T {
+    private suspend fun <T : Any> registerJavaToJsInterfaceHelper(
+        jsValue: JsValue,
+        type: KClass<T>,
+        check: Boolean,
+        waitForRegistration: Boolean
+    ): T {
         if (!type.java.isInterface) {
-            throw JavaToJsInterfaceRegistrationError(type, customMessage = "$type must be an interface")
+            throw JavaToJsInterfaceRegistrationError(
+                type,
+                customMessage = "$type must be an interface"
+            )
         }
 
         // Only allow interface directly implementing JsToJavaInterface (or implementing an interface implementing
@@ -908,7 +1050,10 @@ class JsBridge
                 .singleOrNull()
                 .also {
                     it?.java?.isInterface
-                            ?: throw JavaToJsInterfaceRegistrationError(type, customMessage = "$type and its super interfaces must extend exactly 1 interface")
+                        ?: throw JavaToJsInterfaceRegistrationError(
+                            type,
+                            customMessage = "$type and its super interfaces must extend exactly 1 interface"
+                        )
                 }
 
                 // Continue until it is the JavaToJsInterface
@@ -926,9 +1071,12 @@ class JsBridge
 
             // Map to unique value
             // -> Map<methodName, Method>
-            .mapValues {  entry ->
+            .mapValues { entry ->
                 entry.value.singleOrNull()
-                        ?: throw JavaToJsInterfaceRegistrationError(type, Throwable("${entry.key} is overloaded in $type"))
+                    ?: throw JavaToJsInterfaceRegistrationError(
+                        type,
+                        Throwable("${entry.key} is overloaded in $type")
+                    )
             }
 
             // => Sequence<Method>
@@ -938,14 +1086,24 @@ class JsBridge
             // Synchronous registration
             withContext(coroutineContext) {
                 jsValue.codeEvaluationDeferred?.await()
-                jniRegisterJsObject(jniJsContextOrThrow(), jsValue.associatedJsName, methods.toTypedArray(), check)
+                jniRegisterJsObject(
+                    jniJsContextOrThrow(),
+                    jsValue.associatedJsName,
+                    methods.toTypedArray(),
+                    check
+                )
             }
         } else {
             // Asynchronous registration
             launchInJsThread {
                 try {
                     jsValue.codeEvaluationDeferred?.await()
-                    jniRegisterJsObject(jniJsContextOrThrow(), jsValue.associatedJsName, methods.toTypedArray(), check)
+                    jniRegisterJsObject(
+                        jniJsContextOrThrow(),
+                        jsValue.associatedJsName,
+                        methods.toTypedArray(),
+                        check
+                    )
                 } catch (t: Throwable) {
                     throw JavaToJsInterfaceRegistrationError(type, cause = t)
                 }
@@ -956,7 +1114,11 @@ class JsBridge
         val proxyListener = ProxyListener(jsValue, type.java)
 
         @Suppress("UNCHECKED_CAST")
-        val proxy = Proxy.newProxyInstance(customClassLoader ?: type.java.classLoader, arrayOf(type.java), proxyListener) as T
+        val proxy = Proxy.newProxyInstance(
+            customClassLoader ?: type.java.classLoader,
+            arrayOf(type.java),
+            proxyListener
+        ) as T
         Timber.v("Created proxy instance for ${type.java.name}, js value name: $jsValue")
 
         return proxy
@@ -964,7 +1126,12 @@ class JsBridge
 
     // Call a JS method registered via registerJavaToJsInterface()
     @Throws
-    private fun callJsMethod(name: String, method: JavaMethod, args: Array<Any?>, awaitJsPromise: Boolean): Any? {
+    private fun callJsMethod(
+        name: String,
+        method: JavaMethod,
+        args: Array<Any?>,
+        awaitJsPromise: Boolean
+    ): Any? {
         checkJsThread()
 
         val jniJsContext = jniJsContextOrThrow()
@@ -1019,12 +1186,17 @@ class JsBridge
             val block = {
                 try {
                     val jniJsContext = jniJsContextOrThrow()
-                    val ret = jniCallJsLambda(jniJsContext, jsFunctionObject.associatedJsName, args, false)
+                    val ret = jniCallJsLambda(
+                        jniJsContext,
+                        jsFunctionObject.associatedJsName,
+                        args,
+                        false
+                    )
 
                     processPromiseQueue()
                     ret
                 } catch (t: Throwable) {
-                    throw JsToJavaFunctionCallError("JS lambda($globalObjectName)", t )
+                    throw JsToJavaFunctionCallError("JS lambda($globalObjectName)", t)
                 }
             }
 
@@ -1032,7 +1204,11 @@ class JsBridge
                 // Directly run the function in the JS thread
                 block()
             } else if (hasReturnValue) {
-                throw JavaToJsCallError("$<lambda>::${method.name}()", null, "Calling JS lambda with return value outside of the JS thread")
+                throw JavaToJsCallError(
+                    "$<lambda>::${method.name}()",
+                    null,
+                    "Calling JS lambda with return value outside of the JS thread"
+                )
             } else {
                 // Fire-and-forget in the JS thread
                 runInJsThread {
@@ -1125,7 +1301,8 @@ class JsBridge
     internal fun isMainThread(): Boolean = (Looper.myLooper() == Looper.getMainLooper())
     fun isJsThread(): Boolean = (Thread.currentThread().id == jsThreadId)
 
-    private fun jniJsContextOrThrow() = jniJsContext ?: throw InternalError("Missing JNI JS context!")
+    private fun jniJsContextOrThrow() =
+        jniJsContext ?: throw InternalError("Missing JNI JS context!")
 
 
     // JNI functions
@@ -1135,21 +1312,82 @@ class JsBridge
     private external fun jniDeleteContext(context: Long)
     private external fun jniEnableModuleLoader(context: Long)
     private external fun jniGetCurrentScriptOrModuleName(context: Long, level: Int): String
-    private external fun jniEvaluateString(context: Long, js: String, type: Parameter?, awaitJsPromise: Boolean): Any?
-    private external fun jniEvaluateFileContent(context: Long, js: String, filename: String, asModule: Boolean)
+    private external fun jniEvaluateString(
+        context: Long,
+        js: String,
+        type: Parameter?,
+        awaitJsPromise: Boolean
+    ): Any?
+
+    private external fun jniEvaluateFileContent(
+        context: Long,
+        js: String,
+        filename: String,
+        asModule: Boolean
+    )
+
     private external fun jniRegisterJavaLambda(context: Long, name: String, obj: Any, method: Any)
-    private external fun jniRegisterJavaObject(context: Long, name: String, obj: Any, methods: Array<Any>)
-    private external fun jniRegisterJsObject(context: Long, name: String, methods: Array<out Any>, check: Boolean)
+    private external fun jniRegisterJavaObject(
+        context: Long,
+        name: String,
+        obj: Any,
+        methods: Array<Any>
+    )
+
+    private external fun jniRegisterJsObject(
+        context: Long,
+        name: String,
+        methods: Array<out Any>,
+        check: Boolean
+    )
+
     private external fun jniRegisterJsLambda(context: Long, name: String, method: Any)
-    private external fun jniCallJsMethod(context: Long, objectName: String, javaMethod: JavaMethod, args: Array<Any?>): Any?
-    private external fun jniCallJsMethod(context: Long, objectName: String, javaMethod: JavaMethod, args: Array<Any?>, awaitJsPromise: Boolean): Any?
-    private external fun jniCallJsLambda(context: Long, objectName: String, args: Array<Any?>, awaitJsPromise: Boolean): Any?
+    private external fun jniCallJsMethod(
+        context: Long,
+        objectName: String,
+        javaMethod: JavaMethod,
+        args: Array<Any?>
+    ): Any?
+
+    private external fun jniCallJsMethod(
+        context: Long,
+        objectName: String,
+        javaMethod: JavaMethod,
+        args: Array<Any?>,
+        awaitJsPromise: Boolean
+    ): Any?
+
+    private external fun jniCallJsLambda(
+        context: Long,
+        objectName: String,
+        args: Array<Any?>,
+        awaitJsPromise: Boolean
+    ): Any?
+
     private external fun jniAssignJsValue(context: Long, globalName: String, jsCode: String)
     private external fun jniDeleteJsValue(context: Long, globalName: String)
     private external fun jniCopyJsValue(context: Long, globalNameTo: String, globalNameFrom: String)
-    private external fun jniNewJsFunction(context: Long, globalName: String, functionArgs: Array<String>, jsCode: String)
-    private external fun jniConvertJavaValueToJs(context: Long, globalName: String, value: Any?, parameter: Parameter)
-    private external fun jniCompleteJsPromise(context: Long, id: String, isFulfilled: Boolean, value: Any)
+    private external fun jniNewJsFunction(
+        context: Long,
+        globalName: String,
+        functionArgs: Array<String>,
+        jsCode: String
+    )
+
+    private external fun jniConvertJavaValueToJs(
+        context: Long,
+        globalName: String,
+        value: Any?,
+        parameter: Parameter
+    )
+
+    private external fun jniCompleteJsPromise(
+        context: Long,
+        id: String,
+        isFulfilled: Boolean,
+        value: Any
+    )
+
     private external fun jniProcessPromiseQueue(context: Long)
 
     @Suppress("UNUSED_PARAMETER")
@@ -1182,14 +1420,17 @@ class JsBridge
 
                 // Without return value
                 method.returnType == Unit::class.java ||
-                method.returnType == Void::class.java ||
-                method.returnType == Void::class.javaPrimitiveType -> {
+                        method.returnType == Void::class.java ||
+                        method.returnType == Void::class.javaPrimitiveType -> {
                     callJsMethodWithoutRetVal(method, args)
                     CompletableDeferred(Unit)
                 }
 
                 // Deferred
-                method.returnType.isAssignableFrom(Deferred::class.java) -> callJsMethodAsync(method, args)
+                method.returnType.isAssignableFrom(Deferred::class.java) -> callJsMethodAsync(
+                    method,
+                    args
+                )
 
                 else -> callJsMethodBlocking(method, args)
             }
@@ -1206,7 +1447,11 @@ class JsBridge
             }
         }
 
-        private fun callJsMethodSuspended(method: JavaMethod, args: Array<Any?>, continuation: Continuation<Any?>): Any {
+        private fun callJsMethodSuspended(
+            method: JavaMethod,
+            args: Array<Any?>,
+            continuation: Continuation<Any?>
+        ): Any {
             launch {
                 val retVal = try {
                     Timber.v("Calling (suspend) JS method ${type.name}::${method.name}()...")
