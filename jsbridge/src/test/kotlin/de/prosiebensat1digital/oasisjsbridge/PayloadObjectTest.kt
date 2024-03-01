@@ -15,6 +15,7 @@
  */
 package de.prosiebensat1digital.oasisjsbridge
 
+import com.google.common.truth.Truth.assertThat
 import org.json.JSONObject
 import org.junit.Test
 import kotlin.test.*
@@ -111,19 +112,21 @@ class PayloadObjectTest {
     @Test
     fun fromValuesMap() {
         // WHEN
-        val subject = PayloadObject.fromMap(mapOf(
-            "key1" to 123.4,
-            "key2" to "testString",
-            "key3" to arrayOf(1, "two", null),
-            "key4" to hashMapOf(
-                "subKey1" to 456.7,
-                "subKey2" to "anotherTestString"
-            ),
-            "key5" to null,
-            "key6" to 69,
-            "key7" to true,
-            "key8" to false
-        ))
+        val subject = PayloadObject.fromMap(
+            mapOf(
+                "key1" to 123.4,
+                "key2" to "testString",
+                "key3" to arrayOf(1, "two", null),
+                "key4" to hashMapOf(
+                    "subKey1" to 456.7,
+                    "subKey2" to "anotherTestString"
+                ),
+                "key5" to null,
+                "key6" to 69,
+                "key7" to true,
+                "key8" to false
+            )
+        )
 
         // THEN
         assertEquals(subject.toJsonString(true).compact(), expectedJsonString)
@@ -139,8 +142,8 @@ class PayloadObjectTest {
         val subject = PayloadObject.fromJsonObject(jsonObject)
 
         // THEN
-        assertEquals(subject?.toJsonString(true)?.compact(), expectedJsonString)
-        assertEquals(subject?.toJsString(true)?.compact(), expectedJsString)
+        assertThat(subject?.toJsonString(true)?.compact()).isEqualTo(expectedJsonString)
+        assertThat(subject?.toJsString(true)?.compact()).isEqualTo(expectedJsString)
     }
 
     @Test
@@ -149,38 +152,39 @@ class PayloadObjectTest {
         val subject = PayloadObject.fromJsonString(expectedJsonString)
 
         // THEN
-        assertEquals(subject?.toJsonString(true)?.compact(), expectedJsonString)
-        assertEquals(subject?.toJsString(true)?.compact(), expectedJsString)
+        assertThat(subject?.toJsonString(true)?.compact()).isEqualTo(expectedJsonString)
+        assertThat(subject?.toJsString(true)?.compact()).isEqualTo(expectedJsString)
     }
 
     @Test
     fun toJsonString() {
         // WHEN
-        val subject = PayloadObject.fromMap(mapOf(
-            "title" to "Welcome to \"Jupiter\"",
-            "duration" to 1234
-        ))
+        val subject = PayloadObject.fromMap(
+            mapOf(
+                "title" to "Welcome to \"Jupiter\"",
+                "duration" to 1234
+            )
+        )
 
         // THEN
-        assertEquals(
-            subject.toJsonString(true),
-            """{"duration": 1234, "title": "Welcome to \"Jupiter\""}"""
-        )
+        assertThat(subject.toJsonString(true))
+            .isEqualTo("""{"duration": 1234, "title": "Welcome to \"Jupiter\""}""")
+
     }
 
     @Test
     fun toJsString() {
         // WHEN
-        val subject = PayloadObject.fromMap(mapOf(
-            "title" to "Welcome to \"Jupiter\"",
-            "duration" to 1234
-        ))
+        val subject = PayloadObject.fromMap(
+            mapOf(
+                "title" to "Welcome to \"Jupiter\"",
+                "duration" to 1234
+            )
+        )
 
         // THEN
-        assertEquals(
-            subject.toJsString(true),
-            """{duration: 1234, title: "Welcome to \"Jupiter\""}"""
-        )
+        assertThat(subject.toJsString(true))
+            .isEqualTo("""{duration: 1234, title: "Welcome to \"Jupiter\""}""")
     }
 
     @Test
@@ -192,12 +196,18 @@ class PayloadObjectTest {
         assertNotNull(subject)
 
         assertEquals(subject.keyCount, 8)
-        assertEquals(subject.keys, setOf("key1", "key2", "key3", "key4", "key5", "key6", "key7", "key8"))
+        assertEquals(
+            subject.keys,
+            setOf("key1", "key2", "key3", "key4", "key5", "key6", "key7", "key8")
+        )
 
         assertEquals(subject.getDouble("key1"), 123.4)
         assertEquals(subject.getString("key2"), "testString")
         assertEquals(subject.getArray("key3")?.toJsString(true)?.compact(), "[1,\"two\",null]")
-        assertEquals(subject.getObject("key4")?.toJsString(true)?.compact(), "{subKey1:456.7,subKey2:\"anotherTestString\"}")
+        assertEquals(
+            subject.getObject("key4")?.toJsString(true)?.compact(),
+            "{subKey1:456.7,subKey2:\"anotherTestString\"}"
+        )
         assertTrue(subject.isNull("key5"))
         assertFalse(subject.isUndefined("key5"))
         assertEquals(subject.getInt("key6"), 69)
@@ -241,7 +251,8 @@ class PayloadObjectTest {
     @Test
     fun getValuesWithPath() {
         // WHEN
-        val subject = PayloadObject.fromJsonString("""{
+        val subject = PayloadObject.fromJsonString(
+            """{
             "key1": "value1",
             "key2": 2,
             "key3": {
@@ -269,7 +280,8 @@ class PayloadObjectTest {
                 "key3_6": false
             },
             "key4": [41, "4_2", 4.3, null, true, false]
-        }""")
+        }"""
+        )
 
         // THEN
         assertNotNull(subject)
@@ -291,7 +303,10 @@ class PayloadObjectTest {
         assertEquals(subject.getString(arrayOf("key3", "key3_3", 1, "key3_3_2_1")), "value3_3_2_1")
         assertEquals(subject.getArray(arrayOf("key3", "key3_3", 1, "key3_3_2_2"))?.count, 2)
         assertEquals(subject.getInt(arrayOf("key3", "key3_3", 1, "key3_3_2_2", 0)), 33221)
-        assertEquals(subject.getString(arrayOf("key3", "key3_3", 1, "key3_3_2_2", 1)), "value3_3_2_2_2")
+        assertEquals(
+            subject.getString(arrayOf("key3", "key3_3", 1, "key3_3_2_2", 1)),
+            "value3_3_2_2_2"
+        )
         assertTrue(subject.isNull(arrayOf("key3", "key3_3", 2)))
         assertEquals(subject.getBoolean(arrayOf("key3", "key3_3", 3)), true)
         assertEquals(subject.getBoolean(arrayOf("key3", "key3_3", 4)), false)
@@ -325,9 +340,9 @@ class PayloadObjectTest {
         )
 
         // THEN
-        assertEquals(subject.getString("testString"), """This is a "useful" test""")
-        assertEquals(subject.toJsonString(), """{"testString": "This is a \"useful\" test"}""")
-        assertEquals(subject.toJsString(), """{testString: "This is a \"useful\" test"}""")
+        assertThat(subject.getString("testString")).isEqualTo("""This is a "useful" test""")
+        assertThat(subject.toJsonString()).isEqualTo("""{"testString": "This is a \"useful\" test"}""")
+        assertThat(subject.toJsString()).isEqualTo("""{testString: "This is a \"useful\" test"}""")
     }
 
     @Test

@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <string>
+#include <assert.h>
 
 // map<javaName, JavaTypeId>
 // where javaName: Java name (UTF16) as returned by Java::class.getName(), e.g.: "java.lang.Integer"
