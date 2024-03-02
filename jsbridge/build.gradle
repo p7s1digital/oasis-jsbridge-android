@@ -29,12 +29,6 @@ android {
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
 
-    buildTypes {
-        release {
-            minifyEnabled false
-        }
-    }
-
     compileOptions {
         sourceCompatibility 1.8
         targetCompatibility 1.8
@@ -96,6 +90,17 @@ android {
                     arguments "-DFLAVOR=QUICKJS", "-DJNI_LIB_NAME=$jniLibName"
                 }
             }
+        }
+    }
+
+    publishing {
+        singleVariant("quickjsRelease") {
+            withSourcesJar()
+            withJavadocJar()
+        }
+        singleVariant("duktapeRelease") {
+            withSourcesJar()
+            withJavadocJar()
         }
     }
 }

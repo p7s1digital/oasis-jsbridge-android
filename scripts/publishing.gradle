@@ -6,76 +6,18 @@ import java.util.regex.Pattern
 
 apply plugin: 'maven-publish'
 
-publishing {
-    publications {
-        android.libraryVariants.all { variant ->
-            if (!variant.name.contains("Release")) return
-
-            println("Publishing config ${variant.name} for project ${project.name}...")
-
-
-            def suffix = variant.name.replace("Release", "")
-            def variantArtifactId = "oasis-${project.name}-${suffix}"
-            def publicationName = "${project.name}${variant.name.capitalize()}Publication"
-
-            "$publicationName"(MavenPublication) {
-                artifactId variantArtifactId
-
-                // AAR
-                artifact(variant.outputs[0].packageLibrary)
-
-                // README.md
-                if (file("$projectDir/README.md").exists()) {
-                    artifact("$projectDir/README.md") {
-                        classifier "README"
-                    }
-                }
-
-                // JavaDoc
-                if (file("$buildDir/outputs/javadoc/${artifactId}-javadoc.jar").exists()) {
-                    artifact("$buildDir/outputs/javadoc/${artifactId}-javadoc.jar") {
-                        classifier "javadoc"
-                    }
-                }
-
-                pom.withXml {
-                    def dependenciesNode = asNode().appendNode('dependencies')
-
-                    //Iterate over "api" and "implementation" dependencies (we don't want the test ones), adding a <dependency> node for each
-                    //The publication doesn't know about our dependencies, so we have to manually add them to the pom
-                    configurations.api.allDependencies.findAll {
-                        it.name != 'unspecified'
-                    }.each {
-                        def dependencyNode = dependenciesNode.appendNode('dependency')
-                        dependencyNode.appendNode('groupId', it.group)
-                        dependencyNode.appendNode('artifactId', it.name)
-                        dependencyNode.appendNode('version', it.version)
-                    }
-                    configurations.implementation.allDependencies.findAll {
-                        it.name != 'unspecified'
-                    }.each {
-                        def dependencyNode = dependenciesNode.appendNode('dependency')
-                        dependencyNode.appendNode('groupId', it.group)
-                        dependencyNode.appendNode('artifactId', it.name)
-                        dependencyNode.appendNode('version', it.version)
-                    }
-                }
+afterEvaluate {
+    publishing {
+        publications {
+            quickjsRelease(MavenPublication) {
+                from components.named("quickjsRelease").get()
+                groupId = group
+                artifactId = "oasis-jsbridge-quickjs"
             }
-        }
-    }
-
-    repositories {
-        maven {
-            String s3_bucket = System.getenv()['S3_BUCKET']
-            String s3_path = System.getenv()['S3_PATH']
-            String s3_access_key = System.getenv()['S3_ACCESS_KEY']
-            String s3_secret_key = System.getenv()['S3_SECRET_KEY']
-
-            url "s3://$s3_bucket/$s3_path"
-
-            credentials(AwsCredentials) {
-                accessKey s3_access_key
-                secretKey s3_secret_key
+            duktapeRelease(MavenPublication) {
+                from components.named("duktapeRelease").get()
+                groupId = group
+                artifactId = "oasis-jsbridge-duktape"
             }
         }
     }
