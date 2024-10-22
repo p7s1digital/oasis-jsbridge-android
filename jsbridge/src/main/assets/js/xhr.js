@@ -189,8 +189,12 @@ XMLHttpRequest.prototype._send_java_callback = function(responseInfo, responseTe
         this.response = this.responseText;
         break;
       case "arraybuffer":
-        error = "XHR arraybuffer response is not supported!";
-        break;
+         if (this.responseText !== null) {
+             this.response = this.responseText;
+         } else {
+             error = "XHR arraybuffer response is not supported!";
+         }
+         break;
       case "document":
         this.response = this.responseText;
         this.responseXML = this.responseText;
