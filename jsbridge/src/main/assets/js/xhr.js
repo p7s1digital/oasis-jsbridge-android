@@ -186,7 +186,11 @@
          this.response = this.responseText;
          break;
        case "arraybuffer":
-         error = "XHR arraybuffer response is not supported!";
+         if (this.responseText !== null) {
+             this.response = this.responseText;
+         } else {
+             error = "XHR arraybuffer response is not supported!";
+         }
          break;
        case "document":
          this.response = this.responseText;
