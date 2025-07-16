@@ -11,7 +11,9 @@ apply from: "${rootDir}/scripts/semantic_versioning.gradle"
 group = 'de.prosiebensat1digital'
 
 android {
-    compileSdkVersion rootProject.ext.versions.compile_sdk
+    ndkVersion "28.2.13676358" // NDK version r28 and higher compile 16 KB-aligned by default
+
+    compileSdk rootProject.ext.versions.compile_sdk
     namespace "de.prosiebensat1digital.oasisjsbridge"
 
     defaultConfig {
@@ -24,6 +26,12 @@ android {
 
         ndk {
             abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
+        }
+
+        externalNativeBuild {
+            cmake {
+                arguments '-DANDROID_STL=c++_shared'
+            }
         }
 
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
