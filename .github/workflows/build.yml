@@ -26,7 +26,7 @@ jobs:
         uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
-          ndk-version: r29
+          ndk-version: r28c
 
       - name: Test
         run: ./gradlew test
@@ -57,7 +57,7 @@ jobs:
         uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
-          ndk-version: r29
+          ndk-version: r28c
 
       - name: Run Tests
         uses: reactivecircus/android-emulator-runner@v2

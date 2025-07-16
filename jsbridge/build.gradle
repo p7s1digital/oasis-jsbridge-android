@@ -11,7 +11,7 @@ apply from: "${rootDir}/scripts/semantic_versioning.gradle"
 group = 'de.prosiebensat1digital'
 
 android {
-    ndkVersion "29.0.13599879" // NDK version r28 and higher compile 16 KB-aligned by default
+    ndkVersion "28.2.13676358" // NDK version r28 and higher compile 16 KB-aligned by default
 
     compileSdk rootProject.ext.versions.compile_sdk
     namespace "de.prosiebensat1digital.oasisjsbridge"
