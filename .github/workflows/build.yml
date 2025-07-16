@@ -2,8 +2,8 @@ name: build
 
 on:
   push:
-    #- branches: [master]
-    #- tags:
+  #- branches: [master]
+  #- tags:
   pull_request:
 
 env:
@@ -29,7 +29,9 @@ jobs:
           ndk-version: r28c
 
       - name: Test
-        run: ./gradlew test
+        run:
+          ./gradlew test
+          ./gradlew assemble
 
   android:
     runs-on: macos-latest
