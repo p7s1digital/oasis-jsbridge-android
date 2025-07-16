@@ -22,6 +22,12 @@ jobs:
           distribution: 'zulu'
           java-version: 17
 
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r29
+
       - name: Test
         run: ./gradlew test
 
@@ -47,6 +53,12 @@ jobs:
           distribution: 'zulu'
           java-version: 17
 
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r29
+
       - name: Run Tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -54,4 +66,3 @@ jobs:
           script: ./gradlew connectedCheck
         env:
           API_LEVEL: ${{ matrix.api-level }}
-
