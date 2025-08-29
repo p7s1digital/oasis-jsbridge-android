@@ -70,8 +70,8 @@ if (FLAVOR STREQUAL "DUKTAPE")
     )
 elseif (FLAVOR STREQUAL "QUICKJS")
     file (STRINGS "src/main/jni/quickjs/VERSION" QUICKJS_VERSION)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DCONFIG_VERSION=\\\"${QUICKJS_VERSION}\\\"")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DQUICKJS")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DCONFIG_VERSION=\\\"${QUICKJS_VERSION}\\\" -DCONFIG_BIGNUM")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DQUICKJS -DCONFIG_BIGNUM")
     include_directories(src/quickjs/jni)
 
     target_sources(${JNI_LIB_NAME} PUBLIC
@@ -81,6 +81,7 @@ elseif (FLAVOR STREQUAL "QUICKJS")
             src/main/jni/quickjs/libregexp.c
             src/main/jni/quickjs/libunicode.c
             src/main/jni/quickjs/quickjs.c
+            src/main/jni/quickjs/libbf.c
             src/main/jni/java-types/Deferred_quickjs.cpp
     )
 endif (FLAVOR STREQUAL "DUKTAPE")
